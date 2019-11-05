@@ -17,11 +17,13 @@
 module ToyRISC.Semantics
     ( add
     , jumpCt
+    , whenS'
     ) where
 
 import           Control.Selective
 import           Data.Bool         (bool)
-import           Prelude           hiding (Read, readIO)
+import           Data.Functor      (void)
+import           Prelude           hiding (Read, read, readIO)
 
 import           FS
 import           ToyRISC.Types
@@ -43,7 +45,7 @@ add reg addr read write =
   let arg1 = read (Reg reg)
       arg2 = read (Addr addr)
       result = (+) <$> arg1 <*> arg2
-  in whenS' ((==) <$> write (Reg reg) result <*> pure mempty)
+  in whenS' (toBool <$> ((==) <$> write (Reg reg) result <*> pure mempty))
             (write (F Condition) (pure true))
 
 

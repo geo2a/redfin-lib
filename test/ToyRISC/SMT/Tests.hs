@@ -2,7 +2,7 @@
 
 module ToyRISC.SMT.Tests where
 
-import qualified Data.SBV.Dynamic as SBV
+import qualified Data.SBV.Dynamic as SBV ()
 import qualified Data.Set         as Set
 import           Test.Tasty
 import           Test.Tasty.HUnit
@@ -22,9 +22,12 @@ gatherFreeTests =
 -----------------------------------------------------------------------------
 satTests :: TestTree
 satTests = testGroup "SMT.sat"
-      [ testCase "[x == y | x > 10 && y < 0] is empty" $ do
+      [ testCase "[x == y | x > 10 && y < 0] is unsatisfiable" $ do
           result <- sat testExpr1
           assertBool (show result) (isUnsat result)
+      , testCase "[x + y > 10 | x > 10 && y > 0] is satisfiable" $ do
+          result <- sat testExpr2
+          assertBool (show result) (isSat result)
       ]
 
 testExpr1 :: SExpr
@@ -35,13 +38,11 @@ testExpr1 = let x = Any "x"
                 xEqY = sOp Eq [x, y]
             in sOp And [xEqY, sOp And [xGt10, yLt0]]
 
-isSat :: SBV.SatResult -> Bool
-isSat (SBV.SatResult r) = case r of
-  (SBV.Satisfiable _ _) -> True
-  _                     -> False
-
-isUnsat :: SBV.SatResult -> Bool
-isUnsat (SBV.SatResult r) = case r of
-  (SBV.Unsatisfiable _ _) -> True
-  _                       -> False
+testExpr2 :: SExpr
+testExpr2 = let x = Any "x"
+                y = Any "y"
+                xGt10 = sOp Gt [x, sConst 10]
+                yGt0  = sOp Gt [y, sConst 0]
+                sumGt10 s = sOp Gt [s, sConst 10]
+            in conjoin [sumGt10 (sOp Plus [x, y]), xGt10, yGt0]
 -----------------------------------------------------------------------------

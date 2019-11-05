@@ -11,8 +11,12 @@
 -----------------------------------------------------------------------------
 
 module ToyRISC.SMT
-    ( gatherFree
-    , sat
+    ( -- get the list of free variables in a symbolic expression
+      gatherFree
+      -- check if the expression is satisfiable
+    , sat, solveBool
+      -- helper functions
+    , conjoin, isSat, isUnsat
     ) where
 
 import qualified Data.Map         as Map
@@ -97,21 +101,39 @@ toSMT cs = do
   let freeVars = gatherFree (foldr (\x y -> Symbolic And [x, y]) sTrue cs)
   sValMap <- createSym (Set.toList freeVars)
   smts <- traverse (symToSMT sValMap) cs
-  pure $ conjoin smts
-  where
-    conjoin :: [SBV.SVal] -> SBV.SVal
-    conjoin xs = foldr SBV.svAnd SBV.svTrue xs
+  pure $ conjoinSVal smts
 
--- | Check satisfiability of an expression
+-- | Check satisfiability of a boolean expression
 sat :: SExpr -> IO SBV.SatResult
 sat expr = do
   let smtExpr = toSMT [expr]
   SBV.satWith solver smtExpr
 
+-- | Check a boolean expression is satisfiable then return True, otherwise False
+solveBool :: SExpr -> IO Bool
+solveBool expr = isSat <$> sat expr
+
 -----------------------------------------------------------------------------
 -- | SMT solver configurations
 solver :: SBV.SMTConfig
 solver = SBV.z3 { SBV.verbose = True
-                , SBV.redirectVerbose = Just "./smt-logs/log.smt2"
+                , SBV.redirectVerbose = Just "log.smt2"
                 , SBV.printBase = 16
                 }
+
+-- | Conjunction of boolean symbolic expressions
+conjoinSVal :: [SBV.SVal] -> SBV.SVal
+conjoinSVal xs = foldr SBV.svAnd SBV.svTrue xs
+
+conjoin :: [SExpr] -> SExpr
+conjoin cs = foldr (\x y -> Symbolic And [x, y]) sTrue cs
+
+isSat :: SBV.SatResult -> Bool
+isSat (SBV.SatResult r) = case r of
+  (SBV.Satisfiable _ _) -> True
+  _                     -> False
+
+isUnsat :: SBV.SatResult -> Bool
+isUnsat (SBV.SatResult r) = case r of
+  (SBV.Unsatisfiable _ _) -> True
+  _                       -> False

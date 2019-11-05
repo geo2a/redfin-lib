@@ -92,3 +92,4 @@ instance Monoid (Data Int) where
 -- | We now consider a value to be a numeric monoid which could also be converted
 --   into booleans
 type Value a = (Eq a, Num a, Boolean a, Monoid a)
+-----------------------------------------------------------------------------
