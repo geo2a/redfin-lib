@@ -14,10 +14,10 @@ gatherFreeTests :: TestTree
 gatherFreeTests =
   testGroup "SMT.gatherFree"
       [ testCase "singleton Any" $
-          gatherFree (Any "x") @?= Set.fromList [Any "x"]
+          gatherFree (SAny "x") @?= Set.fromList [SAny "x"]
       , testCase "Any as arguments of operations" $
-          gatherFree (Symbolic Eq [Symbolic And [Any "x", constBool True], Any "y"]) @?=
-          Set.fromList [Any "x", Any "y"]
+          gatherFree (SGt (SAny "x") (SAny "y")) @?=
+          Set.fromList [SAny "x", SAny "y"]
       ]
 -----------------------------------------------------------------------------
 satTests :: TestTree
@@ -30,19 +30,24 @@ satTests = testGroup "SMT.sat"
           assertBool (show result) (isSat result)
       ]
 
-testExpr1 :: SExpr
-testExpr1 = let x = Any "x"
-                y = Any "y"
-                xGt10 = sOp Gt [x, sConst 10]
-                yLt0  = sOp Lt [y, sConst 0]
-                xEqY = sOp Eq [x, y]
-            in sOp And [xEqY, sOp And [xGt10, yLt0]]
+testExpr1 :: Sym Bool
+testExpr1 = let x = SAny "x"
+                y = SAny "y"
+                xGt10 = SGt x (SConst 10)
+                yLt0  = SLt y (SConst 0)
+                xEqY = SEq x y
+            in SAnd xEqY (SAnd xGt10 yLt0)
 
-testExpr2 :: SExpr
-testExpr2 = let x = Any "x"
-                y = Any "y"
-                xGt10 = sOp Gt [x, sConst 10]
-                yGt0  = sOp Gt [y, sConst 0]
-                sumGt10 s = sOp Gt [s, sConst 10]
-            in conjoin [sumGt10 (sOp Plus [x, y]), xGt10, yGt0]
+testExpr2 :: Sym Bool
+testExpr2 = let x = SAny "x"
+                y = SAny "y"
+                xGt10 = SGt x (SConst 10)
+                yGt0  = SGt y (SConst 0)
+                sumGt10 s = SGt s (SConst 10)
+            in conjoin [sumGt10 (SAdd x y), xGt10, yGt0]
+
+plusComm :: Sym Bool
+plusComm = let x = SAny "x"
+               y = SAny "y"
+           in SNot $ SEq (x + y) (y + x)
 -----------------------------------------------------------------------------

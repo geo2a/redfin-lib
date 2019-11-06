@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs        #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ToyRISC.SMT
@@ -14,119 +16,123 @@ module ToyRISC.SMT
     ( -- get the list of free variables in a symbolic expression
       gatherFree
       -- check if the expression is satisfiable
-    , sat, solveBool
+    , sat
       -- helper functions
     , conjoin, isSat, isUnsat
     ) where
 
-import qualified Data.Map         as Map
-import qualified Data.SBV.Dynamic as SBV
+import           Data.Int         (Int32)
+import qualified Data.Map.Strict  as Map
+import qualified Data.SBV         as SBV
 import qualified Data.Set         as Set
 import           Data.Text        (Text)
 import qualified Data.Text        as Text
 
 import           ToyRISC.Symbolic
 
+-- | Walk the constraint gathering up the free variables.
+gatherFree :: Sym a -> Set.Set (Sym Int32)
+gatherFree c@(SAny _) = Set.singleton c
+gatherFree (SAdd l r) = gatherFree l <> gatherFree r
+gatherFree (SSub l r) = gatherFree l <> gatherFree r
+gatherFree (SMul l r) = gatherFree l <> gatherFree r
+gatherFree (SDiv l r) = gatherFree l <> gatherFree r
+gatherFree (SMod l r) = gatherFree l <> gatherFree r
+gatherFree (SAbs l)   = gatherFree l
+gatherFree (SNot c)   = gatherFree c
+gatherFree (SOr l r)  = gatherFree l <> gatherFree r
+gatherFree (SAnd l r) = gatherFree l <> gatherFree r
+gatherFree (SEq l r)  = gatherFree l <> gatherFree r
+gatherFree (SGt l r)  = gatherFree l <> gatherFree r
+gatherFree (SLt l r)  = gatherFree l <> gatherFree r
+gatherFree (SConst _) = mempty
 
--- | Walk the symbolic expression gathering up the free variables.
-gatherFree :: SExpr -> Set.Set SExpr
-gatherFree = \case
-  Concrete _  -> mempty
-  var@(Any _) -> Set.singleton var
-  Symbolic op args -> case op of
-    Plus  -> gatherFree (_1 args) <> gatherFree (_2 args)
-    Times -> gatherFree (_1 args) <> gatherFree (_2 args)
-    Minus -> gatherFree (_1 args) <> gatherFree (_2 args)
-    Neg   -> gatherFree (_1 args)
-    Abs   -> gatherFree (_1 args)
-    Not   -> gatherFree (_1 args)
-    And   -> gatherFree (_1 args) <> gatherFree (_2 args)
-    Or    -> gatherFree (_1 args) <> gatherFree (_2 args)
-    Eq    -> gatherFree (_1 args) <> gatherFree (_2 args)
-    Lt    -> gatherFree (_1 args) <> gatherFree (_2 args)
-    Gt    -> gatherFree (_1 args) <> gatherFree (_2 args)
-  where _1 :: [a] -> a
-        _1 = head
-
-        _2 :: [a] -> a
-        _2 = head . tail
-
--- | Create existential variables for each of Any's in the input.
-createSym :: [SExpr] -> SBV.Symbolic (Map.Map Text SBV.SVal)
+-- | Create existential SVals for each of SAny's in the input.
+createSym :: [Sym Int32] -> SBV.Symbolic (Map.Map Text SBV.SInt32)
 createSym cs = do
   pairs <- traverse createSymPair cs
   pure $ Map.fromList pairs
-    where createSymPair :: SExpr -> SBV.Symbolic (Text, SBV.SVal)
-          createSymPair (Any name) = do
-            v <- SBV.sIntN 32 (Text.unpack name)
-            pure (name, v)
+    where createSymPair :: Sym Int32 -> SBV.Symbolic (Text, SBV.SInt32)
+          createSymPair (SAny i) = do
+            v <- SBV.sInt32 (Text.unpack i)
+            pure (i, v)
           createSymPair _ = error "Non-variable encountered."
 
--- | Translate symbolic values into the SBV representation
-symToSMT :: Map.Map Text SBV.SVal -> SExpr -> SBV.Symbolic (SBV.SVal)
-symToSMT env = \case
-  Concrete c -> case c of
-                  (CBounded i) ->
-                    pure (SBV.svInteger (SBV.KBounded True 32) (fromIntegral i))
-                  (CChar _)    -> error "SMT.symToSMT: Char support is not implemented"
-                  (CBool b)    -> pure (SBV.svBool b)
-  Any   name -> case Map.lookup name env of
-                  Just val -> pure val
-                  Nothing  -> error $ "SMT.symToSMT: Missing symbolic variable with name " <>
-                      (Text.unpack name)
-  Symbolic op args ->
-    case op of
-      Plus  -> (SBV.svPlus)  <$> symToSMT env (_1 args) <*> symToSMT env (_2 args)
-      Times -> (SBV.svTimes) <$> symToSMT env (_1 args) <*> symToSMT env (_2 args)
-      Minus -> (SBV.svMinus) <$> symToSMT env (_1 args) <*> symToSMT env (_2 args)
-      Neg   -> (SBV.svUNeg)  <$> symToSMT env (_1 args)
-      Abs   -> (SBV.svAbs)   <$> symToSMT env (_1 args)
-      Not   -> (SBV.svNot)   <$> symToSMT env (_1 args)
-      And   -> (SBV.svAnd)   <$> symToSMT env (_1 args) <*> symToSMT env (_2 args)
-      Or    -> (SBV.svOr)    <$> symToSMT env (_1 args) <*> symToSMT env (_2 args)
-      Eq    -> (SBV.svEqual)          <$> symToSMT env (_1 args) <*> symToSMT env (_2 args)
-      Lt    -> (SBV.svLessThan)       <$> symToSMT env (_1 args) <*> symToSMT env (_2 args)
-      Gt    -> (SBV.svGreaterThan)    <$> symToSMT env (_1 args) <*> symToSMT env (_2 args)
-  where _1 :: [a] -> a
-        _1 = head
-
-        _2 :: [a] -> a
-        _2 = head . tail
-
--- | Convert a list of (boolean) symbolic expressions
---   to a symbolic value the SMT solver can solve.
+-- | Convert a list of path constraints to a symbolic value the SMT solver can solve.
 --   Each constraint in the list is conjoined with the others.
-toSMT :: [SExpr] -> SBV.Symbolic SBV.SVal
+toSMT :: [Sym Bool] -> SBV.Symbolic SBV.SBool
 toSMT cs = do
-  let freeVars = gatherFree (foldr (\x y -> Symbolic And [x, y]) sTrue cs)
+  let freeVars = gatherFree (foldr SAnd (SConst True) cs)
   sValMap <- createSym (Set.toList freeVars)
   smts <- traverse (symToSMT sValMap) cs
-  pure $ conjoinSVal smts
+  pure $ conjoinSBV smts
+
+-- | Translate type indices of the Sym GADT into SBV phantom types
+type family ToSBV a where
+    ToSBV Int32 = SBV.SBV Int32
+    ToSBV Bool  = SBV.SBV Bool
+    ToSBV a     = SBV.SBV a
+
+-- | Translate symbolic values into the SBV representation
+symToSMT :: SBV.SymVal a => Map.Map Text SBV.SInt32 -> Sym a -> SBV.Symbolic (ToSBV a)
+symToSMT m (SEq l r) =
+  (SBV..==) <$> symToSMT m l <*> symToSMT m r
+symToSMT m (SGt l r) =
+  (SBV..>) <$> symToSMT m l <*> symToSMT m r
+symToSMT m (SLt l r) =
+  (SBV..<) <$> symToSMT m l <*> symToSMT m r
+symToSMT m (SAdd l r) =
+  (+) <$> symToSMT m l <*> symToSMT m r
+symToSMT m (SSub l r) =
+  (-) <$> symToSMT m l <*> symToSMT m r
+symToSMT m (SMul l r) =
+  (*) <$> symToSMT m l <*> symToSMT m r
+symToSMT m (SDiv l r) =
+  SBV.sDiv <$> symToSMT m l <*> symToSMT m r
+symToSMT m (SMod l r) =
+  SBV.sMod <$> symToSMT m l <*> symToSMT m r
+symToSMT _ (SConst w) = pure (SBV.literal w)
+symToSMT m (SAbs l) =
+  abs <$> symToSMT m l
+symToSMT m (SNot c) =
+  SBV.sNot <$> symToSMT m c
+symToSMT m (SAnd l r) =
+  (SBV..&&) <$> symToSMT m l <*> symToSMT m r
+symToSMT m (SOr l r) =
+  (SBV..||) <$> symToSMT m l <*> symToSMT m r
+symToSMT m (SAny i) =
+  case Map.lookup i m of
+    Just val -> pure val
+    Nothing  -> error "Missing symbolic variable."
 
 -- | Check satisfiability of a boolean expression
-sat :: SExpr -> IO SBV.SatResult
+sat :: Sym Bool  -> IO SBV.SatResult
 sat expr = do
   let smtExpr = toSMT [expr]
   SBV.satWith solver smtExpr
 
--- | Check a boolean expression is satisfiable then return True, otherwise False
-solveBool :: SExpr -> IO Bool
-solveBool expr = isSat <$> sat expr
+-- -- | Solve the path constraints in a symbolic execution state
+-- solveSym :: State -> IO SolvedState
+-- solveSym state = do
+--     let smtExpr = toSMT . map snd $ pathConstraintList state
+--     SBV.SatResult smtRes <- SBV.satWith prover smtExpr
+--     pure (SolvedState state smtRes)
 
------------------------------------------------------------------------------
--- | SMT solver configurations
+-- -- | Traverse a symbolic execution trace and solve path constraints in every node
+-- solveTrace :: Trace State -> IO (Trace SolvedState)
+-- solveTrace = traverse solveSym
+
+conjoinSBV :: [SBV.SBool] -> SBV.SBool
+conjoinSBV = SBV.sAnd
+
+conjoin :: [Sym Bool] -> Sym Bool
+conjoin cs = foldr (\x y -> SAnd x y) (SConst True) cs
+
 solver :: SBV.SMTConfig
 solver = SBV.z3 { SBV.verbose = True
                 , SBV.redirectVerbose = Just "log.smt2"
                 , SBV.printBase = 16
                 }
-
--- | Conjunction of boolean symbolic expressions
-conjoinSVal :: [SBV.SVal] -> SBV.SVal
-conjoinSVal xs = foldr SBV.svAnd SBV.svTrue xs
-
-conjoin :: [SExpr] -> SExpr
-conjoin cs = foldr (\x y -> Symbolic And [x, y]) sTrue cs
 
 isSat :: SBV.SatResult -> Bool
 isSat (SBV.SatResult r) = case r of
