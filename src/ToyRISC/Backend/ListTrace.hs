@@ -28,6 +28,7 @@ import           Control.Monad.Reader
 import           Control.Monad.State.Class
 import           Control.Selective
 import           Data.Either               (either)
+import           Data.Int                  (Int32)
 import           Data.IORef
 import qualified Data.Map.Strict           as Map
 import           Data.Maybe                (fromJust)
@@ -42,9 +43,10 @@ import           ToyRISC.SMT
 import           ToyRISC.Symbolic
 import           ToyRISC.Types
 
-data Context = MkContext { _bindings      :: Map.Map Key SExpr
-                         , _pathCondition :: SExpr
-                         , _lastRead      :: (Key, SExpr)
+data Context = MkContext { _bindings      :: Map.Map Key (Sym Int32)
+                         , _flags         :: Map.Map Key (Sym Bool)
+                         , _pathCondition :: Sym Bool
+                         , _lastRead      :: (Key, Sym Bool)
                          }
 
 makeLenses ''Context
@@ -52,9 +54,8 @@ makeLenses ''Context
 instance Show Context where
   show ctx = unlines [ show (_pathCondition ctx)
                      , show (Map.toList $ _bindings ctx)
+                     , show (Map.toList $ _flags ctx)
                      ]
-
-type WorldId = Word8
 
 -- | The Symbolic Execution Engine maintains the state of the machine and a list
 --   of path constraints.
@@ -71,21 +72,42 @@ instance Selective Engine where
   select cond f = Engine $ \s -> do
     (x, s') <- runEngine cond s
     let lr = snd $ _lastRead s'
-    let opt = solveBoolExpr lr
+    let opt = solve 1000 lr
     case x of
       Left  a ->
         case opt of
           DeadEnd -> error "Engine.select: unsatisfiable path constraint"
-          Literal b -> error $ "Engine.select: literal path constraint" <> show b
+          Literal b -> -- [runEngine (when b (f <*> pure b) *> pure b) s']
+            error $ "Engine.select: literal path constraint" <> show b
           Sat expr ->
-            let onTrue  = s {_pathCondition = sOp And [expr, _pathCondition s]}
-                onFalse = s {_pathCondition = sOp And [sOp Not [expr], _pathCondition s]}
+            let onTrue  = s {_pathCondition = SAnd expr (_pathCondition s)}
+                onFalse = s {_pathCondition = SAnd (SNot expr) (_pathCondition s)}
             in -- runEngine (($ a) <$> f) onTrue
                concat [ runEngine (f <*> pure a) onTrue
                       , [((unsafeCoerce lr) :: b, onFalse)]
                       ]
       Right b ->
         error "Engine.select: OMG it's Right! Right is not right when you only use whenS."
+
+-- instance Selective Engine where
+--   select cond f = Engine $ \s -> do
+--     (x, s') <- runEngine cond s
+--     let lr = snd $ _lastRead s'
+--     let opt = solveBoolExpr lr
+--     case x of
+--       Left  a ->
+--         case opt of
+--           DeadEnd -> error "Engine.select: unsatisfiable path constraint"
+--           Literal b -> error $ "Engine.select: literal path constraint" <> show b
+--           Sat expr ->
+--             let onTrue  = s {_pathCondition = sOp And [expr, _pathCondition s]}
+--                 onFalse = s {_pathCondition = sOp And [sOp Not [expr], _pathCondition s]}
+--             in -- runEngine (($ a) <$> f) onTrue
+--                concat [ runEngine (f <*> pure a) onTrue
+--                       , [((unsafeCoerce lr) :: b, onFalse)]
+--                       ]
+--       Right b ->
+--         error "Engine.select: OMG it's Right! Right is not right when you only use whenS."
 
 -- | A 'Monad' instance for 'Engine' is a combination of state and list monads:
 --   * 'return' embeds the value paired with the current state into a list
@@ -101,66 +123,51 @@ instance (MonadState Context) Engine where
     get   = Engine $ \s -> [(s, s)]
     put s = Engine $ \_ -> [((), s)]
 
-readKey :: Key -> Engine (Data SExpr)
+readKey :: Key -> Engine (Data (Sym Int32))
 readKey key = do
   ctx <- get
+  case key of
+    F flag -> do
   let x = (Map.!) (_bindings ctx) key
-  put $ ctx {_lastRead = (key, x)}
+  -- put $ ctx {_lastRead = (key, x)}
   pure (MkData x)
 
-writeKey :: Key -> Engine (Data SExpr) -> Engine (Data SExpr)
+writeKey :: Key -> Engine (Data (Sym Int32)) -> Engine (Data (Sym Int32))
 writeKey key computation = do
   ctx <- get
   (MkData value) <- computation
   put $ ctx {_bindings = Map.insert key value (_bindings ctx)}
   pure (MkData value)
 
-data Options = DeadEnd
-             -- ^ the path constraint is unsatisfiable
-             | Literal Bool
-             -- ^ the path constraint is a literal boolean value, continue in this world
-             | Sat SExpr
-             -- ^ the path constraint is a satisfiable symbolic boolean -- need to create
-             --   two worlds: for it and its negation
-
-solveBoolExpr :: SExpr -> Options
-solveBoolExpr = \case
-  Concrete c          -> case c of
-                           CBounded b -> error $ "solveBoolExpr CBounded " <> show b
-                           CBool    b -> Literal b
-                           CChar    b -> error "solveBoolExpr CChar"
-  expr@(Any _)        -> Sat expr
-  expr@(Symbolic _ _) -> Sat expr
-
 test :: Engine ()
 test =
   let cond = readKey (F Condition)
-  in whenS (const True <$> cond) (void $ writeKey (Reg R0) (pure . MkData $ sConst 1))
+  in whenS (const True <$> cond) (void $ writeKey (Reg R0) (pure . MkData $ SConst 1))
 
-add' :: Register -> Address -> FS Key Selective Value a
-add' reg addr read write =
-  let arg1 = read (Reg reg)
-      arg2 = read (Addr addr)
-      result = (+) <$> arg1 <*> arg2
-  -- in write (Reg reg) result
-  -- in whenS' (toBool <$> ((==) <$> write (Reg reg) result <*> pure (not mempty)))
-  --           (write (F Condition) (pure true))
-  in whenS' (toBool <$> ((==) <$> write (Reg reg) result <*> arg1))
-            (write (F Condition) (pure true) *> write (Reg R1) arg2)
+-- add' :: Register -> Address -> FS Key Selective Value a
+-- add' reg addr read write =
+--   let arg1 = read (Reg reg)
+--       arg2 = read (Addr addr)
+--       result = (+) <$> arg1 <*> arg2
+--   -- in write (Reg reg) result
+--   -- in whenS' (toBool <$> ((==) <$> write (Reg reg) result <*> pure (not mempty)))
+--   --           (write (F Condition) (pure true))
+--   in whenS' (toBool <$> ((==) <$> write (Reg reg) result <*> arg1))
+--             (write (F Condition) (pure true) *> write (Reg R1) arg2)
 
 ex :: IO ()
 ex = do
-  let ctx = MkContext { _pathCondition = sTrue
-                      , _bindings = Map.fromList [ (IC, sConst 0)
-                                                 , (F Condition, Any "z")
-                                                 , (Reg R0, sConst $ 1)
+  let ctx = MkContext { _pathCondition = SConst True
+                      , _bindings = Map.fromList [ (IC, SConst 0)
+                                                 -- , (F Condition, SEq (SAny "z") (SConst 0))
+                                                 , (Reg R0, SConst $ 1)
                                                  -- , (Reg R1, sConst $ 2)
-                                                 , (Addr 0, sConst $ 3)
+                                                 , (Addr 0, SConst 3)
                                                  ]
-                      , _lastRead = (IC, sTrue)
+                      , _lastRead = (IC, SConst True)
                       }
-  let t = add' R0 0 readKey writeKey
-  -- let t = jumpCt (MkData $ sConst 3) readKey writeKey
+  -- let t = add' R0 0 readKey writeKey
+  let t = jumpCt (MkData $ SConst 3) readKey writeKey
   let xs = runEngine t ctx
   print $ xs
   pure ()

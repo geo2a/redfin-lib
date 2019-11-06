@@ -16,7 +16,7 @@ module ToyRISC.SMT
     ( -- get the list of free variables in a symbolic expression
       gatherFree
       -- check if the expression is satisfiable
-    , sat
+    , sat, Options (..), solve
       -- helper functions
     , conjoin, isSat, isUnsat
     ) where
@@ -27,6 +27,7 @@ import qualified Data.SBV         as SBV
 import qualified Data.Set         as Set
 import           Data.Text        (Text)
 import qualified Data.Text        as Text
+import           System.IO.Unsafe (unsafePerformIO)
 
 import           ToyRISC.Symbolic
 
@@ -143,3 +144,22 @@ isUnsat :: SBV.SatResult -> Bool
 isUnsat (SBV.SatResult r) = case r of
   (SBV.Unsatisfiable _ _) -> True
   _                       -> False
+-----------------------------------------------------------------------------
+data Options = DeadEnd
+             -- ^ the path constraint is unsatisfiable
+             | Literal Bool
+             -- ^ the path constraint is a literal boolean value, continue in this world
+             | Sat (Sym Bool)
+             -- ^ the path constraint is a satisfiable symbolic boolean -- need to create
+             --   two worlds: for it and its negation
+
+solve :: Int -> Sym Bool -> Options
+solve fuel expr =
+  case (getValue . simplify fuel $ expr) of
+    Just val -> Literal val
+    Nothing ->
+      let (SBV.SatResult result) = unsafePerformIO (sat expr)
+      in case result of
+           SBV.Unsatisfiable _ _ -> DeadEnd
+           SBV.Satisfiable _ _   -> Sat (expr)
+           _                     -> error "Sym.solveBoolExpr: fatal error!"

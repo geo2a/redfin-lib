@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 -----------------------------------------------------------------------------
 -- |
@@ -31,6 +32,7 @@ module ToyRISC.Types
     , Value
     ) where
 
+import           Data.Int  (Int32)
 import           Data.Word (Word16)
 
 -- | Data registers
@@ -54,19 +56,49 @@ newtype Data a = MkData a
 
 -----------------------------------------------------------------------------
 
--- | This type enumerates data locations in the ISA model
-data Key = Reg Register
-         | Addr Address
-         | F Flag
-         | IC -- ^ instruction counter (aka program counter)
-         deriving (Eq, Ord)
+data Key where
+  Reg :: Register -> Key
+  Addr :: Address -> Key
+  F :: Flag -> Key
+  IC :: Key
+
+deriving instance Eq Key
+deriving instance Ord Key
 
 instance Show Key where
-  show = \case
-    Reg r -> show r
-    Addr a -> show a
-    F flag -> show flag
-    IC -> "IC"
+    show = \case
+        Reg  reg   -> show reg
+        Addr addr  -> show addr
+        F    flag  -> show flag
+        IC         -> "IC"
+        -- IR         -> "IR"
+        -- Prog addr  -> show addr
+
+-- data Key a where
+--     Reg  :: Register -> Key Int32
+--     -- ^ register
+--     Addr :: Address -> Key Int32
+--     -- ^ memory address
+--     F   :: Flag -> Key Bool
+--     -- -- ^ flag
+--     IC   :: Key Int32
+--     -- -- ^ instruction counter
+--     -- IR   :: Key (InstructionCode)
+--     -- -- ^ instruction register
+--     -- Prog :: InstructionAddress -> Key (InstructionCode)
+--     -- -- ^ program memory address
+
+-- deriving instance Eq a => Eq (Key a)
+-- deriving instance Ord a => Ord (Key a)
+
+-- instance Show (Key a) where
+--     show = \case
+--         Reg  reg   -> show reg
+--         Addr addr  -> show addr
+--         F    flag  -> show flag
+--         IC         -> "IC"
+--         -- IR         -> "IR"
+--         -- Prog addr  -> show addr
 
 class Boolean a where
   true    :: a
@@ -78,15 +110,15 @@ instance Boolean Bool where
   not = Prelude.not
   toBool = id
 
-instance Boolean (Data Int) where
+instance Boolean (Data Int32) where
   true = (MkData 1)
   not x = if x == (MkData 0) then (MkData 1) else (MkData 0)
   toBool x = (x /= 0)
 
-instance Semigroup (Data Int) where
+instance Semigroup (Data Int32) where
   (<>) = (+)
 
-instance Monoid (Data Int) where
+instance Monoid (Data Int32) where
   mempty = 0
 
 -- | We now consider a value to be a numeric monoid which could also be converted

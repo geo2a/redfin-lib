@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 module ToyRISC.Symbolic
-    (Sym (..)) where
+    (Sym (..), simplify, getValue) where
 
 import           Data.Int      (Int32)
 import           Data.Text     (Text)
@@ -70,6 +70,11 @@ instance Semigroup (Data (Sym Int32)) where
 instance Monoid (Data (Sym Int32)) where
   mempty = MkData $ SConst 0
 
+instance Boolean (Data (Sym Int32)) where
+  true = MkData $ SConst 1
+  toBool _ = True
+  not x = undefined -- SNot x
+
 instance Boolean (Sym Bool) where
   true = SConst True
   toBool _ = True
@@ -108,53 +113,67 @@ instance Eq a => Eq (Sym a)  where
 
 deriving instance Ord a => Ord (Sym a)
 
--- -- | Form an expression containing an integer constant
--- sConst :: Int32 -> SExpr
--- sConst i = Concrete (CBounded i)
+-----------------------------------------------------------------------------
+-- | Try to perform constant folding and get the resulting value. Return 'Nothing' on
+--   encounter of a symbolic variable.
+getValue :: Sym a -> Maybe a
+getValue = \case
+    (SAny   _) -> Nothing
+    (SConst x) -> Just x
+    (SAdd p q) -> (+)           <$> getValue p <*> getValue q
+    (SSub p q) -> (-)           <$> getValue p <*> getValue q
+    (SMul p q) -> (*)           <$> getValue p <*> getValue q
+    (SDiv p q) -> (Prelude.div) <$> getValue p <*> getValue q
+    (SMod p q) -> (Prelude.mod) <$> getValue p <*> getValue q
+    (SAbs x  ) -> Prelude.abs   <$> getValue x
+    (SAnd p q) -> (&&)          <$> getValue p <*> getValue q
+    (SOr  p q) -> (||)          <$> getValue p <*> getValue q
+    (SNot x  ) -> not           <$> getValue x
+    (SEq  p q) -> (==)          <$> getValue p <*> getValue q
+    (SGt  p q) -> (>)           <$> getValue p <*> getValue q
+    (SLt  p q) -> (<)           <$> getValue p <*> getValue q
 
--- -- | Form an expression containing a boolean constant
--- constBool :: Bool -> SExpr
--- constBool b = Concrete (CBool b)
+-- | Constant-fold the expression if it only contains 'SConst' leafs; return the
+--   unchanged expression otherwise.
+tryFoldConstant :: Sym a -> Sym a
+tryFoldConstant x =
+  let maybeVal = getValue x
+  in case maybeVal of
+          Just val -> SConst val
+          Nothing  -> x
 
--- sTrue :: SExpr
--- sTrue = constBool True
+tryReduce :: Sym a -> Sym a
+tryReduce = \case
+    SNot x -> SNot (tryReduce x)
 
--- sFalse :: SExpr
--- sFalse = constBool False
+    -- 0 + y = y
+    (SAdd (SConst 0) y) -> tryReduce y
+    -- x + 0 = x
+    (SAdd x (SConst 0)) -> tryReduce x
+    (SAdd x y) -> tryReduce x `SAdd` tryReduce y
+    -- x - 0 = x
+    (SSub x (SConst 0)) -> tryReduce x
+    (SSub x y) -> tryReduce x `SSub` tryReduce y
+    -- T && y = y
+    (SAnd (SConst True) y) -> tryReduce y
+    -- x && T = x
+    (SAnd x (SConst True)) -> tryReduce x
+    (SAnd x y            ) -> tryReduce x `SAnd` tryReduce y
+    -- F || y = y
+    (SOr (SConst False) y) -> tryReduce y
+    -- x || F = x
+    (SOr x (SConst False)) -> tryReduce x
+    (SOr x y) -> tryReduce x `SOr` tryReduce y
 
--- sOp :: Op -> [SExpr] -> SExpr
--- sOp = Symbolic
+    (SEq (SConst 0) (SConst 0)) -> SConst True
+    (SEq x y) -> tryReduce x `SEq` tryReduce y
+    (SGt (SConst 0) (SConst 0)) -> SConst False
+    (SGt x y) -> tryReduce x `SGt` tryReduce y
+    (SLt (SConst 0) (SConst 0)) -> SConst False
+    (SLt x y) -> tryReduce x `SLt` tryReduce y
+    s -> s
 
--- sAdd :: SExpr -> SExpr -> SExpr
--- sAdd x y = Symbolic Plus [x, y]
--- -----------------------------------------------------------------------------
--- -- | Try to perform constant folding and get the resulting value. Return 'Nothing' on
--- --   encounter of a symbolic variable.
--- getValue :: SExpr -> Maybe CVal
--- getValue = \case
---   Concrete cval -> Just cval
---   Any var -> Nothing
---   expr@(Symbolic op args) ->
---     if leavesAreConcrete expr
---     then undefined
---     else Nothing
-
-
--- -- | Check of all leaves of a symbolic expression are, in fact, concrete
--- leavesAreConcrete :: SExpr -> Bool
--- leavesAreConcrete = \case
---   Concrete _       -> True
---   Any _            -> False
---   Symbolic op args ->
---     case (op, args) of
---       (Plus , [x,y]) -> leavesAreConcrete x && leavesAreConcrete y
---       (Times, [x,y]) -> leavesAreConcrete x && leavesAreConcrete y
---       (Minus, [x,y]) -> leavesAreConcrete x && leavesAreConcrete y
---       (Neg  , [x]  ) -> leavesAreConcrete x
---       (Abs  , [x]  ) -> leavesAreConcrete x
---       (Not  , [x]  ) -> leavesAreConcrete x
---       (And  , [x,y]) -> leavesAreConcrete x && leavesAreConcrete y
---       (Or   , [x,y]) -> leavesAreConcrete x && leavesAreConcrete y
---       (Eq   , [x,y]) -> leavesAreConcrete x && leavesAreConcrete y
---       (Lt   , [x,y]) -> leavesAreConcrete x && leavesAreConcrete y
---       (Gt   , [x,y]) -> leavesAreConcrete x && leavesAreConcrete y
+simplify :: Int -> Sym a -> Sym a
+simplify steps | steps <= 0  = id
+               | otherwise   = last . take steps
+                             . iterate (tryFoldConstant . tryReduce)

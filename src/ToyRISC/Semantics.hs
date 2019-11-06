@@ -22,7 +22,7 @@ module ToyRISC.Semantics
 
 import           Control.Selective
 import           Data.Bool         (bool)
-import           Data.Functor      (void)
+-- import           Data.Functor      (void)
 import           Prelude           hiding (Read, read, readIO)
 
 import           FS
