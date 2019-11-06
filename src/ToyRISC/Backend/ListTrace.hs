@@ -43,10 +43,9 @@ import           ToyRISC.SMT
 import           ToyRISC.Symbolic
 import           ToyRISC.Types
 
-data Context = MkContext { _bindings      :: Map.Map Key (Sym Int32)
-                         , _flags         :: Map.Map Key (Sym Bool)
-                         , _pathCondition :: Sym Bool
-                         , _lastRead      :: (Key, Sym Bool)
+data Context = MkContext { _bindings      :: Map.Map Key Sym
+                         , _pathCondition :: Sym
+                         , _lastFmap      :: Sym
                          }
 
 makeLenses ''Context
@@ -54,7 +53,6 @@ makeLenses ''Context
 instance Show Context where
   show ctx = unlines [ show (_pathCondition ctx)
                      , show (Map.toList $ _bindings ctx)
-                     , show (Map.toList $ _flags ctx)
                      ]
 
 -- | The Symbolic Execution Engine maintains the state of the machine and a list
@@ -62,6 +60,12 @@ instance Show Context where
 data Engine a = Engine
     { runEngine :: Context -> [(a, Context)] }
     deriving Functor
+-- instance Functor Engine where
+--   fmap f (Engine e) =
+--     Engine $ \s -> do
+--       (res, s') <- e s
+--       pure ((f res), s' {_lastFmap = unsafeCoerce res})
+--     -- zip (map (f . fst) (e s)) (repeat s)
 
 -- | A standard 'Applicative' instance available for any 'Monad'.
 instance Applicative Engine where
@@ -71,8 +75,8 @@ instance Applicative Engine where
 instance Selective Engine where
   select cond f = Engine $ \s -> do
     (x, s') <- runEngine cond s
-    let lr = snd $ _lastRead s'
-    let opt = solve 1000 lr
+    let lr = _lastFmap s'
+    let opt = solve lr 1000
     case x of
       Left  a ->
         case opt of
@@ -123,16 +127,14 @@ instance (MonadState Context) Engine where
     get   = Engine $ \s -> [(s, s)]
     put s = Engine $ \_ -> [((), s)]
 
-readKey :: Key -> Engine (Data (Sym Int32))
+readKey :: Key -> Engine (Data Sym)
 readKey key = do
   ctx <- get
-  case key of
-    F flag -> do
   let x = (Map.!) (_bindings ctx) key
   -- put $ ctx {_lastRead = (key, x)}
   pure (MkData x)
 
-writeKey :: Key -> Engine (Data (Sym Int32)) -> Engine (Data (Sym Int32))
+writeKey :: Key -> Engine (Data Sym) -> Engine (Data Sym)
 writeKey key computation = do
   ctx <- get
   (MkData value) <- computation
@@ -144,30 +146,43 @@ test =
   let cond = readKey (F Condition)
   in whenS (const True <$> cond) (void $ writeKey (Reg R0) (pure . MkData $ SConst 1))
 
--- add' :: Register -> Address -> FS Key Selective Value a
--- add' reg addr read write =
---   let arg1 = read (Reg reg)
---       arg2 = read (Addr addr)
---       result = (+) <$> arg1 <*> arg2
---   -- in write (Reg reg) result
---   -- in whenS' (toBool <$> ((==) <$> write (Reg reg) result <*> pure (not mempty)))
---   --           (write (F Condition) (pure true))
---   in whenS' (toBool <$> ((==) <$> write (Reg reg) result <*> arg1))
---             (write (F Condition) (pure true) *> write (Reg R1) arg2)
+whenS'' :: (Selective f, Monoid a) => f Sym -> f a -> f a
+whenS'' x y = selector <*? effect
+  where
+    -- selector :: f (Either Sym a)
+    selector = analyseSym <$> x
+    -- bool (Right mempty) (Left ()) <$> x -- NB: maps True to Left ()
+    effect   = const                     <$> y
+
+    analyseSym :: Monoid a => Sym -> Either Sym a
+    analyseSym = \case
+      x -> Left x
+      _ -> Right mempty
+
+add' :: Register -> Address -> FS Key Selective Value a
+add' reg addr read write =
+  let arg1 = read (Reg reg)
+      arg2 = read (Addr addr)
+      result = (+) <$> arg1 <*> arg2
+  -- in write (Reg reg) result
+  -- in whenS' (toBool <$> ((==) <$> write (Reg reg) result <*> pure (not mempty)))
+  --           (write (F Condition) (pure true))
+  in whenS' ((==) <$> write (Reg reg) result <*> arg1)
+            (write (F Condition) (pure true) *> write (Reg R1) arg2)
 
 ex :: IO ()
 ex = do
-  let ctx = MkContext { _pathCondition = SConst True
+  let ctx = MkContext { _pathCondition = SConst (CBool True)
                       , _bindings = Map.fromList [ (IC, SConst 0)
-                                                 -- , (F Condition, SEq (SAny "z") (SConst 0))
-                                                 , (Reg R0, SConst $ 1)
+                                                 , (F Condition, SEq (SAny "z") (SConst 0))
+                                                 , (Reg R0, SConst 1)
                                                  -- , (Reg R1, sConst $ 2)
                                                  , (Addr 0, SConst 3)
                                                  ]
-                      , _lastRead = (IC, SConst True)
+                      , _lastFmap = SConst 0
                       }
-  -- let t = add' R0 0 readKey writeKey
-  let t = jumpCt (MkData $ SConst 3) readKey writeKey
+  let t = add' R0 0 readKey writeKey
+  -- let t = jumpCt (MkData $ SConst 3) readKey writeKey
   let xs = runEngine t ctx
   print $ xs
   pure ()

@@ -13,17 +13,18 @@
 -----------------------------------------------------------------------------
 
 module ToyRISC.SMT
-    ( -- get the list of free variables in a symbolic expression
-      gatherFree
-      -- check if the expression is satisfiable
-    , sat, Options (..), solve
-      -- helper functions
-    , conjoin, isSat, isUnsat
-    ) where
+    -- ( -- get the list of free variables in a symbolic expression
+    --   gatherFree
+    --   -- check if the expression is satisfiable
+    -- , sat, Options (..), solve
+    --   -- helper functions
+    -- , conjoin, isSat, isUnsat
+    -- ) where
+  where
 
 import           Data.Int         (Int32)
 import qualified Data.Map.Strict  as Map
-import qualified Data.SBV         as SBV
+import qualified Data.SBV.Dynamic as SBV
 import qualified Data.Set         as Set
 import           Data.Text        (Text)
 import qualified Data.Text        as Text
@@ -32,7 +33,7 @@ import           System.IO.Unsafe (unsafePerformIO)
 import           ToyRISC.Symbolic
 
 -- | Walk the constraint gathering up the free variables.
-gatherFree :: Sym a -> Set.Set (Sym Int32)
+gatherFree :: Sym -> Set.Set Sym
 gatherFree c@(SAny _) = Set.singleton c
 gatherFree (SAdd l r) = gatherFree l <> gatherFree r
 gatherFree (SSub l r) = gatherFree l <> gatherFree r
@@ -49,85 +50,80 @@ gatherFree (SLt l r)  = gatherFree l <> gatherFree r
 gatherFree (SConst _) = mempty
 
 -- | Create existential SVals for each of SAny's in the input.
-createSym :: [Sym Int32] -> SBV.Symbolic (Map.Map Text SBV.SInt32)
+createSym :: [Sym] -> SBV.Symbolic (Map.Map Text SBV.SVal)
 createSym cs = do
   pairs <- traverse createSymPair cs
   pure $ Map.fromList pairs
-    where createSymPair :: Sym Int32 -> SBV.Symbolic (Text, SBV.SInt32)
-          createSymPair (SAny i) = do
-            v <- SBV.sInt32 (Text.unpack i)
-            pure (i, v)
+    where createSymPair :: Sym -> SBV.Symbolic (Text, SBV.SVal)
+          createSymPair (SAny name) = do
+            v <- SBV.sIntN 32 (Text.unpack name)
+            pure (name, v)
           createSymPair _ = error "Non-variable encountered."
 
 -- | Convert a list of path constraints to a symbolic value the SMT solver can solve.
 --   Each constraint in the list is conjoined with the others.
-toSMT :: [Sym Bool] -> SBV.Symbolic SBV.SBool
+toSMT :: [Sym] -> SBV.Symbolic SBV.SVal
 toSMT cs = do
-  let freeVars = gatherFree (foldr SAnd (SConst True) cs)
+  let freeVars = gatherFree (foldr SAnd (SConst (CBool True)) cs)
   sValMap <- createSym (Set.toList freeVars)
   smts <- traverse (symToSMT sValMap) cs
   pure $ conjoinSBV smts
 
--- | Translate type indices of the Sym GADT into SBV phantom types
-type family ToSBV a where
-    ToSBV Int32 = SBV.SBV Int32
-    ToSBV Bool  = SBV.SBV Bool
-    ToSBV a     = SBV.SBV a
-
 -- | Translate symbolic values into the SBV representation
-symToSMT :: SBV.SymVal a => Map.Map Text SBV.SInt32 -> Sym a -> SBV.Symbolic (ToSBV a)
+symToSMT :: Map.Map Text SBV.SVal -> Sym -> SBV.Symbolic SBV.SVal
 symToSMT m (SEq l r) =
-  (SBV..==) <$> symToSMT m l <*> symToSMT m r
+  (SBV.svEqual) <$> symToSMT m l <*> symToSMT m r
 symToSMT m (SGt l r) =
-  (SBV..>) <$> symToSMT m l <*> symToSMT m r
+  (SBV.svGreaterThan) <$> symToSMT m l <*> symToSMT m r
 symToSMT m (SLt l r) =
-  (SBV..<) <$> symToSMT m l <*> symToSMT m r
+  (SBV.svLessThan) <$> symToSMT m l <*> symToSMT m r
 symToSMT m (SAdd l r) =
-  (+) <$> symToSMT m l <*> symToSMT m r
+  (SBV.svPlus) <$> symToSMT m l <*> symToSMT m r
 symToSMT m (SSub l r) =
-  (-) <$> symToSMT m l <*> symToSMT m r
+  (SBV.svMinus) <$> symToSMT m l <*> symToSMT m r
 symToSMT m (SMul l r) =
-  (*) <$> symToSMT m l <*> symToSMT m r
-symToSMT m (SDiv l r) =
-  SBV.sDiv <$> symToSMT m l <*> symToSMT m r
-symToSMT m (SMod l r) =
-  SBV.sMod <$> symToSMT m l <*> symToSMT m r
-symToSMT _ (SConst w) = pure (SBV.literal w)
+  (SBV.svTimes) <$> symToSMT m l <*> symToSMT m r
+symToSMT m (SDiv l r) = error "SMT.symToSMT: div is not yet defined"
+--   (SBV.svDiv) <$> symToSMT m l <*> symToSMT m r
+symToSMT m (SMod l r) = error "SMT.symToSMT: mod is not yet defined"
+--   (SBV.svMod) <$> symToSMT m l <*> symToSMT m r
+symToSMT _ (SConst (CInt i)) = pure (SBV.svInteger (SBV.KBounded True 32) (fromIntegral i))
+symToSMT _ (SConst (CBool b)) = pure (SBV.svBool b)
 symToSMT m (SAbs l) =
-  abs <$> symToSMT m l
+  SBV.svAbs <$> symToSMT m l
 symToSMT m (SNot c) =
-  SBV.sNot <$> symToSMT m c
+  SBV.svNot <$> symToSMT m c
 symToSMT m (SAnd l r) =
-  (SBV..&&) <$> symToSMT m l <*> symToSMT m r
+  SBV.svAnd <$> symToSMT m l <*> symToSMT m r
 symToSMT m (SOr l r) =
-  (SBV..||) <$> symToSMT m l <*> symToSMT m r
+  SBV.svOr <$> symToSMT m l <*> symToSMT m r
 symToSMT m (SAny i) =
   case Map.lookup i m of
     Just val -> pure val
     Nothing  -> error "Missing symbolic variable."
 
 -- | Check satisfiability of a boolean expression
-sat :: Sym Bool  -> IO SBV.SatResult
+sat :: Sym -> IO SBV.SatResult
 sat expr = do
   let smtExpr = toSMT [expr]
   SBV.satWith solver smtExpr
 
--- -- | Solve the path constraints in a symbolic execution state
--- solveSym :: State -> IO SolvedState
--- solveSym state = do
---     let smtExpr = toSMT . map snd $ pathConstraintList state
---     SBV.SatResult smtRes <- SBV.satWith prover smtExpr
---     pure (SolvedState state smtRes)
+-- -- -- | Solve the path constraints in a symbolic execution state
+-- -- solveSym :: State -> IO SolvedState
+-- -- solveSym state = do
+-- --     let smtExpr = toSMT . map snd $ pathConstraintList state
+-- --     SBV.SatResult smtRes <- SBV.satWith prover smtExpr
+-- --     pure (SolvedState state smtRes)
 
--- -- | Traverse a symbolic execution trace and solve path constraints in every node
--- solveTrace :: Trace State -> IO (Trace SolvedState)
--- solveTrace = traverse solveSym
+-- -- -- | Traverse a symbolic execution trace and solve path constraints in every node
+-- -- solveTrace :: Trace State -> IO (Trace SolvedState)
+-- -- solveTrace = traverse solveSym
 
-conjoinSBV :: [SBV.SBool] -> SBV.SBool
-conjoinSBV = SBV.sAnd
+conjoinSBV :: [SBV.SVal] -> SBV.SVal
+conjoinSBV = foldr (\x y -> SBV.svAnd x y) (SBV.svBool True)
 
-conjoin :: [Sym Bool] -> Sym Bool
-conjoin cs = foldr (\x y -> SAnd x y) (SConst True) cs
+conjoin :: [Sym] -> Sym
+conjoin cs = foldr (\x y -> SAnd x y) (SConst (CBool True)) cs
 
 solver :: SBV.SMTConfig
 solver = SBV.z3 { SBV.verbose = True
@@ -149,14 +145,15 @@ data Options = DeadEnd
              -- ^ the path constraint is unsatisfiable
              | Literal Bool
              -- ^ the path constraint is a literal boolean value, continue in this world
-             | Sat (Sym Bool)
+             | Sat Sym
              -- ^ the path constraint is a satisfiable symbolic boolean -- need to create
              --   two worlds: for it and its negation
 
-solve :: Int -> Sym Bool -> Options
-solve fuel expr =
-  case (getValue . simplify fuel $ expr) of
-    Just val -> Literal val
+solve :: Sym -> Int -> Options
+solve expr fuel =
+  case getValue (simplify fuel expr) of
+    Just (CBool val) -> Literal val
+    Just (CInt i) -> error $ "Sym.solve: non-boolean literal " <> show i
     Nothing ->
       let (SBV.SatResult result) = unsafePerformIO (sat expr)
       in case result of

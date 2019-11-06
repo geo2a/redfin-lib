@@ -101,19 +101,25 @@ instance Show Key where
 --         -- Prog addr  -> show addr
 
 class Boolean a where
+  toBool  :: a -> Bool
   true    :: a
   not     :: a -> a
-  toBool  :: a -> Bool
+
+  (|||)   :: a -> a -> a
+  (&&&)   :: a -> a -> a
 
 instance Boolean Bool where
   true = True
   not = Prelude.not
   toBool = id
 
-instance Boolean (Data Int32) where
-  true = (MkData 1)
-  not x = if x == (MkData 0) then (MkData 1) else (MkData 0)
-  toBool x = (x /= 0)
+  x ||| y = x || y
+  x &&& y = x && y
+
+-- instance Boolean (Data Int32) where
+--   true = (MkData 1)
+--   not x = if x == (MkData 0) then (MkData 1) else (MkData 0)
+--   toBool x = (x /= 0)
 
 instance Semigroup (Data Int32) where
   (<>) = (+)
