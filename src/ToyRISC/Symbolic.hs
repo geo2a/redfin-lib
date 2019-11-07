@@ -18,6 +18,8 @@ module ToyRISC.Symbolic
 import           Data.Int      (Int32)
 import           Data.Text     (Text)
 import qualified Data.Text     as Text
+import           Data.Typeable
+import           Debug.Trace
 import           Prelude       hiding (not)
 
 import           ToyRISC.Types
@@ -87,6 +89,10 @@ data Sym where
     SOr    :: Sym -> Sym -> Sym
     SNot   :: Sym -> Sym
 
+deriving instance Eq Sym
+deriving instance Ord Sym
+deriving instance Typeable Sym
+
 instance Show Sym where
     show (SAdd x y) = "(" <> show x <> " + " <> show y <> ")"
     show (SSub x y) = "(" <> show x <> " - " <> show y <> ")"
@@ -108,7 +114,7 @@ instance Num Sym where
   x * y = SMul x y
   abs x = SAbs x
   signum _ = error "Sym.Num: signum is not defined"
-  fromInteger _ = error "Sym.Num: fromInteger is not defined"
+  fromInteger x = SConst (CInt $ fromInteger x)
   negate _ = error "Sym.Num: negate is not defined"
 
 instance Semigroup (Data Sym) where
@@ -119,7 +125,7 @@ instance Monoid (Data Sym) where
 
 instance Boolean Sym where
   true = SConst (CBool True)
-  toBool _ = True
+  toBool x = trace (show x) True
   not x = SNot x
 
   x ||| y = SOr x y
@@ -127,39 +133,45 @@ instance Boolean Sym where
 
 instance Boolean (Data Sym) where
   true = MkData $ SConst (CBool True)
-  toBool (MkData _) = True
+  toBool (MkData x) = trace (show x) True
   not (MkData x) = MkData (SNot x)
 
   (MkData x) ||| (MkData y) = MkData (SOr x y)
   (MkData x) &&& (MkData y) = MkData (SAnd x y)
 
-instance Eq Sym  where
-  SConst c1  == SConst c2  = c1 == c2
-  SAny name1 == SAny name2 = name1 == name2
+instance TryEq Sym where
+  x === y = Unsolvable (SEq x y)
 
-  SAnd _ _  == SAnd _ _  =
-    error "Sym.Eq.(==): can't compare symbolic booleans for equality"
-  SOr  _ _  == SOr _ _ =
-    error "Sym.Eq.(==): can't compare symbolic booleans for equality"
-  SNot _ == SNot _ =
-    error "Sym.Eq.(==): can't compare symbolic booleans for equality"
-  (SEq  _ _) == (SEq  _ _) =
-    error "Sym.Eq.(==): can't compare symbolic booleans for equality"
-  (SGt  _ _) == (SGt  _ _) =
-    error "Sym.Eq.(==): can't compare symbolic booleans for equality"
-  (SLt  _ _) == (SLt  _ _) =
-    error "Sym.Eq.(==): can't compare symbolic booleans for equality"
+instance TryEq (Data Sym) where
+  (MkData x) === (MkData y) = Unsolvable (MkData $ SEq x y)
 
-  p@(SAdd _ _) == q@(SAdd _ _) = toBool $ SEq p q
-  p@(SSub _ _) == q@(SSub _ _) = toBool $ SEq p q
-  p@(SMul _ _) == q@(SMul _ _) = toBool $ SEq p q
-  p@(SDiv _ _) == q@(SDiv _ _) = toBool $ SEq p q
-  p@(SMod _ _) == q@(SMod _ _) = toBool $ SEq p q
-  p@(SAbs   _) == q@(SAbs   _) = toBool $ SEq p q
+-- instance Eq Sym  where
+--   p@(SConst c1)  == q@(SConst c2)  = toBool $ SEq p q -- c1 == c2
+--   p@(SAny name1) == q@(SAny name2) = toBool $ SEq p q -- name1 == name2
 
-  _ == _ = False
+--   SAnd _ _  == SAnd _ _  =
+--     error "Sym.Eq.(==): can't compare symbolic booleans for equality"
+--   SOr  _ _  == SOr _ _ =
+--     error "Sym.Eq.(==): can't compare symbolic booleans for equality"
+--   SNot _ == SNot _ =
+--     error "Sym.Eq.(==): can't compare symbolic booleans for equality"
+--   (SEq  _ _) == (SEq  _ _) =
+--     error "Sym.Eq.(==): can't compare symbolic booleans for equality"
+--   (SGt  _ _) == (SGt  _ _) =
+--     error "Sym.Eq.(==): can't compare symbolic booleans for equality"
+--   (SLt  _ _) == (SLt  _ _) =
+--     error "Sym.Eq.(==): can't compare symbolic booleans for equality"
 
-deriving instance Ord Sym
+--   p@(SAdd _ _) == q@(SAdd _ _) = toBool $ SEq p q
+--   p@(SSub _ _) == q@(SSub _ _) = toBool $ SEq p q
+--   p@(SMul _ _) == q@(SMul _ _) = toBool $ SEq p q
+--   p@(SDiv _ _) == q@(SDiv _ _) = toBool $ SEq p q
+--   p@(SMod _ _) == q@(SMod _ _) = toBool $ SEq p q
+--   p@(SAbs   _) == q@(SAbs   _) = toBool $ SEq p q
+
+--   _ == _ = False
+
+-- deriving instance Ord Sym
 
 -----------------------------------------------------------------------------
 -- | Try to perform constant folding and get the resulting value. Return 'Nothing' on

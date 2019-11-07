@@ -37,7 +37,7 @@ whenS' :: (Selective f, Monoid a) => f Bool -> f a -> f a
 whenS' x y = selector <*? effect
   where
     selector = bool (Right mempty) (Left ()) <$> x -- NB: maps True to Left ()
-    effect   = const                     <$> y
+    effect   = const                         <$> y
 -----------------------------------------------------------------------------
 
 add :: Register -> Address -> FS Key Selective Value a
@@ -45,7 +45,7 @@ add reg addr read write =
   let arg1 = read (Reg reg)
       arg2 = read (Addr addr)
       result = (+) <$> arg1 <*> arg2
-  in whenS' (toBool <$> ((==) <$> write (Reg reg) result <*> pure mempty))
+  in whenS' (toBool <$> ((===) <$> write (Reg reg) result <*> pure mempty))
             (write (F Condition) (pure true))
 
 

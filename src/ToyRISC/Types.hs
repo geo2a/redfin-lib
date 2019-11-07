@@ -22,7 +22,10 @@ module ToyRISC.Types
     , Flag (..)
       -- immediate agument
     , Imm (..)
+    -- packaged data
     , Data (..)
+    -- equality check that may fail
+    , Equality(..), TryEq (..)
     -- * Abstraction over possible locations in the ISA
     , Key(..)
 
@@ -32,8 +35,10 @@ module ToyRISC.Types
     , Value
     ) where
 
-import           Data.Int  (Int32)
-import           Data.Word (Word16)
+import           Data.Int      (Int32)
+import           Data.Typeable
+import           Data.Word     (Word16)
+import           Debug.Trace
 
 -- | Data registers
 data Register = R0 | R1
@@ -52,7 +57,7 @@ newtype Imm a = Imm a
   deriving (Show, Eq, Num)
 
 newtype Data a = MkData a
-  deriving (Show, Eq, Ord, Num)
+  deriving (Show, Eq, Ord, Num, Typeable)
 
 -----------------------------------------------------------------------------
 
@@ -116,10 +121,32 @@ instance Boolean Bool where
   x ||| y = x || y
   x &&& y = x && y
 
--- instance Boolean (Data Int32) where
---   true = (MkData 1)
---   not x = if x == (MkData 0) then (MkData 1) else (MkData 0)
---   toBool x = (x /= 0)
+data Equality a = Solvable Bool
+                | Unsolvable a
+                deriving (Show, Typeable)
+
+
+instance Show a => Boolean (Equality a) where
+  true = Solvable True
+  not  = error "Equality.Boolean.not: not is undefined"
+  toBool t = case t of
+    Solvable b   -> b
+    Unsolvable x -> -- True
+                    trace (show t) True
+  (|||) = error "Equality.Boolean.|||: undefined"
+  (&&&) = error "Equality.Boolean.&&&: undefined"
+
+-- | This class abstracts an equality check with possible failure, i.e. in the
+--   case when the values are symbolic. In case of concrete types with an 'Eq'
+--   instance '(===)' will always return @Right Bool@.
+class TryEq a where
+  (===) :: a -> a -> Equality a
+
+-- instance Eq a => TryEq (Data a) where
+--   (MkData x) === (MkData y) = Solvable (x == y)
+
+instance TryEq (Data Int32) where
+  (MkData x) === (MkData y) = Solvable (x == y)
 
 instance Semigroup (Data Int32) where
   (<>) = (+)
@@ -129,5 +156,5 @@ instance Monoid (Data Int32) where
 
 -- | We now consider a value to be a numeric monoid which could also be converted
 --   into booleans
-type Value a = (Eq a, Num a, Boolean a, Monoid a)
+type Value a = (Typeable a, Show a, TryEq a, Num a, Boolean a, Monoid a)
 -----------------------------------------------------------------------------
