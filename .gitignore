@@ -1,3 +1,6 @@
 .stack-work/
-serval-haskell.cabal
 *~
+*#
+*.smt2
+stack.yaml.lock
+*.el
