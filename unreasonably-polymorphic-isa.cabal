@@ -1,14 +1,14 @@
 cabal-version: 1.12
 
-name:           serval-haskell
+name:           unreasonably-polymorphic-isa
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/serval-haskell#readme>
-homepage:       https://github.com/githubuser/serval-haskell#readme
-bug-reports:    https://github.com/githubuser/serval-haskell/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2019 Author name here
-license:        BSD3
+description:    Please see the README on GitHub at <https://github.com/geo2a/unreasonably-polymorphic-isa#readme>
+homepage:       https://github.com/geo2a/unreasonably-polymorphic-isa#readme
+bug-reports:    https://github.com/geo2a/unreasonably-polymorphic-isa/issues
+author:         Georgy Lukyanov
+maintainer:     mail@geo2a.info
+copyright:      2019 Georgy Lukyanov
+license:        MIT
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
@@ -17,7 +17,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/serval-haskell
+  location: https://github.com/geo2a/unreasonably-polymorphic-isa
 
 library
   default-language: Haskell2010
@@ -77,4 +77,4 @@ test-suite tests
     tasty,
     tasty-hunit,
     sbv,
-    serval-haskell
+    unreasonably-polymorphic-isa
