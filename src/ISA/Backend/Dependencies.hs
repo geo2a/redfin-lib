@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module     : ToyRISC.Backend.Dependencies
+-- Module     : ISA.Backend.Dependencies
 -- Copyright  : (c) Georgy Lukyanov 2019
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
@@ -10,14 +10,14 @@
 --
 -----------------------------------------------------------------------------
 
-module ToyRISC.Backend.Dependencies
+module ISA.Backend.Dependencies
   (dependencies) where
 
 import           Control.Selective
 import           Data.Either       (partitionEithers)
 
 import           FS
-import           ToyRISC.Types
+import           ISA.Types
 
 trackingRead :: key -> Over [Either key key] a
 trackingRead key = Over [Left key]

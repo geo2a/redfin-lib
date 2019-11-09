@@ -2,17 +2,17 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 -----------------------------------------------------------------------------
 -- |
--- Module     : ToyRISC.Types
+-- Module     : ISA.Types
 -- Copyright  : (c) Georgy Lukyanov 2019
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 --
--- Types describing ToyRISC ISA
+-- Types describing ISA ISA
 --
 -----------------------------------------------------------------------------
 
-module ToyRISC.Types
+module ISA.Types
     ( -- * Types describing architecture concepts
       -- ** data register
       Register (..)

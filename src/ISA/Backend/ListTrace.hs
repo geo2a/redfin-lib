@@ -9,7 +9,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 -----------------------------------------------------------------------------
 -- |
--- Module     : ToyRISC.Backend.TreeTrace
+-- Module     : ISA.Backend.TreeTrace
 -- Copyright  : (c) Georgy Lucknow 2019
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
@@ -17,7 +17,7 @@
 --
 -- Pure tree trace-based symbolic execution backend
 -----------------------------------------------------------------------------
-module ToyRISC.Backend.ListTrace
+module ISA.Backend.ListTrace
     -- ( Env(..), Engine (..), run
     -- , State (..), bindings
     -- , pathCond, model -- lenses for State
@@ -35,9 +35,9 @@ import           Lens.Micro.Platform
 import           Prelude                   hiding (log, not, read, readIO)
 
 import           FS
-import           ToyRISC.Semantics
-import           ToyRISC.Symbolic
-import           ToyRISC.Types
+import           ISA.Semantics
+import           ISA.Symbolic
+import           ISA.Types
 
 data Context = MkContext { _bindings      :: Map.Map Key Sym
                          , _pathCondition :: Sym

@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
--- Module     : ToyRISC.SMT
+-- Module     : ISA.SMT
 -- Copyright  : (c) Georgy Lukyanov 2019
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-module ToyRISC.SMT
+module ISA.SMT
     -- ( -- get the list of free variables in a symbolic expression
     --   gatherFree
     --   -- check if the expression is satisfiable
@@ -30,7 +30,7 @@ import           Data.Text        (Text)
 import qualified Data.Text        as Text
 import           System.IO.Unsafe (unsafePerformIO)
 
-import           ToyRISC.Symbolic
+import           ISA.Symbolic
 
 -- | Walk the constraint gathering up the free variables.
 gatherFree :: Sym -> Set.Set Sym

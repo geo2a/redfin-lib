@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 import           Test.Tasty
-import           Test.Tasty.HUnit  ()
+import           Test.Tasty.HUnit ()
 
-import           ToyRISC.SMT.Tests
+import           ISA.SMT.Tests
 
 main :: IO ()
 main = defaultMain tests

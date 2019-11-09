@@ -6,15 +6,15 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module     : ToyRISC.Semantics
+-- Module     : ISA.Semantics
 -- Copyright  : (c) Georgy Lukyanov 2019
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 --
--- Semantics of ToyRISC instructions
+-- Semantics of ISA instructions
 -----------------------------------------------------------------------------
-module ToyRISC.Semantics
+module ISA.Semantics
     ( add
     , jumpCt
     , whenS'
@@ -26,7 +26,7 @@ import           Data.Functor      (void)
 import           Prelude           hiding (Read, read, readIO)
 
 import           FS
-import           ToyRISC.Types
+import           ISA.Types
 
 -----------------------------------------------------------------------------
 -- | A valiant of 'Control.Selective.whenS'

@@ -6,25 +6,25 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module     : ToyRISC.Instruction
+-- Module     : ISA.Instruction
 -- Copyright  : (c) Georgy Lukyanov 2019
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 --
--- Syntax of ToyRISC instructions
+-- Syntax of ISA instructions
 -----------------------------------------------------------------------------
-module ToyRISC.Types.Instruction
+module ISA.Types.Instruction
     ( Instruction(..)
     ) where
 
 import           Prelude       hiding (Read, readIO)
 
-import           ToyRISC.Types
+import           ISA.Types
 
 -----------------------------------------------------------------------------
 
--- | Syntax of ToyRISC instructions
+-- | Syntax of ISA instructions
 data Instruction a = Ret
                  -- ^ end execution
                  --   @pc <- 0; halt@

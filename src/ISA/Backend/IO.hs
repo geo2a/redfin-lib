@@ -2,17 +2,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
--- Module     : ToyRISC.Backend.IO
+-- Module     : ISA.Backend.IO
 -- Copyright  : (c) Georgy Lukyanov 2019
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 --
--- Simplistic IO-based interpreter for ToyRISC
+-- Simplistic IO-based interpreter for ISA
 
 -----------------------------------------------------------------------------
 
-module ToyRISC.Backend.IO
+module ISA.Backend.IO
     ( bootRuntimeIO
     , example ) where
 
@@ -25,8 +25,8 @@ import qualified Data.Map                   as Map
 import           FS
 import           Prelude                    hiding (Read, init, readIO)
 
-import           ToyRISC.Semantics
-import           ToyRISC.Types
+import           ISA.Semantics
+import           ISA.Types
 
 -- | Simulator environment
 data Env a = MkEnv

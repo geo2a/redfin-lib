@@ -1,14 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module ToyRISC.SMT.Tests where
+module ISA.SMT.Tests where
 
 import qualified Data.SBV.Dynamic as SBV ()
 import qualified Data.Set         as Set
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
-import           ToyRISC.SMT
-import           ToyRISC.Symbolic
+import           ISA.SMT
+import           ISA.Symbolic
 -----------------------------------------------------------------------------
 gatherFreeTests :: TestTree
 gatherFreeTests =
@@ -30,7 +30,7 @@ satTests = testGroup "SMT.sat"
           assertBool (show result) (isSat result)
       ]
 
-testExpr1 :: Sym Bool
+testExpr1 :: Sym
 testExpr1 = let x = SAny "x"
                 y = SAny "y"
                 xGt10 = SGt x (SConst 10)
@@ -38,7 +38,7 @@ testExpr1 = let x = SAny "x"
                 xEqY = SEq x y
             in SAnd xEqY (SAnd xGt10 yLt0)
 
-testExpr2 :: Sym Bool
+testExpr2 :: Sym
 testExpr2 = let x = SAny "x"
                 y = SAny "y"
                 xGt10 = SGt x (SConst 10)
@@ -46,7 +46,7 @@ testExpr2 = let x = SAny "x"
                 sumGt10 s = SGt s (SConst 10)
             in conjoin [sumGt10 (SAdd x y), xGt10, yGt0]
 
-plusComm :: Sym Bool
+plusComm :: Sym
 plusComm = let x = SAny "x"
                y = SAny "y"
            in SNot $ SEq (x + y) (y + x)

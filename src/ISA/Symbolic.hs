@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 -----------------------------------------------------------------------------
 -- |
--- Module     : ToyRISC.Symbolic
+-- Module     : ISA.Symbolic
 -- Copyright  : (c) Georgy Lukyanov 2019
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
@@ -12,7 +12,7 @@
 -- Typed symbolic expressions syntax
 --
 -----------------------------------------------------------------------------
-module ToyRISC.Symbolic
+module ISA.Symbolic
     (Concrete(..), Sym (..), simplify, getValue) where
 
 import           Data.Int      (Int32)
@@ -22,7 +22,7 @@ import           Data.Typeable
 import           Debug.Trace
 import           Prelude       hiding (not)
 
-import           ToyRISC.Types
+import           ISA.Types
 
 -----------------------------------------------------------------------------
 
