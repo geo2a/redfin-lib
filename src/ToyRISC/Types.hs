@@ -120,6 +120,15 @@ instance Boolean Bool where
   x ||| y = x || y
   x &&& y = x && y
 
+instance Boolean (Data Int32) where
+  toBool (MkData x) = x /= 0
+  true = MkData 1
+  not  (MkData x) = if x == 0 then 1 else 0
+
+  x ||| y = if (toBool x ||| toBool y) then 1 else 0
+  x &&& y = if (toBool x &&& toBool y) then 1 else 0
+
+
 data Equality a = Trivial Bool
                 | Nontrivial a
                 deriving (Show, Typeable)
@@ -153,5 +162,5 @@ instance Monoid (Data Int32) where
 
 -- | We now consider a value to be a numeric monoid which could also be converted
 --   into booleans
-type Value a = (Typeable a, Show a, TryEq a, Num a, Boolean a, Monoid a)
+type Value a = (Typeable a, Show a, TryEq a, Num a, Boolean a)
 -----------------------------------------------------------------------------

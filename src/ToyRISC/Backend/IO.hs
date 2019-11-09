@@ -1,3 +1,4 @@
+{-# LANGUAGE MonoLocalBinds      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -----------------------------------------------------------------------------
 -- |
@@ -8,7 +9,7 @@
 -- Stability  : experimental
 --
 -- Simplistic IO-based interpreter for ToyRISC
---
+
 -----------------------------------------------------------------------------
 
 module ToyRISC.Backend.IO
@@ -18,10 +19,11 @@ module ToyRISC.Backend.IO
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Trans.Reader
 import           Control.Selective
+import           Data.Int                   (Int32)
 import           Data.IORef
 import qualified Data.Map                   as Map
 import           FS
-import           Prelude                    hiding (Read, readIO)
+import           Prelude                    hiding (Read, init, readIO)
 
 import           ToyRISC.Semantics
 import           ToyRISC.Types
@@ -36,7 +38,7 @@ bootRuntimeIO :: [(Key, a)] -> IO (Env a)
 bootRuntimeIO init =
   pure . MkEnv =<< newIORef (Map.fromList init)
 
-readIO :: Show a => Key -> ReaderT (Env a) IO a
+readIO :: Key -> ReaderT (Env a) IO a
 readIO key = do
   boundKeys <- liftIO . readIORef . bindings =<< ask
   case Map.lookup key boundKeys of
@@ -49,21 +51,22 @@ writeIO :: Show a => Key -> ReaderT (Env a) IO a -> ReaderT (Env a) IO a
 writeIO key producer = do
   env <- ask
   value <- liftIO (runReaderT producer env)
-  env <- ask
-  boundKeys <- liftIO . readIORef . bindings $ env
+  env' <- ask
+  boundKeys <- liftIO . readIORef . bindings $ env'
   liftIO $ writeIORef (bindings env) (Map.adjust (const value) key boundKeys)
   liftIO $ putStrLn $ "Write: (" <> show key <> ", " <> show value <> ")"
   pure value
 
-simulateIO :: (Value a, Show a) => FS Key Selective Value a -> IO ()
-simulateIO comp = do
-  (env :: Env a) <-
+simulateIO :: Env (Data Int32) -> FS Key Selective Value (Data Int32) -> IO (Data Int32)
+simulateIO env comp = do
+  runReaderT (comp readIO writeIO) env
+
+example :: IO ()
+example = do
+  env  <-
     bootRuntimeIO [ (IC, 0)
                   , (F Condition, 0)
                   , (Reg R0, -1)
-                  , (Addr 0, 2)]
-  -- runReaderT (add R0 0 readIO writeIO *> jumpCt 42 readIO writeIO) env
-  runReaderT (comp readIO writeIO) env
-  putStrLn "Done."
-
-example = simulateIO (add R0 0 :: FS Key Selective Value (Data Int))
+                  , (Addr 0, 1)]
+  result <- simulateIO env (add R0 0)
+  print result
