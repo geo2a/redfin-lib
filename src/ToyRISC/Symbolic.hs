@@ -140,10 +140,10 @@ instance Boolean (Data Sym) where
   (MkData x) &&& (MkData y) = MkData (SAnd x y)
 
 instance TryEq Sym where
-  x === y = Unsolvable (SEq x y)
+  x === y = Nontrivial (SEq x y)
 
 instance TryEq (Data Sym) where
-  (MkData x) === (MkData y) = Unsolvable (MkData $ SEq x y)
+  (MkData x) === (MkData y) = Nontrivial (MkData $ SEq x y)
 
 -- instance Eq Sym  where
 --   p@(SConst c1)  == q@(SConst c2)  = toBool $ SEq p q -- c1 == c2

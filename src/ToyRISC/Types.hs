@@ -38,7 +38,6 @@ module ToyRISC.Types
 import           Data.Int      (Int32)
 import           Data.Typeable
 import           Data.Word     (Word16)
-import           Debug.Trace
 
 -- | Data registers
 data Register = R0 | R1
@@ -121,18 +120,16 @@ instance Boolean Bool where
   x ||| y = x || y
   x &&& y = x && y
 
-data Equality a = Solvable Bool
-                | Unsolvable a
+data Equality a = Trivial Bool
+                | Nontrivial a
                 deriving (Show, Typeable)
 
-
-instance Show a => Boolean (Equality a) where
-  true = Solvable True
+instance Boolean (Equality a) where
+  true = Trivial True
   not  = error "Equality.Boolean.not: not is undefined"
   toBool t = case t of
-    Solvable b   -> b
-    Unsolvable x -> -- True
-                    trace (show t) True
+    Trivial b    -> b
+    Nontrivial _ -> True
   (|||) = error "Equality.Boolean.|||: undefined"
   (&&&) = error "Equality.Boolean.&&&: undefined"
 
@@ -143,10 +140,10 @@ class TryEq a where
   (===) :: a -> a -> Equality a
 
 -- instance Eq a => TryEq (Data a) where
---   (MkData x) === (MkData y) = Solvable (x == y)
+--   (MkData x) === (MkData y) = Trivial (x == y)
 
 instance TryEq (Data Int32) where
-  (MkData x) === (MkData y) = Solvable (x == y)
+  (MkData x) === (MkData y) = Trivial (x == y)
 
 instance Semigroup (Data Int32) where
   (<>) = (+)

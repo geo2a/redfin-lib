@@ -22,7 +22,7 @@ module ToyRISC.Semantics
 
 import           Control.Selective
 import           Data.Bool         (bool)
--- import           Data.Functor      (void)
+import           Data.Functor      (void)
 import           Prelude           hiding (Read, read, readIO)
 
 import           FS
@@ -45,13 +45,15 @@ add reg addr read write =
   let arg1 = read (Reg reg)
       arg2 = read (Addr addr)
       result = (+) <$> arg1 <*> arg2
-  in whenS' (toBool <$> ((===) <$> write (Reg reg) result <*> pure mempty))
-            (write (F Condition) (pure true))
+  in whenS (toBool <$> ((===) <$> write (Reg reg) result <*> pure (fromInteger 0)))
+           (void $ write (F Condition) (pure true))
+     *> result
 
 
 jumpCt :: a -> FS Key Selective Value a
 jumpCt offset read write =
-    whenS' (toBool <$> read (F Condition))
-           (write IC ((+) <$> pure offset
-                          <*> read IC))
+    whenS (toBool <$> read (F Condition))
+          (void $ write IC ((+) <$> pure offset
+                                <*> read IC))
+    *> read IC
 -----------------------------------------------------------------------------
