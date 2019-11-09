@@ -48,7 +48,8 @@ newtype Address = Address Word16
   deriving (Show, Eq, Ord, Num)
 
 -- | Flag
-data Flag = Condition
+data Flag = Halted
+          | Condition
   deriving (Show, Eq, Ord)
 
 -- | Immediate argument
@@ -162,5 +163,5 @@ instance Monoid (Data Int32) where
 
 -- | We now consider a value to be a numeric monoid which could also be converted
 --   into booleans
-type Value a = (Typeable a, Show a, TryEq a, Num a, Boolean a)
+type Value a = (Show a, TryEq a, Monoid a, Num a, Boolean a)
 -----------------------------------------------------------------------------
