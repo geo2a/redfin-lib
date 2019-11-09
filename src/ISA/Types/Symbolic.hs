@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 -----------------------------------------------------------------------------
 -- |
--- Module     : ISA.Symbolic
+-- Module     : ISA.Types.Symbolic
 -- Copyright  : (c) Georgy Lukyanov 2019
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
@@ -12,7 +12,7 @@
 -- Typed symbolic expressions syntax
 --
 -----------------------------------------------------------------------------
-module ISA.Symbolic
+module ISA.Types.Symbolic
     (Concrete(..), Sym (..), simplify, getValue) where
 
 import           Data.Int      (Int32)
@@ -144,34 +144,6 @@ instance TryEq Sym where
 
 instance TryEq (Data Sym) where
   (MkData x) === (MkData y) = Nontrivial (MkData $ SEq x y)
-
--- instance Eq Sym  where
---   p@(SConst c1)  == q@(SConst c2)  = toBool $ SEq p q -- c1 == c2
---   p@(SAny name1) == q@(SAny name2) = toBool $ SEq p q -- name1 == name2
-
---   SAnd _ _  == SAnd _ _  =
---     error "Sym.Eq.(==): can't compare symbolic booleans for equality"
---   SOr  _ _  == SOr _ _ =
---     error "Sym.Eq.(==): can't compare symbolic booleans for equality"
---   SNot _ == SNot _ =
---     error "Sym.Eq.(==): can't compare symbolic booleans for equality"
---   (SEq  _ _) == (SEq  _ _) =
---     error "Sym.Eq.(==): can't compare symbolic booleans for equality"
---   (SGt  _ _) == (SGt  _ _) =
---     error "Sym.Eq.(==): can't compare symbolic booleans for equality"
---   (SLt  _ _) == (SLt  _ _) =
---     error "Sym.Eq.(==): can't compare symbolic booleans for equality"
-
---   p@(SAdd _ _) == q@(SAdd _ _) = toBool $ SEq p q
---   p@(SSub _ _) == q@(SSub _ _) = toBool $ SEq p q
---   p@(SMul _ _) == q@(SMul _ _) = toBool $ SEq p q
---   p@(SDiv _ _) == q@(SDiv _ _) = toBool $ SEq p q
---   p@(SMod _ _) == q@(SMod _ _) = toBool $ SEq p q
---   p@(SAbs   _) == q@(SAbs   _) = toBool $ SEq p q
-
---   _ == _ = False
-
--- deriving instance Ord Sym
 
 -----------------------------------------------------------------------------
 -- | Try to perform constant folding and get the resulting value. Return 'Nothing' on

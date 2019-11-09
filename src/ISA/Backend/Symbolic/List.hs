@@ -9,67 +9,73 @@
 {-# LANGUAGE TemplateHaskell            #-}
 -----------------------------------------------------------------------------
 -- |
--- Module     : ISA.Backend.TreeTrace
--- Copyright  : (c) Georgy Lucknow 2019
+-- Module     : ISA.Backend.Symbolic.List
+-- Copyright  : (c) Georgy Lukyanov 2019
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 --
 -- Pure tree trace-based symbolic execution backend
 -----------------------------------------------------------------------------
-module ISA.Backend.ListTrace
-    -- ( Env(..), Engine (..), run
-    -- , State (..), bindings
-    -- , pathCond, model -- lenses for State
-    -- , ) where
-  where
+module ISA.Backend.Symbolic.List
+    ( -- * symbolic execution state
+      Context(..)
+      -- * symbolic execution engine
+    , Engine (..)
+      -- instances of read/write callbacks for Engine
+    , readKey, writeKey
+      -- examples
+    , example
+    ) where
 
-import           Unsafe.Coerce
--- import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Reader
 import           Control.Monad.State.Class
 import           Control.Selective
 import qualified Data.Map.Strict           as Map
 import           GHC.Exts                  (Any)
-import           Lens.Micro.Platform
 import           Prelude                   hiding (log, not, read, readIO)
+import           Unsafe.Coerce
 
-import           FS
 import           ISA.Semantics
-import           ISA.Symbolic
 import           ISA.Types
+import           ISA.Types.Symbolic
 
+-- | A record type for state of the symbolically executed computation
+--   * @_bindings@: keys (like register names, memory cells) mapped to their symbolic values
+--   * @_pathCondition@ : a symbolic expression which must hold for this state to be
+--     reachable
+--   * @_fmapLog@: a stack of values of @fmap@'s second arguments.
+--     Consider @fmap (f :: a -> b) (x :: Engine a)@, then after executing this
+--     computations: @head (_fmapLog s)@ will contain the "purified" @x@, i.e.
+--     a value of type @a@ coerced to 'GHC.Exts.Any'. This field is modified
+--     via 'pushFmapArg' and 'popFmapArg' functions.
+--     (TODO: come up with a better explanation for this)
 data Context = MkContext { _bindings      :: Map.Map Key Sym
                          , _pathCondition :: Sym
                          , _fmapLog       :: [Any]
                          }
 
-makeLenses ''Context
-
 instance Show Context where
-  -- show = Text.unpack . pShow
   show ctx = unlines [ "Path constraint: " <> show (_pathCondition ctx)
                      , "Context: " <> show (Map.toList $ _bindings ctx)
-                     -- , "last fmap argument: " <> show (_lastFmap ctx)
                      ]
 
--- | The Symbolic Execution Engine maintains the state of the machine and a list
---   of path constraints.
+-- | A Symbolic Execution Engine is a combination of State and List monads:
+--   given a state, it produces a list of new possible states. Imagine conditional
+--   branch: one state (before branch) produces two new states, one where the condition
+--   is true and one where it's false.
 data Engine a = Engine
     { runEngine :: Context -> [(a, Context)] }
 
+{-# WARNING pushFmapArg "This function uses @unsafeCoerce@." #-}
 pushFmapArg :: a -> Engine ()
 pushFmapArg res = do
-  -- Engine $ \s ->
-  -- pure ((), s {_fmapLog = (unsafeCoerce res :: Any) : _fmapLog s})
   s <- get
   put $ s {_fmapLog = (unsafeCoerce res :: Any) : _fmapLog s}
 
+{-# WARNING popFmapArg "This function uses @unsafeCoerce@." #-}
 popFmapArg :: Engine a
 popFmapArg = do
-  -- Engine $ \s ->
-  -- let (res:rest) = _fmapLog s
-  -- in pure (unsafeCoerce res, s {_fmapLog = rest})
   s <- get
   case (_fmapLog s) of
     [] -> error "Engine.popFmapArg: empty _fmapLog!"
@@ -77,6 +83,9 @@ popFmapArg = do
       put $ s {_fmapLog = rest}
       pure (unsafeCoerce res)
 
+-- | The 'Functor' instance for @Engine@, besides fmapping the result of the
+--   computations performs additional work: it logs the "purified" value of @fmap@'s
+--   second argument via 'pushFmapArg'.
 instance Functor Engine where
   fmap f e =
     Engine $ \s0 -> do
@@ -162,17 +171,8 @@ writeKey key computation = do
   put $ ctx {_bindings = Map.insert key value (_bindings ctx)}
   pure (MkData value)
 -----------------------------------------------------------------------------
-add' :: Register -> Address -> FS Key Selective Value a
-add' reg addr read write =
-  let arg1 = read (Reg reg)
-      arg2 = read (Addr addr)
-      result = (+) <$> arg1 <*> arg2
-  in ifS (toBool <$> ((===) <$> write (Reg reg) result <*> pure (fromInteger 0)))
-         (write (F Condition) (pure true))
-         (write (F Condition) (pure (not true)))
-
-ex :: IO ()
-ex = do
+example :: IO ()
+example = do
   let ctx = MkContext { _pathCondition = SConst (CBool True)
                       , _bindings = Map.fromList [ (IC, SConst 0)
                                                  , (F Condition, SEq (SAny "z") (SConst 0))

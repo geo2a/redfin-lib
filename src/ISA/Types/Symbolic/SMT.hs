@@ -1,36 +1,32 @@
-{-# LANGUAGE GADTs        #-}
-{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
--- Module     : ISA.SMT
+-- Module     : ISA.Symbolic.SMT
 -- Copyright  : (c) Georgy Lukyanov 2019
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 --
--- SMT bindings via SBV
+-- Semantics of symbolic expressions in terms of SMT
 --
 -----------------------------------------------------------------------------
 
-module ISA.SMT
-    -- ( -- get the list of free variables in a symbolic expression
-    --   gatherFree
-    --   -- check if the expression is satisfiable
-    -- , sat, Options (..), solve
-    --   -- helper functions
-    -- , conjoin, isSat, isUnsat
-    -- ) where
-  where
+module ISA.Types.Symbolic.SMT
+    ( -- get the list of free variables in a symbolic expression
+      gatherFree
+      -- check if the expression is satisfiable
+    , sat, Options (..), solve
+      -- helper functions
+    , conjoin, isSat, isUnsat
+    ) where
 
-import           Data.Int         (Int32)
-import qualified Data.Map.Strict  as Map
-import qualified Data.SBV.Dynamic as SBV
-import qualified Data.Set         as Set
-import           Data.Text        (Text)
-import qualified Data.Text        as Text
-import           System.IO.Unsafe (unsafePerformIO)
+import qualified Data.Map.Strict    as Map
+import qualified Data.SBV.Dynamic   as SBV
+import qualified Data.Set           as Set
+import           Data.Text          (Text)
+import qualified Data.Text          as Text
+import           System.IO.Unsafe   (unsafePerformIO)
 
-import           ISA.Symbolic
+import           ISA.Types.Symbolic
 
 -- | Walk the constraint gathering up the free variables.
 gatherFree :: Sym -> Set.Set Sym
@@ -83,9 +79,9 @@ symToSMT m (SSub l r) =
   (SBV.svMinus) <$> symToSMT m l <*> symToSMT m r
 symToSMT m (SMul l r) =
   (SBV.svTimes) <$> symToSMT m l <*> symToSMT m r
-symToSMT m (SDiv l r) = error "SMT.symToSMT: div is not yet defined"
+symToSMT _ (SDiv _ _) = error "SMT.symToSMT: div is not yet defined"
 --   (SBV.svDiv) <$> symToSMT m l <*> symToSMT m r
-symToSMT m (SMod l r) = error "SMT.symToSMT: mod is not yet defined"
+symToSMT _ (SMod _ _) = error "SMT.symToSMT: mod is not yet defined"
 --   (SBV.svMod) <$> symToSMT m l <*> symToSMT m r
 symToSMT _ (SConst (CInt i)) = pure (SBV.svInteger (SBV.KBounded True 32) (fromIntegral i))
 symToSMT _ (SConst (CBool b)) = pure (SBV.svBool b)

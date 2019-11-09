@@ -23,15 +23,16 @@ library
   default-language: Haskell2010
   exposed-modules:
       ISA,
-      ISA.SMT,
-      ISA.Symbolic
+      ISA.Types.Symbolic,
+      ISA.Types.Symbolic.SMT
   other-modules:
       FS,
       ISA.Types,
       ISA.Types.Instruction,
       ISA.Semantics,
-      ISA.Backend.IO
-
+      ISA.Backend.IO,
+      ISA.Backend.Dependencies,
+      ISA.Backend.Symbolic.List
   hs-source-dirs:
       src
   build-depends:
@@ -46,7 +47,6 @@ library
       pretty-simple,
       text,
       transformers
-  default-language: Haskell2010
   default-extensions: LambdaCase
                     , FlexibleContexts
                     , FlexibleInstances

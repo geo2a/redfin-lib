@@ -2,13 +2,13 @@
 
 module ISA.SMT.Tests where
 
-import qualified Data.SBV.Dynamic as SBV ()
-import qualified Data.Set         as Set
+import qualified Data.SBV.Dynamic       as SBV ()
+import qualified Data.Set               as Set
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
-import           ISA.SMT
-import           ISA.Symbolic
+import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.SMT
 -----------------------------------------------------------------------------
 gatherFreeTests :: TestTree
 gatherFreeTests =
