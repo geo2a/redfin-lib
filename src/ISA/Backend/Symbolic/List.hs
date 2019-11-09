@@ -24,8 +24,6 @@ module ISA.Backend.Symbolic.List
     , Engine (..)
       -- instances of read/write callbacks for Engine
     , readKey, writeKey
-      -- examples
-    , example
     ) where
 
 import           Control.Monad.Reader
@@ -171,19 +169,3 @@ writeKey key computation = do
   put $ ctx {_bindings = Map.insert key value (_bindings ctx)}
   pure (MkData value)
 -----------------------------------------------------------------------------
-example :: IO ()
-example = do
-  let ctx = MkContext { _pathCondition = SConst (CBool True)
-                      , _bindings = Map.fromList [ (IC, SConst 0)
-                                                 , (F Condition, SEq (SAny "z") (SConst 0))
-                                                 , (Reg R0, SAny "r0")
-                                                 , (Reg R1, SAny "r1")
-                                                 , (Addr 0, SAny "a0")
-                                                 , (Addr 1, SAny "a1")
-                                                 ]
-                      , _fmapLog = []
-                      }
-  let t = add R0 0 readKey writeKey
-  let xs = runEngine t ctx
-  print $ xs
-  pure ()
