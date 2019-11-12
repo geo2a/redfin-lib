@@ -36,6 +36,7 @@ import           Unsafe.Coerce
 
 import           ISA.Semantics
 import           ISA.Types
+import           ISA.Types.Instruction
 import           ISA.Types.Symbolic
 
 -- | A record type for state of the symbolically executed computation
@@ -49,6 +50,7 @@ import           ISA.Types.Symbolic
 --     via 'pushFmapArg' and 'popFmapArg' functions.
 --     (TODO: come up with a better explanation for this)
 data Context = MkContext { _bindings      :: Map.Map Key Sym
+                         , ir             :: Instruction (Data Sym)
                          , _pathCondition :: Sym
                          , _fmapLog       :: [Any]
                          }
@@ -62,6 +64,9 @@ instance Show Context where
 --   given a state, it produces a list of new possible states. Imagine conditional
 --   branch: one state (before branch) produces two new states, one where the condition
 --   is true and one where it's false.
+--
+--   A fun note: isn't this a monadic parser? How can we explore a connection between
+--   symbolic execution and parsing and turn it into a functional pearl for ICFP...
 data Engine a = Engine
     { runEngine :: Context -> [(a, Context)] }
 
@@ -158,9 +163,9 @@ instance (MonadState Context) Engine where
 
 readKey :: Key -> Engine (Data Sym)
 readKey key = do
-  ctx <- get
-  let x = (Map.!) (_bindings ctx) key
-  pure (MkData x)
+    ctx <- get
+    let x = (Map.!) (_bindings ctx) key
+    pure (MkData x)
 
 writeKey :: Key -> Engine (Data Sym) -> Engine (Data Sym)
 writeKey key computation = do
@@ -169,3 +174,49 @@ writeKey key computation = do
   put $ ctx {_bindings = Map.insert key value (_bindings ctx)}
   pure (MkData value)
 -----------------------------------------------------------------------------
+
+-- | Fetching an instruction is a Monadic operation. It is possible
+--   (and natural) to implement in terms of @FS Key Monad Value@, but
+--   for now we'll stick with this concrete implementation in the
+--   @Engine@ monad.
+fetchInstruction :: Engine ()
+fetchInstruction =
+  readKey IC >>= \(MkData x) -> case (toAddress x) of
+    Right ic -> void $ writeKey IR (readKey (Prog ic))
+    Left sym ->
+      error $ "Engine.fetchInstruction: symbolic or malformed instruction counter "
+            <> show sym
+
+incrementInstructionCounter :: Engine ()
+incrementInstructionCounter =
+  void $ writeKey IC ((+ 1) <$> readKey IC)
+
+-- readInstructionRegister :: Engine (Instruction (Data Sym))
+-- readInstructionRegister = do
+--   irSym <- readKey IR
+
+-- pipeline :: Context -> (Instruction (Data Sym), Context)
+-- pipeline state =
+--     let steps = do fetchInstruction
+--                    incrementInstructionCounter
+--                    readInstructionRegister
+--     in case runSymEngine steps state of
+--             [result] -> result
+--             _ -> error
+--                 "piplineStep: impossible happened: fetchInstruction returned not a singleton."
+
+-- readInstructionRegister :: SymEngine InstructionCode
+-- readInstructionRegister = instructionRegister <$> get
+
+-- -- | Perform one step of symbolic execution
+-- symStep :: State -> [State]
+-- symStep state =
+--     let (instrCode, fetched) = pipeline state
+--         instrSemantics =
+--              case decode instrCode of
+--                 (Instruction (JumpZero offset)) -> jumpZeroSym offset
+--                 (Instruction (LoadMI reg addr)) -> loadMISym reg addr
+--                 (Instruction (JumpCt offset))   -> jumpCtSym offset
+--                 (Instruction (JumpCf offset))   -> jumpCfSym offset
+--                 i                               -> instructionSemantics i readKey writeKey
+--     in map snd $ runSymEngine instrSemantics fetched

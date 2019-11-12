@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -17,8 +18,9 @@
 -- Syntax of ISA instructions
 -----------------------------------------------------------------------------
 module ISA.Types.Instruction
-    -- ( Instruction(..)
-    -- )
+    ( Instruction(..), mkI
+    , InstructionImpl(..)
+    )
   where
 
 import           Control.Selective
@@ -28,6 +30,7 @@ import           Data.Word         (Word16, Word64, Word8)
 import           Prelude           hiding (Read, readIO)
 import           Prelude           hiding (Monad, Read, abs, div, mod)
 import qualified Prelude           (Monad, Read, abs, div, mod)
+import GHC.Generics (Generic)
 
 import           ISA.Types
 
@@ -56,15 +59,14 @@ data InstructionImpl (c :: (* -> *) -> Constraint) a where
   Mod      :: Register -> Address -> InstructionImpl Applicative a
   Abs      :: Register                  -> InstructionImpl Applicative a
   Jump     :: Value a => Imm a                    -> InstructionImpl Applicative a
-  JumpZero :: Value a => Imm a                   -> InstructionImpl Selective a
   LoadMI   :: Register -> Address -> InstructionImpl Prelude.Monad a
 
   CmpEq    :: Register  -> Address -> InstructionImpl Selective a
   CmpGt    :: Register  -> Address -> InstructionImpl Selective a
   CmpLt    :: Register  -> Address -> InstructionImpl Selective a
 
-  JumpCt   :: Value a => Imm a                     -> InstructionImpl Selective a
-  JumpCf   :: Value a => Imm a                     -> InstructionImpl Selective a
+  JumpCt   :: Value a => Imm a -> InstructionImpl Selective a
+  JumpCf   :: Value a => Imm a -> InstructionImpl Selective a
 
 -- deriving instance Eq  (InstructionImpl c)
 -- deriving instance Ord (InstructionImpl c)
@@ -82,7 +84,6 @@ instance Show (InstructionImpl c a) where
     Mod      reg addr  -> "Mod "      ++ show reg ++ " " ++ show addr
     Abs      reg       -> "Abs "      ++ show reg
     Jump     offset    -> "Jump "     ++ show offset
-    JumpZero offset    -> "JumpZero " ++ show offset
     JumpCt   offset    -> "JumpCt "   ++ show offset
     JumpCf   offset    -> "JumpCf "   ++ show offset
     LoadMI   reg addr  -> "LoadMI "   ++ show reg ++ " " ++ show addr
@@ -92,6 +93,9 @@ instance Show (InstructionImpl c a) where
     CmpLt    reg addr  -> "CmpLt " ++ show reg ++ " " ++ show addr
 
 data Instruction a = forall c. Instruction (InstructionImpl c a)
+
+mkI :: forall c a. InstructionImpl c a -> Instruction a
+mkI = Instruction
 
 instance Show (Instruction a) where
   show (Instruction i) = show i

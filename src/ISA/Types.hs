@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 -----------------------------------------------------------------------------
@@ -20,8 +22,10 @@ module ISA.Types
     , Address (..)
       -- ** flag
     , Flag (..)
-      -- immediate agument
+      -- immediate argument
     , Imm (..)
+    -- instruction code
+    , InstructionCode (..)
     -- packaged data
     , Data (..)
     -- equality check that may fail
@@ -35,37 +39,70 @@ module ISA.Types
     , Value
     ) where
 
-import           Data.Int      (Int32)
+import           Data.Bits
+import           Data.Int        (Int32)
 import           Data.Typeable
-import           Data.Word     (Word16)
+import           Data.Word       (Word16)
+import           Generic.Random
+import           GHC.Generics    (Generic)
+import           Test.QuickCheck (Arbitrary, arbitrary)
 
 -- | Data registers
-data Register = R0 | R1
-  deriving (Show, Eq, Ord)
+data Register = R0 | R1 | R2 | R3
+  deriving (Show, Eq, Ord, Generic)
+
+instance Arbitrary Register where
+  arbitrary = genericArbitrary uniform
 
 -- | Memory location
 newtype Address = Address Word16
-  deriving (Show, Eq, Ord, Num)
+  deriving (Show, Eq, Ord, Num, Real, Enum, Integral, Bounded, Bits, FiniteBits, Generic)
+
+instance Arbitrary Address where
+  arbitrary = genericArbitrary uniform
 
 -- | Flag
 data Flag = Halted
           | Condition
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance Arbitrary Flag where
+  arbitrary = genericArbitrary uniform
 
 -- | Immediate argument
 newtype Imm a = Imm a
-  deriving (Show, Eq, Num)
+  deriving (Functor, Show, Eq, Num, Bits, FiniteBits, Generic)
+
+instance Arbitrary a => Arbitrary (Imm a) where
+  arbitrary = genericArbitrary uniform
+
+newtype InstructionCode a = InstructionCode a
+  deriving (Functor, Show, Eq, Ord, Num, Bits, FiniteBits, Generic)
+
+instance Arbitrary a => Arbitrary (InstructionCode a) where
+  arbitrary = genericArbitrary uniform
 
 newtype Data a = MkData a
-  deriving (Show, Eq, Ord, Num, Typeable)
+  deriving (Functor, Show, Eq, Ord, Num, Typeable, Bounded, Bits, FiniteBits, Generic)
+
+instance Arbitrary a => Arbitrary (Data a) where
+  arbitrary = genericArbitrary uniform
 
 -----------------------------------------------------------------------------
 
 data Key where
   Reg :: Register -> Key
+  -- ^ data register
   Addr :: Address -> Key
+  -- ^ memory cell
   F :: Flag -> Key
+  -- ^ flag, a special boolean register
   IC :: Key
+  -- ^ instruction counter
+  IR :: Key
+  -- ^ instruction register
+  Prog :: Address -> Key
+  -- ^ program address
 
 deriving instance Eq Key
 deriving instance Ord Key
@@ -76,34 +113,8 @@ instance Show Key where
         Addr addr  -> show addr
         F    flag  -> show flag
         IC         -> "IC"
-        -- IR         -> "IR"
-        -- Prog addr  -> show addr
-
--- data Key a where
---     Reg  :: Register -> Key Int32
---     -- ^ register
---     Addr :: Address -> Key Int32
---     -- ^ memory address
---     F   :: Flag -> Key Bool
---     -- -- ^ flag
---     IC   :: Key Int32
---     -- -- ^ instruction counter
---     -- IR   :: Key (InstructionCode)
---     -- -- ^ instruction register
---     -- Prog :: InstructionAddress -> Key (InstructionCode)
---     -- -- ^ program memory address
-
--- deriving instance Eq a => Eq (Key a)
--- deriving instance Ord a => Ord (Key a)
-
--- instance Show (Key a) where
---     show = \case
---         Reg  reg   -> show reg
---         Addr addr  -> show addr
---         F    flag  -> show flag
---         IC         -> "IC"
---         -- IR         -> "IR"
---         -- Prog addr  -> show addr
+        IR         -> "IR"
+        Prog addr  -> show addr
 
 class Boolean a where
   toBool  :: a -> Bool

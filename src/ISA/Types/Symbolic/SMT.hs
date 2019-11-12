@@ -147,7 +147,7 @@ data Options = DeadEnd
 
 solve :: Sym -> Int -> Options
 solve expr fuel =
-  case getValue (simplify fuel expr) of
+  case getValue (simplify (Just fuel) expr) of
     Just (CBool val) -> Literal val
     Just (CInt i) -> error $ "Sym.solve: non-boolean literal " <> show i
     Nothing ->

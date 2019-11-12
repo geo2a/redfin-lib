@@ -13,7 +13,10 @@
 --
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic
-    (Concrete(..), Sym (..), simplify, getValue) where
+    ( Concrete(..), Sym (..), simplify
+    -- try to concertise symbolic values
+    , getValue, toAddress, toImm
+    ) where
 
 import           Data.Int      (Int32)
 import           Data.Text     (Text)
@@ -207,7 +210,29 @@ tryReduce = \case
     (SLt x y) -> tryReduce x `SLt` tryReduce y
     s -> s
 
-simplify :: Int -> Sym -> Sym
-simplify steps | steps <= 0  = id
-               | otherwise   = last . take steps
-                             . iterate (tryFoldConstant . tryReduce)
+simplify :: (Maybe Int) -> Sym -> Sym
+simplify steps =
+  let actualSteps = case steps of
+                       Nothing -> defaultSteps
+                       Just s  -> s
+  in last . take actualSteps . iterate (tryFoldConstant . tryReduce)
+  where defaultSteps = 1000
+-----------------------------------------------------------------------------
+-- | Try to convert a symbolic value into a memory/program address,
+--   possibly doing constant folding.
+--   Return @Left@ in cases of symbolic value, concrete boolean and non-Word16 value
+toAddress :: Sym -> Either Sym Address
+toAddress sym =
+  case getValue (simplify Nothing sym) of
+    Just (CInt i)  -> if (i > 0) && (i <= fromIntegral (maxBound :: Address))
+                      then Right (fromIntegral i)
+                      else Left sym
+    Just (CBool _) -> Left sym
+    Nothing        -> Left sym
+
+toImm :: Sym -> Either Sym (Imm (Data Int32))
+toImm sym =
+    case getValue (simplify Nothing sym) of
+    Just (CInt i)  -> Right (Imm . MkData $ i)
+    Just (CBool _) -> Left sym
+    Nothing        -> Left sym

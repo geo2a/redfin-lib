@@ -1,3 +1,4 @@
+
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -87,6 +88,16 @@ jumpCt (Imm offset) read write =
            (write IC ((+) <$> pure offset
                           <*> read IC))
 -----------------------------------------------------------------------------
+
+-- | Increment the instruction counter.
+incrementIC :: Value a => FS Key Functor Value a
+incrementIC read write =
+  write IC ((+ 1) <$> read IC)
+
+-- -- | Aha! fetching an instruction is Monadic!
+-- fetchInstruction :: Value a => FS Key Prelude.Monad Value a
+-- fetchInstruction read write =
+--       read IC >>= \ic -> write IR (read (Prog ic))
 
 instructionSemantics :: Value a => Instruction a -> FS Key Selective Value a
 instructionSemantics (Instruction i) r w = case i of

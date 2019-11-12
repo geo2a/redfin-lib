@@ -1,14 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 import           Test.Tasty
-import           Test.Tasty.HUnit ()
+import           Test.Tasty.HUnit            ()
 
 import           ISA.SMT.Tests
+import           ISA.Types.Instruction.Tests
 
 main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [unitTests]
+tests = testGroup "Tests" [unitTests, properties]
 
 unitTests :: TestTree
 unitTests = testGroup "Unit tests"
@@ -18,4 +19,7 @@ unitTests = testGroup "Unit tests"
     ]
   ]
 
+properties :: TestTree
+properties = testGroup "QuickCheck properties"
+  [encodedecode]
 -----------------------------------------------------------------------------

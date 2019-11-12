@@ -23,12 +23,14 @@ library
   default-language: Haskell2010
   exposed-modules:
       ISA,
+      ISA.Types,
+      ISA.Types.Instruction,
+      ISA.Types.Instruction.Decode,
+      ISA.Types.Instruction.Encode,
       ISA.Types.Symbolic,
       ISA.Types.Symbolic.SMT
   other-modules:
       FS,
-      ISA.Types,
-      ISA.Types.Instruction,
       ISA.Semantics,
       ISA.Backend.IO,
       ISA.Backend.Dependencies,
@@ -41,13 +43,15 @@ library
       constraint,
       containers,
       co-log,
+      generic-random,
       microlens-platform,
       mtl,
       sbv,
       selective,
       pretty-simple,
       text,
-      transformers
+      transformers,
+      QuickCheck
   default-extensions: LambdaCase
                     , FlexibleContexts
                     , FlexibleInstances
@@ -67,14 +71,17 @@ test-suite tests
   default-language: Haskell2010
   hs-source-dirs:   test
   main-is:          TestSuite.hs
-  other-modules:    ISA.SMT.Tests
+  other-modules:    ISA.SMT.Tests,
+                    ISA.Types.Instruction.Tests
   type:             exitcode-stdio-1.0
 
   build-depends:
     base            >= 4.7 && < 5,
     containers,
     HUnit,
+    QuickCheck,
     tasty,
     tasty-hunit,
+    tasty-quickcheck,
     sbv,
     unreasonably-polymorphic-isa
