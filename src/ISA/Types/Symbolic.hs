@@ -227,7 +227,7 @@ simplify steps =
 toAddress :: Sym -> Either Sym Address
 toAddress sym =
   case getValue (simplify Nothing sym) of
-    Just (CInt i)  -> if (i > 0) && (i <= fromIntegral (maxBound :: Address))
+    Just (CInt i)  -> if (i >= 0) && (i <= fromIntegral (maxBound :: Address))
                       then Right (fromIntegral i)
                       else Left sym
     Just (CBool _) -> Left sym

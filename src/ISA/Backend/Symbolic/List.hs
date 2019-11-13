@@ -3,6 +3,7 @@
 {-# LANGUAGE InstanceSigs               #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE MultiWayIf                 #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
@@ -21,23 +22,26 @@ module ISA.Backend.Symbolic.List
     ( -- * symbolic execution state
       Context(..)
       -- * symbolic execution engine
-    , Engine (..)
+    , Engine (..), runModel
       -- instances of read/write callbacks for Engine
     , readKey, writeKey
     ) where
 
 import           Control.Monad.Reader
+import           Control.Monad.State          (evalState)
 import           Control.Monad.State.Class
 import           Control.Selective
-import qualified Data.Map.Strict           as Map
-import           GHC.Exts                  (Any)
-import           Prelude                   hiding (log, not, read, readIO)
+import qualified Data.Map.Strict              as Map
+import           GHC.Exts                     (Any)
+import           Prelude                      hiding (log, not, read, readIO)
 import           Unsafe.Coerce
 
 import           ISA.Semantics
 import           ISA.Types
 import           ISA.Types.Instruction
+import           ISA.Types.Instruction.Decode
 import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.Trace
 
 -- | A record type for state of the symbolically executed computation
 --   * @_bindings@: keys (like register names, memory cells) mapped to their symbolic values
@@ -50,14 +54,25 @@ import           ISA.Types.Symbolic
 --     via 'pushFmapArg' and 'popFmapArg' functions.
 --     (TODO: come up with a better explanation for this)
 data Context = MkContext { _bindings      :: Map.Map Key Sym
-                         , ir             :: Instruction (Data Sym)
                          , _pathCondition :: Sym
                          , _fmapLog       :: [Any]
                          }
 
+showKey :: Context -> Key -> String
+showKey ctx key =
+  case Map.lookup key (_bindings ctx) of
+    Nothing -> "uninitialised"
+    Just v  ->
+      if key == IR
+      then show key <> ": " <> show (toInstruction v)
+      else show key <> ": " <> show v
+
+
 instance Show Context where
   show ctx = unlines [ "Path constraint: " <> show (_pathCondition ctx)
-                     , "Context: " <> show (Map.toList $ _bindings ctx)
+                     , showKey ctx IR
+                     , showKey ctx (F Condition)
+                     , showKey ctx (F Halted)
                      ]
 
 -- | A Symbolic Execution Engine is a combination of State and List monads:
@@ -164,7 +179,9 @@ instance (MonadState Context) Engine where
 readKey :: Key -> Engine (Data Sym)
 readKey key = do
     ctx <- get
-    let x = (Map.!) (_bindings ctx) key
+    let x = case Map.lookup key (_bindings ctx) of
+              Just v -> v
+              Nothing -> error $ "Engine.readKey: uninitialised key " <> show key
     pure (MkData x)
 
 writeKey :: Key -> Engine (Data Sym) -> Engine (Data Sym)
@@ -193,30 +210,57 @@ incrementInstructionCounter =
 
 -- readInstructionRegister :: Engine (Instruction (Data Sym))
 -- readInstructionRegister = do
---   irSym <- readKey IR
+--   x <- (fmap toInstructionCode) <$> readKey IR
+--   case x of
+--     (MkData (Right ic)) -> case decode ic of
+--                              Nothing -> error $ "Engine.readInstructionRegister: " <>
+--                                         "unknown instruction with code " <> show ic
+--                              Just i -> pure i
+--     (MkData (Left sym)) -> error $ "Engine.readInstructionRegister: " <>
+--                            "symbolic instruction code encountered!"
 
--- pipeline :: Context -> (Instruction (Data Sym), Context)
--- pipeline state =
---     let steps = do fetchInstruction
---                    incrementInstructionCounter
---                    readInstructionRegister
---     in case runSymEngine steps state of
---             [result] -> result
---             _ -> error
---                 "piplineStep: impossible happened: fetchInstruction returned not a singleton."
+pipeline :: Context -> (InstructionCode, Context)
+pipeline s =
+    let steps = do fetchInstruction
+                   incrementInstructionCounter
+                   readInstructionRegister
+    in case runEngine steps s of
+            [result] -> result
+            _ -> error
+                "piplineStep: impossible happened: fetchInstruction returned not a singleton."
 
--- readInstructionRegister :: SymEngine InstructionCode
--- readInstructionRegister = instructionRegister <$> get
+readInstructionRegister :: Engine InstructionCode
+readInstructionRegister =  do
+  x <- (fmap toInstructionCode) <$> readKey IR
+  case x of
+    (MkData (Right ic)) -> pure ic
+    (MkData (Left sym)) -> error $ "Engine.readInstructionRegister: " <>
+                           "symbolic instruction code encountered " <> show sym
 
--- -- | Perform one step of symbolic execution
--- symStep :: State -> [State]
--- symStep state =
---     let (instrCode, fetched) = pipeline state
---         instrSemantics =
---              case decode instrCode of
---                 (Instruction (JumpZero offset)) -> jumpZeroSym offset
---                 (Instruction (LoadMI reg addr)) -> loadMISym reg addr
---                 (Instruction (JumpCt offset))   -> jumpCtSym offset
---                 (Instruction (JumpCf offset))   -> jumpCfSym offset
---                 i                               -> instructionSemantics i readKey writeKey
---     in map snd $ runSymEngine instrSemantics fetched
+-- | Perform one step of symbolic execution
+step :: Context -> [Context]
+step s =
+    let (ic, fetched) = pipeline s
+        instrSemantics = case decode ic of
+                           Nothing -> error $ "Engine.readInstructionRegister: " <>
+                                              "unknown instruction with code " <> show ic
+                           Just i -> instructionSemantics (symbolise i) readKey writeKey
+    in map snd $ runEngine instrSemantics fetched
+
+runModelM :: MonadState NodeId m => Int -> Context -> m (Trace Context)
+runModelM steps s = do
+    modify (+ 1)
+    n <- get
+    let h = case Map.lookup (F Halted) (_bindings s) of
+          Just b  -> b
+          Nothing -> error "Engine.runModel: uninitialised flag Halted!"
+    let halted    = h == SConst (CBool True)
+        newStates = step s
+    if | steps <= 0 -> pure (mkTrace (Node n s) [])
+       | otherwise  ->
+         if halted then pure (mkTrace (Node n s) [])
+                   else do children <- traverse (runModelM (steps - 1)) newStates
+                           pure $ mkTrace (Node n s) children
+
+runModel :: Int -> Context -> Trace Context
+runModel steps s = evalState (runModelM steps s) 0

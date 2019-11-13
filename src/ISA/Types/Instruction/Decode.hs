@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs      #-}
 {-# LANGUAGE MultiWayIf #-}
 -----------------------------------------------------------------------------
 -- |
@@ -12,7 +13,7 @@
 -----------------------------------------------------------------------------
 
 module ISA.Types.Instruction.Decode
-    (decode) where
+    (decode, symbolise, toInstruction) where
 
 import           Data.Bits
 import           Data.Int              (Int32)
@@ -20,6 +21,35 @@ import           Data.Int              (Int32)
 import           ISA.Types
 import           ISA.Types.Instruction
 import           ISA.Types.Symbolic
+
+symbolise :: Instruction (Data Int32) -> Instruction (Data Sym)
+symbolise (Instruction i) =
+  case i of
+    Halt              -> mkI $ Halt
+    Load   reg1 addr1 -> mkI $ Load   reg1 addr1
+    Add    reg1 addr1 -> mkI $ Add    reg1 addr1
+    Sub    reg1 addr1 -> mkI $ Sub    reg1 addr1
+    Mul    reg1 addr1 -> mkI $ Mul    reg1 addr1
+    Div    reg1 addr1 -> mkI $ Div    reg1 addr1
+    Mod    reg1 addr1 -> mkI $ Mod    reg1 addr1
+    Store  reg1 addr1 -> mkI $ Store  reg1 addr1
+    Set    reg1 imm1  -> mkI $ Set    reg1 ((fmap (SConst . CInt)) <$> imm1)
+    Abs    reg1       -> mkI $ Abs    reg1
+    Jump   offset1    -> mkI $ Jump   ((fmap (SConst . CInt)) <$> offset1)
+    JumpCt offset1    -> mkI $ JumpCt ((fmap (SConst . CInt)) <$> offset1)
+    JumpCf offset1    -> mkI $ JumpCf ((fmap (SConst . CInt)) <$> offset1)
+    LoadMI reg1 addr1 -> mkI $ LoadMI reg1 addr1
+    CmpEq  reg1 addr1 -> mkI $ CmpEq  reg1 addr1
+    CmpGt  reg1 addr1 -> mkI $ CmpGt  reg1 addr1
+    CmpLt  reg1 addr1 -> mkI $ CmpLt  reg1 addr1
+
+
+toInstruction :: Sym -> Either Sym (Instruction (Data Int32))
+toInstruction sym = case sym of
+  (SConst (CWord ic)) -> case decode (InstructionCode ic) of
+                           Just i  -> Right i
+                           Nothing -> Left sym
+  _                   -> Left sym
 
 decode :: InstructionCode -> Maybe (Instruction (Data Int32))
 decode (InstructionCode code) =
