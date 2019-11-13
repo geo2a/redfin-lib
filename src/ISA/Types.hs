@@ -42,7 +42,7 @@ module ISA.Types
 import           Data.Bits
 import           Data.Int        (Int32)
 import           Data.Typeable
-import           Data.Word       (Word16)
+import           Data.Word       (Word16, Word32)
 import           Generic.Random
 import           GHC.Generics    (Generic)
 import           Test.QuickCheck (Arbitrary, arbitrary)
@@ -76,10 +76,10 @@ newtype Imm a = Imm a
 instance Arbitrary a => Arbitrary (Imm a) where
   arbitrary = genericArbitrary uniform
 
-newtype InstructionCode a = InstructionCode a
-  deriving (Functor, Show, Eq, Ord, Num, Bits, FiniteBits, Generic)
+newtype InstructionCode = InstructionCode Word32
+  deriving (Show, Eq, Ord, Num, Bits, FiniteBits, Generic)
 
-instance Arbitrary a => Arbitrary (InstructionCode a) where
+instance Arbitrary InstructionCode where
   arbitrary = genericArbitrary uniform
 
 newtype Data a = MkData a

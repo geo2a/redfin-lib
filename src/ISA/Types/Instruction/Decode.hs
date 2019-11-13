@@ -21,10 +21,10 @@ import           ISA.Types
 import           ISA.Types.Instruction
 import           ISA.Types.Symbolic
 
-decode :: InstructionCode (Data Int32) -> Maybe (Instruction (Data Int32))
+decode :: InstructionCode -> Maybe (Instruction (Data Int32))
 decode (InstructionCode code) =
     let expandedCode = blastLE code
-        opcode = take 6 expandedCode
+        opcode = decodeOpcode expandedCode
     in if | opcode == [f, f, f, f, f, f]  -> Just $ Instruction Halt
           | opcode == [f, f, f, f, f, t]  -> Just $ Instruction $
                 Load (decodeRegister . extractRegister $ expandedCode)
@@ -98,13 +98,13 @@ extractRegister :: [Bool] -> [Bool]
 extractRegister = take 2 . drop 6
 
 extractMemoryAddress :: [Bool] -> [Bool]
-extractMemoryAddress = (++ pad 56) . take 8 . drop 8
+extractMemoryAddress = (++ pad 24) . take 8 . drop 8
 
 extractSImm8 :: [Bool] -> [Bool]
-extractSImm8 = (++ pad 56) . take 8 . drop 8
+extractSImm8 = (++ pad 24) . take 8 . drop 8
 
 extractSImm8Jump :: [Bool] -> [Bool]
-extractSImm8Jump = (++ pad 56) . take 8 . drop 6
+extractSImm8Jump = (++ pad 24) . take 8 . drop 6
 
 pad :: Int -> [Bool]
 pad k = replicate k False

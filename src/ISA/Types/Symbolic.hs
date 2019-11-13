@@ -15,13 +15,14 @@
 module ISA.Types.Symbolic
     ( Concrete(..), Sym (..), simplify
     -- try to concertise symbolic values
-    , getValue, toAddress, toImm
+    , getValue, toAddress, toImm, toInstructionCode
     ) where
 
 import           Data.Int      (Int32)
 import           Data.Text     (Text)
 import qualified Data.Text     as Text
 import           Data.Typeable
+import           Data.Word     (Word32)
 import           Debug.Trace
 import           Prelude       hiding (not)
 
@@ -31,7 +32,8 @@ import           ISA.Types
 
 -- | Concrete values: either signed integers or booleans
 data Concrete where
-  CInt :: Int32 -> Concrete
+  CInt  :: Int32 -> Concrete
+  CWord :: Word32 -> Concrete
   CBool :: Bool -> Concrete
 
 deriving instance Eq Concrete
@@ -39,6 +41,7 @@ deriving instance Ord Concrete
 
 instance Show Concrete where
   show (CInt i)  = show i
+  show (CWord w) = show w
   show (CBool b) = show b
 
 instance Num Concrete where
@@ -233,6 +236,14 @@ toAddress sym =
 toImm :: Sym -> Either Sym (Imm (Data Int32))
 toImm sym =
     case getValue (simplify Nothing sym) of
-    Just (CInt i)  -> Right (Imm . MkData $ i)
+    Just (CInt  i) -> Right (Imm . MkData $ i)
+    Just (CBool _) -> Left sym
+    Nothing        -> Left sym
+
+toInstructionCode :: Sym -> Either Sym InstructionCode
+toInstructionCode sym =
+    case getValue (simplify Nothing sym) of
+    Just (CInt  _) -> Left sym
+    Just (CWord w) -> Right (InstructionCode w)
     Just (CBool _) -> Left sym
     Nothing        -> Left sym

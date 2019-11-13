@@ -19,7 +19,7 @@
 -----------------------------------------------------------------------------
 module ISA.Types.Instruction
     ( Instruction(..), mkI
-    , InstructionImpl(..)
+    , InstructionImpl(..), instrEq
     )
   where
 
@@ -68,7 +68,7 @@ data InstructionImpl (c :: (* -> *) -> Constraint) a where
   JumpCt   :: Value a => Imm a -> InstructionImpl Selective a
   JumpCf   :: Value a => Imm a -> InstructionImpl Selective a
 
--- deriving instance Eq  (InstructionImpl c)
+deriving instance Eq a => Eq (InstructionImpl c a)
 -- deriving instance Ord (InstructionImpl c)
 
 instance Show (InstructionImpl c a) where
@@ -93,6 +93,30 @@ instance Show (InstructionImpl c a) where
     CmpLt    reg addr  -> "CmpLt " ++ show reg ++ " " ++ show addr
 
 data Instruction a = forall c. Instruction (InstructionImpl c a)
+
+instance Eq a => Eq (Instruction a) where
+  (Instruction i) == (Instruction j) = i `instrEq` j
+
+instrEq :: Eq a => InstructionImpl c1 a -> InstructionImpl c2 a -> Bool
+instrEq i j = case (i, j) of
+  (Halt, Halt) -> True
+  (Load   reg1 addr1, Load   reg2 addr2) -> reg1 == reg2 && addr1 == addr2
+  (Add    reg1 addr1, Add    reg2 addr2) -> reg1 == reg2 && addr1 == addr2
+  (Sub    reg1 addr1, Sub    reg2 addr2) -> reg1 == reg2 && addr1 == addr2
+  (Mul    reg1 addr1, Mul    reg2 addr2) -> reg1 == reg2 && addr1 == addr2
+  (Div    reg1 addr1, Div    reg2 addr2) -> reg1 == reg2 && addr1 == addr2
+  (Mod    reg1 addr1, Mod    reg2 addr2) -> reg1 == reg2 && addr1 == addr2
+  (Store  reg1 addr1, Store  reg2 addr2) -> reg1 == reg2 && addr1 == addr2
+  (Set    reg1 imm1 , Set    reg2 imm2 ) -> reg1 == reg2 && imm1  == imm2
+  (Abs    reg1      , Abs    reg2      ) -> reg1 == reg2
+  (Jump   offset1   , Jump   offset2   ) -> offset1 == offset2
+  (JumpCt offset1   , JumpCt offset2   ) -> offset1 == offset2
+  (JumpCf offset1   , JumpCf offset2   ) -> offset1 == offset2
+  (LoadMI reg1 addr1, LoadMI reg2 addr2) -> reg1 == reg2 && addr1 == addr2
+  (CmpEq  reg1 addr1, CmpEq  reg2 addr2) -> reg1 == reg2 && addr1 == addr2
+  (CmpGt  reg1 addr1, CmpGt  reg2 addr2) -> reg1 == reg2 && addr1 == addr2
+  (CmpLt  reg1 addr1, CmpLt  reg2 addr2) -> reg1 == reg2 && addr1 == addr2
+  (_,_) -> False
 
 mkI :: forall c a. InstructionImpl c a -> Instruction a
 mkI = Instruction

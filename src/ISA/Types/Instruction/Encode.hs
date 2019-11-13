@@ -16,6 +16,7 @@ module ISA.Types.Instruction.Encode
 
 import           Data.Bits
 import           Data.Int              (Int32)
+import           Data.Word             (Word32)
 
 import           ISA.Types
 import           ISA.Types.Instruction
@@ -60,69 +61,69 @@ concretiseInstr = \case
     --       t = True
     --       pad k = replicate k f
 
-encode :: Instruction (Data Int32) -> InstructionCode (Data Int32)
+encode :: Instruction (Data Int32) -> InstructionCode
 encode = \case
     Instruction Halt -> 0
     Instruction (Load     r addr) ->
         fromBitsLE $ [f, f, f, f, f, t] ++ encodeRegister r
                                         ++ encodeMemoryAddress addr
-                                        ++ pad 48
+                                        ++ pad 8
     Instruction (LoadMI   r addr) ->
         fromBitsLE $ [f, f, f, f, t, f] ++ encodeRegister r
                                         ++ encodeMemoryAddress addr
-                                        ++ pad 48
+                                        ++ pad 8
     Instruction (Set      r (Imm (MkData byte))) ->
         fromBitsLE $ [f, f, f, f, t, t] ++ encodeRegister r
                                         ++ encodeByte (Imm byte)
-                                        ++ pad 48
+                                        ++ pad 8
     Instruction (Store    r addr) ->
         fromBitsLE $ [f, f, f, t, f, f] ++ encodeRegister r
                                         ++ encodeMemoryAddress addr
-                                        ++ pad 48
+                                        ++ pad 8
     Instruction (Add      r addr) ->
         fromBitsLE $ [f, f, f, t, f, t] ++ encodeRegister r
                                         ++ encodeMemoryAddress addr
-                                        ++ pad 48
+                                        ++ pad 8
     Instruction (Jump     (Imm (MkData byte)))   ->
         fromBitsLE $ [f, f, f, t, t, f] ++ encodeByte (Imm byte)
-                                        ++ pad 50
+                                        ++ pad 18
     Instruction (CmpEq      r addr) ->
         fromBitsLE $ [f, t, f, f, f, t] ++ encodeRegister r
                                         ++ encodeMemoryAddress addr
-                                        ++ pad 48
+                                        ++ pad 8
     Instruction (CmpLt      r addr) ->
         fromBitsLE $ [f, t, f, f, t, f] ++ encodeRegister r
                                         ++ encodeMemoryAddress addr
-                                        ++ pad 48
+                                        ++ pad 8
     Instruction (CmpGt      r addr) ->
         fromBitsLE $ [f, t, f, f, t, t] ++ encodeRegister r
                                         ++ encodeMemoryAddress addr
-                                        ++ pad 48
+                                        ++ pad 8
     Instruction (JumpCt (Imm (MkData byte)))   ->
         fromBitsLE $ [t, t, f, f, f, t] ++ encodeByte (Imm byte)
-                                        ++ pad 50
+                                        ++ pad 18
     Instruction (JumpCf (Imm (MkData byte)))   ->
         fromBitsLE $ [t, t, f, f, t, f] ++ encodeByte (Imm byte)
-                                        ++ pad 50
+                                        ++ pad 18
     Instruction (Sub      r addr) ->
         fromBitsLE $ [f, f, t, f, f, f] ++ encodeRegister r
                                         ++ encodeMemoryAddress addr
-                                        ++ pad 48
+                                        ++ pad 8
     Instruction (Mul      r addr) ->
         fromBitsLE $ [f, f, t, f, f, t] ++ encodeRegister r
                                         ++ encodeMemoryAddress addr
-                                        ++ pad 48
+                                        ++ pad 8
     Instruction (Div      r addr) ->
         fromBitsLE $ [f, f, t, f, t, f] ++ encodeRegister r
                                         ++ encodeMemoryAddress addr
-                                        ++ pad 48
+                                        ++ pad 8
     Instruction (Mod      r addr) ->
         fromBitsLE $ [f, f, t, f, t, t] ++ encodeRegister r
                                         ++ encodeMemoryAddress addr
-                                        ++ pad 48
+                                        ++ pad 8
     Instruction (Abs      r)      ->
         fromBitsLE $ [f, f, t, t, f, f] ++ encodeRegister r
-                                        ++ pad 56
+                                        ++ pad 24
     where f = False
           t = True
           pad k = replicate k f
@@ -145,7 +146,7 @@ encodeRegister = \case
 
 -- | 'MemoryAddress' is stored in the leading 8 bits (little-endian) of a 'Value'
 encodeMemoryAddress :: Address -> [Bool]
-encodeMemoryAddress = take 16 . blastLE
+encodeMemoryAddress = blastLE
 
 -- | 'Byte' is stored in the leading 8 bits (little-endian) of a 'Value'
 encodeByte :: Imm Int32 -> [Bool]
