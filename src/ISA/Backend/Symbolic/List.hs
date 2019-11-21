@@ -22,7 +22,7 @@ module ISA.Backend.Symbolic.List
     ( -- * symbolic execution state
       Context(..)
       -- * symbolic execution engine
-    , Engine (..), runModel
+    , Engine (..)
       -- instances of read/write callbacks for Engine
     , readKey, writeKey
     ) where
@@ -191,76 +191,3 @@ writeKey key computation = do
   put $ ctx {_bindings = Map.insert key value (_bindings ctx)}
   pure (MkData value)
 -----------------------------------------------------------------------------
-
--- | Fetching an instruction is a Monadic operation. It is possible
---   (and natural) to implement in terms of @FS Key Monad Value@, but
---   for now we'll stick with this concrete implementation in the
---   @Engine@ monad.
-fetchInstruction :: Engine ()
-fetchInstruction =
-  readKey IC >>= \(MkData x) -> case (toAddress x) of
-    Right ic -> void $ writeKey IR (readKey (Prog ic))
-    Left sym ->
-      error $ "Engine.fetchInstruction: symbolic or malformed instruction counter "
-            <> show sym
-
-incrementInstructionCounter :: Engine ()
-incrementInstructionCounter =
-  void $ writeKey IC ((+ 1) <$> readKey IC)
-
--- readInstructionRegister :: Engine (Instruction (Data Sym))
--- readInstructionRegister = do
---   x <- (fmap toInstructionCode) <$> readKey IR
---   case x of
---     (MkData (Right ic)) -> case decode ic of
---                              Nothing -> error $ "Engine.readInstructionRegister: " <>
---                                         "unknown instruction with code " <> show ic
---                              Just i -> pure i
---     (MkData (Left sym)) -> error $ "Engine.readInstructionRegister: " <>
---                            "symbolic instruction code encountered!"
-
-pipeline :: Context -> (InstructionCode, Context)
-pipeline s =
-    let steps = do fetchInstruction
-                   incrementInstructionCounter
-                   readInstructionRegister
-    in case runEngine steps s of
-            [result] -> result
-            _ -> error
-                "piplineStep: impossible happened: fetchInstruction returned not a singleton."
-
-readInstructionRegister :: Engine InstructionCode
-readInstructionRegister =  do
-  x <- (fmap toInstructionCode) <$> readKey IR
-  case x of
-    (MkData (Right ic)) -> pure ic
-    (MkData (Left sym)) -> error $ "Engine.readInstructionRegister: " <>
-                           "symbolic instruction code encountered " <> show sym
-
--- | Perform one step of symbolic execution
-step :: Context -> [Context]
-step s =
-    let (ic, fetched) = pipeline s
-        instrSemantics = case decode ic of
-                           Nothing -> error $ "Engine.readInstructionRegister: " <>
-                                              "unknown instruction with code " <> show ic
-                           Just i -> instructionSemantics (symbolise i) readKey writeKey
-    in map snd $ runEngine instrSemantics fetched
-
-runModelM :: MonadState NodeId m => Int -> Context -> m (Trace Context)
-runModelM steps s = do
-    modify (+ 1)
-    n <- get
-    let h = case Map.lookup (F Halted) (_bindings s) of
-          Just b  -> b
-          Nothing -> error "Engine.runModel: uninitialised flag Halted!"
-    let halted    = h == SConst (CBool True)
-        newStates = step s
-    if | steps <= 0 -> pure (mkTrace (Node n s) [])
-       | otherwise  ->
-         if halted then pure (mkTrace (Node n s) [])
-                   else do children <- traverse (runModelM (steps - 1)) newStates
-                           pure $ mkTrace (Node n s) children
-
-runModel :: Int -> Context -> Trace Context
-runModel steps s = evalState (runModelM steps s) 0

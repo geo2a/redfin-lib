@@ -131,7 +131,8 @@ instance Monoid (Data Sym) where
 
 instance Boolean Sym where
   true = SConst (CBool True)
-  toBool x = trace (show x) True
+  -- | Converting symbolic expressions to boolean always returns True
+  toBool _ = True
   not x = SNot x
 
   x ||| y = SOr x y
