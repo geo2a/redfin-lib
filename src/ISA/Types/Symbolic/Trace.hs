@@ -21,7 +21,7 @@ import           ISA.Types
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
 
-type NodeId = Integer
+type NodeId = Int
 
 data Node s = Node { nodeId   :: NodeId
                    , nodeBody :: s

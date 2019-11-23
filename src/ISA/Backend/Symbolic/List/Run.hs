@@ -56,15 +56,15 @@ readInstructionRegister :: Engine InstructionCode
 readInstructionRegister =  do
   x <- (fmap toInstructionCode) <$> readKey IR
   case x of
-    (MkData (Right ic)) -> pure ic
+    (MkData (Right instr)) -> pure instr
     (MkData (Left sym)) -> error $ "Engine.readInstructionRegister: " <>
                            "symbolic instruction code encountered " <> show sym
 
 
 pipeline :: Context -> (InstructionCode, Context)
 pipeline s =
-    let steps = do fetchInstruction
-                   incrementInstructionCounter
+    let steps = fetchInstruction >>
+                   incrementInstructionCounter >>
                    readInstructionRegister
     in case runEngine steps s of
             [result] -> result
@@ -85,8 +85,8 @@ step s =
 runModelM :: MonadState NodeId m =>
    Int -> Context -> m (Trace Context)
 runModelM steps s = do
-    modify (+ 1)
     n <- get
+    modify (+ 1)
     let h = case Map.lookup (F Halted) (_bindings s) of
           Just b  -> b
           Nothing -> error "Engine.runModel: uninitialised flag Halted!"

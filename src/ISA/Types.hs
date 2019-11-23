@@ -31,7 +31,7 @@ module ISA.Types
     -- equality check that may fail
     , Equality(..), TryEq (..)
     -- * Abstraction over possible locations in the ISA
-    , Key(..)
+    , Key(..), keyTag
 
     -- * Classes abstracting values that ISA model can operate with
     -- ** Booleans
@@ -106,6 +106,15 @@ data Key where
 
 deriving instance Eq Key
 deriving instance Ord Key
+
+keyTag :: Key -> String
+keyTag = \case
+  Reg  _ -> "register"
+  Addr _ -> "address"
+  F    _ -> "flag"
+  IC     -> "instruction-counter"
+  IR     -> "instruction-register"
+  Prog _ -> "program-address"
 
 instance Show Key where
     show = \case
