@@ -24,7 +24,6 @@ import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Encode
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Trace
-import           ISA.Types.Symbolic.Trace.Render
 
 mkProgram :: Script -> [(Key, Sym)]
 mkProgram src =
@@ -36,9 +35,9 @@ mkProgram src =
 src_ex1 :: Script
 src_ex1 = do
   add R0 0
-  -- add R1 1
-  -- goto_ct "end"
-  -- halt
+  add R1 1
+  goto_ct "end"
+  halt
   "end" @@ halt
 
 demo :: IO ()

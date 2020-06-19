@@ -11,11 +11,12 @@
 --
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic.Trace
-    ( Trace(..), mkTrace, renderTrace
+    ( Trace(..), mkTrace, renderTrace, writeTraceHtmlFile
     , Node(..), NodeId
     ) where
 
 import qualified Data.Tree                    as Tree
+import qualified Data.Tree.View               as TreeView
 import           Data.Word                    (Word16)
 import           ISA.Types
 import           ISA.Types.Instruction.Decode
@@ -53,7 +54,17 @@ instance Traversable Trace where
 
 renderTrace :: (s -> String) -> Trace s -> String
 renderTrace shower (Trace tree) =
-  Tree.drawTree (renderNode shower <$> tree)
+  TreeView.showTree (renderNode shower <$> tree)
+
+htmlTrace :: (s -> String) -> Trace s -> String
+htmlTrace shower (Trace tree) =
+  TreeView.htmlTree Nothing $
+    fmap (\node -> TreeView.NodeInfo TreeView.InitiallyCollapsed (show (nodeId node))
+                                                            (shower (nodeBody node)))
+         tree
+
+writeTraceHtmlFile :: Show s => FilePath -> Trace s -> IO ()
+writeTraceHtmlFile path trace = writeFile path (htmlTrace show trace)
 
 mkTrace :: Node s -> [Trace s] -> Trace s
 mkTrace node children = Trace $ Tree.Node node (map unTrace children)

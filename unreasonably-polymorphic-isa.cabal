@@ -54,7 +54,8 @@ library
       pretty-simple,
       text,
       transformers,
-      QuickCheck
+      QuickCheck,
+      tree-view >= 0.5
   default-extensions: LambdaCase
                     , FlexibleContexts
                     , FlexibleInstances
