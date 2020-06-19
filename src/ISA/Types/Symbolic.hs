@@ -9,7 +9,7 @@
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 --
--- Typed symbolic expressions syntax
+-- Untyped symbolic expressions syntax
 --
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic
@@ -30,7 +30,7 @@ import           ISA.Types
 
 -----------------------------------------------------------------------------
 
--- | Concrete values: either signed integers or booleans
+-- | Concrete values: either signed or unsigned integers, or booleans
 data Concrete where
   CInt  :: Int32 -> Concrete
   CWord :: Word32 -> Concrete
