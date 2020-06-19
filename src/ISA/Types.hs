@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DerivingVia                #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 -----------------------------------------------------------------------------
@@ -56,7 +57,8 @@ instance Arbitrary Register where
 
 -- | Memory location
 newtype Address = Address Word16
-  deriving (Show, Eq, Ord, Num, Real, Enum, Integral, Bounded, Bits, FiniteBits, Generic)
+  deriving (Eq, Ord, Num, Real, Enum, Integral, Bounded, Bits, FiniteBits, Generic)
+  deriving Show via Word16
 
 instance Arbitrary Address where
   arbitrary = genericArbitrary uniform
@@ -71,19 +73,22 @@ instance Arbitrary Flag where
 
 -- | Immediate argument
 newtype Imm a = Imm a
-  deriving (Functor, Show, Eq, Num, Bits, FiniteBits, Generic)
+  deriving (Functor, Eq, Num, Bits, FiniteBits, Generic)
+  deriving Show via a
 
 instance Arbitrary a => Arbitrary (Imm a) where
   arbitrary = genericArbitrary uniform
 
 newtype InstructionCode = InstructionCode Word32
-  deriving (Show, Eq, Ord, Num, Bits, FiniteBits, Generic)
+  deriving (Eq, Ord, Num, Bits, FiniteBits, Generic)
+  deriving Show via Word32
 
 instance Arbitrary InstructionCode where
   arbitrary = genericArbitrary uniform
 
 newtype Data a = MkData a
-  deriving (Functor, Show, Eq, Ord, Num, Typeable, Bounded, Bits, FiniteBits, Generic)
+  deriving (Functor, Eq, Ord, Num, Typeable, Bounded, Bits, FiniteBits, Generic)
+  deriving Show via a
 
 instance Arbitrary a => Arbitrary (Data a) where
   arbitrary = genericArbitrary uniform
