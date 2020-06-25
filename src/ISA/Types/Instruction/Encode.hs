@@ -43,24 +43,13 @@ concretiseInstr = \case
     Instruction (CmpEq      r addr) -> Instruction (CmpEq r addr)
     Instruction (CmpLt      r addr) -> Instruction (CmpLt r addr)
     Instruction (CmpGt      r addr) -> Instruction (CmpGt r addr)
-    Instruction (JumpCt (Imm (MkData byte)))   ->
-      case toImm byte of
-        Right imm -> Instruction (JumpCt imm)
-        Left sym -> error $ "Instruction.decode: symbolic instruction "
-                         <> show sym
-    Instruction (JumpCf (Imm (MkData byte)))   ->
-      case toImm byte of
-        Right imm -> Instruction (JumpCf imm)
-        Left sym -> error $ "Instruction.decode: symbolic instruction "
-                         <> show sym
+    Instruction (JumpCt imm)   -> Instruction (JumpCt (concretiseImm imm))
+    Instruction (JumpCf imm)   -> Instruction (JumpCf (concretiseImm imm))
     Instruction (Sub      r addr) -> Instruction (Sub r addr)
     Instruction (Mul      r addr) -> Instruction (Mul r addr)
     Instruction (Div      r addr) -> Instruction (Div r addr)
     Instruction (Mod      r addr) -> Instruction (Mod r addr)
     Instruction (Abs      r)      -> Instruction (Abs r)
-    -- where f = False
-    --       t = True
-    --       pad k = replicate k f
 
 encode :: Instruction (Data Int32) -> InstructionCode
 encode i = case i of

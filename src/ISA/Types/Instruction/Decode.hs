@@ -59,53 +59,52 @@ decode (InstructionCode code) =
     in case tag opcode of
       Just TagHalt   -> Just $ Instruction Halt
       Just TagLoad   -> Just $ Instruction $
-        Load (decodeRegister . extractRegister $ expandedCode)
-             (fromBitsLE $ extractMemoryAddress expandedCode)
+              Load (decodeRegister . extractRegister $ expandedCode)
+                   (fromBitsLE $ extractMemoryAddress expandedCode)
       Just TagSet    -> Just $ Instruction $
-                Set (decodeRegister . extractRegister $ expandedCode)
-                    (fromBitsLE $ extractSImm8 expandedCode)
+              Set (decodeRegister . extractRegister $ expandedCode)
+                  (fromBitsLE $ extractSImm8 expandedCode)
       Just TagStore  -> Just $ Instruction $
-                Store (decodeRegister . extractRegister $ expandedCode)
-                      (fromBitsLE $ extractMemoryAddress expandedCode)
+              Store (decodeRegister . extractRegister $ expandedCode)
+                    (fromBitsLE $ extractMemoryAddress expandedCode)
       Just TagAdd    -> Just $ Instruction $
-                Add (decodeRegister . extractRegister $ expandedCode)
-                    (fromBitsLE $ extractMemoryAddress expandedCode)
+              Add (decodeRegister . extractRegister $ expandedCode)
+                  (fromBitsLE $ extractMemoryAddress expandedCode)
       Just TagAddI   -> Just $ Instruction $
-                AddI (decodeRegister . extractRegister $ expandedCode)
-                     (fromBitsLE $ extractSImm8 expandedCode)
+              AddI (decodeRegister . extractRegister $ expandedCode)
+                   (fromBitsLE $ extractSImm8 expandedCode)
       Just TagSub    -> Just $ Instruction $
-                Sub (decodeRegister . extractRegister $ expandedCode)
-                    (fromBitsLE $ extractMemoryAddress expandedCode)
+              Sub (decodeRegister . extractRegister $ expandedCode)
+                  (fromBitsLE $ extractMemoryAddress expandedCode)
       Just TagMul    -> Just $ Instruction $
-                Mul (decodeRegister . extractRegister $ expandedCode)
-                    (fromBitsLE $ extractMemoryAddress expandedCode)
+              Mul (decodeRegister . extractRegister $ expandedCode)
+                  (fromBitsLE $ extractMemoryAddress expandedCode)
       Just TagDiv    -> Just $ Instruction $
-                Div (decodeRegister . extractRegister $ expandedCode)
-                    (fromBitsLE $ extractMemoryAddress expandedCode)
+              Div (decodeRegister . extractRegister $ expandedCode)
+                  (fromBitsLE $ extractMemoryAddress expandedCode)
       Just TagMod    -> Just $ Instruction $
-                Mod (decodeRegister . extractRegister $ expandedCode)
-                    (fromBitsLE $ extractMemoryAddress expandedCode)
+              Mod (decodeRegister . extractRegister $ expandedCode)
+                  (fromBitsLE $ extractMemoryAddress expandedCode)
       Just TagAbs    -> Just $ Instruction $
-                Abs (decodeRegister . extractRegister $ expandedCode)
+              Abs (decodeRegister . extractRegister $ expandedCode)
       Just TagJump   -> Just $ Instruction $
-        Jump (fromBitsLE $ extractSImm8Jump expandedCode)
+              Jump (fromBitsLE $ extractSImm8Jump expandedCode)
       Just TagLoadMI -> Just $ Instruction $
-        LoadMI (decodeRegister . extractRegister $ expandedCode)
-               (fromBitsLE $ extractMemoryAddress expandedCode)
-
+              LoadMI (decodeRegister . extractRegister $ expandedCode)
+                     (fromBitsLE $ extractMemoryAddress expandedCode)
       Just TagCmpEq  -> Just $ Instruction $
-                CmpEq (decodeRegister . extractRegister $ expandedCode)
+              CmpEq (decodeRegister . extractRegister $ expandedCode)
                     (fromBitsLE $ extractMemoryAddress expandedCode)
       Just TagCmpGt  -> Just $ Instruction $
-                CmpGt (decodeRegister . extractRegister $ expandedCode)
+              CmpGt (decodeRegister . extractRegister $ expandedCode)
                     (fromBitsLE $ extractMemoryAddress expandedCode)
       Just TagCmpLt  -> Just $ Instruction $
-                CmpLt (decodeRegister . extractRegister $ expandedCode)
+              CmpLt (decodeRegister . extractRegister $ expandedCode)
                     (fromBitsLE $ extractMemoryAddress expandedCode)
       Just TagJumpCt -> Just $ Instruction $
-                JumpCt (fromBitsLE $ extractSImm8Jump expandedCode)
+              JumpCt (fromBitsLE $ extractSImm8Jump expandedCode)
       Just TagJumpCf -> Just $ Instruction $
-                JumpCf (fromBitsLE $ extractSImm8Jump expandedCode)
+              JumpCf (fromBitsLE $ extractSImm8Jump expandedCode)
       Nothing -> Nothing
 
 fromBitsLE :: (FiniteBits a, Num a) => [Bool] -> a

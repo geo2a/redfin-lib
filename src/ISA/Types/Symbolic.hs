@@ -22,7 +22,7 @@ import           Data.Int      (Int32)
 import           Data.Text     (Text)
 import qualified Data.Text     as Text
 import           Data.Typeable
-import           Data.Word     (Word32)
+import           Data.Word     (Word16)
 import           Debug.Trace
 import           Prelude       hiding (not)
 
@@ -33,7 +33,7 @@ import           ISA.Types
 -- | Concrete values: either signed or unsigned integers, or booleans
 data Concrete where
   CInt  :: Int32 -> Concrete
-  CWord :: Word32 -> Concrete
+  CWord :: Word16 -> Concrete
   CBool :: Bool -> Concrete
 
 deriving instance Eq Concrete

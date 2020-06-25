@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 
 module ISA.Types.Instruction.Opcodes
-  (Opcode(..), asBools, opcode, InstructionTag(..), tag, toTag) where
+  (Opcode(..), asBools, opcode, InstructionTag(..), tag) where
 
 import           Control.Monad         (replicateM)
 

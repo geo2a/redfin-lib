@@ -103,6 +103,7 @@ instrEq i j = case (i, j) of
   (Halt, Halt) -> True
   (Load   reg1 addr1, Load   reg2 addr2) -> reg1 == reg2 && addr1 == addr2
   (Add    reg1 addr1, Add    reg2 addr2) -> reg1 == reg2 && addr1 == addr2
+  (AddI   reg1 imm1 , AddI   reg2 imm2 ) -> reg1 == reg2 && imm1 == imm2
   (Sub    reg1 addr1, Sub    reg2 addr2) -> reg1 == reg2 && addr1 == addr2
   (Mul    reg1 addr1, Mul    reg2 addr2) -> reg1 == reg2 && addr1 == addr2
   (Div    reg1 addr1, Div    reg2 addr2) -> reg1 == reg2 && addr1 == addr2

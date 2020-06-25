@@ -80,9 +80,9 @@ instance Arbitrary a => Arbitrary (Imm a) where
   arbitrary = genericArbitrary uniform
 
 -- | A binary representation of an instruction
-newtype InstructionCode = InstructionCode Word32
+newtype InstructionCode = InstructionCode Word16
   deriving (Eq, Ord, Num, Bits, FiniteBits, Generic)
-  deriving Show via Word32
+  deriving Show via Word16
 
 instance Arbitrary InstructionCode where
   arbitrary = genericArbitrary uniform
