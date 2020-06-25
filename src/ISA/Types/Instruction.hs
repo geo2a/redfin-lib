@@ -24,19 +24,18 @@ module ISA.Types.Instruction
   where
 
 import           Control.Selective
-import           Data.Int          (Int16, Int64, Int8)
+import           Data.Int          ()
 import           Data.Kind         (Constraint)
-import           Data.Word         (Word16, Word64, Word8)
+import           Data.Word         ()
 import           Prelude           hiding (Read, readIO)
 import           Prelude           hiding (Monad, Read, abs, div, mod)
-import qualified Prelude           (Monad, Read, abs, div, mod)
-import GHC.Generics (Generic)
+import GHC.Generics()
 
 import           ISA.Types
 
 -- | We amend the standard 'Monad' constraint to include 'Selective' into
 --   the hierarchy
-type Monad (m :: * -> *) = (Selective m, Prelude.Monad m)
+-- type Monad (m :: * -> *) = (Selective m, Prelude.Monad m)
 
 -----------------------------------------------------------------------------
 
@@ -53,6 +52,7 @@ data InstructionImpl (c :: (* -> *) -> Constraint) a where
   Set      :: Value a => Register -> Imm a         -> InstructionImpl Functor a
   Store    :: Register -> Address -> InstructionImpl Functor a
   Add      :: Register -> Address -> InstructionImpl Applicative a
+  AddI     :: Value a => Register -> Imm a -> InstructionImpl Applicative a
   Sub      :: Register -> Address -> InstructionImpl Applicative a
   Mul      :: Register -> Address -> InstructionImpl Applicative a
   Div      :: Register -> Address -> InstructionImpl Applicative a
@@ -78,6 +78,7 @@ instance Show (InstructionImpl c a) where
     Set      reg value -> "Set "      ++ show reg ++ " " ++ show value
     Store    reg addr  -> "Store "    ++ show reg ++ " " ++ show addr
     Add      reg addr  -> "Add "      ++ show reg ++ " " ++ show addr
+    AddI     reg imm   -> "AddI "     ++ show reg ++ " " ++ show imm
     Sub      reg addr  -> "Sub "      ++ show reg ++ " " ++ show addr
     Mul      reg addr  -> "Mul "      ++ show reg ++ " " ++ show addr
     Div      reg addr  -> "Div "      ++ show reg ++ " " ++ show addr

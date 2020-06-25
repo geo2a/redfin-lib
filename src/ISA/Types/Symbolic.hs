@@ -162,9 +162,9 @@ getValue = \case
     (SAdd p q) -> (+)           <$> getValue p <*> getValue q
     (SSub p q) -> (-)           <$> getValue p <*> getValue q
     (SMul p q) -> (*)           <$> getValue p <*> getValue q
-    (SDiv p q) -> error "Sym.getValue: div is undefined"
+    (SDiv _ _) -> error "Sym.getValue: div is undefined"
     -- (Prelude.div) <$> getValue p <*> getValue q
-    (SMod p q) -> error "Sym.getValue: mod is undefined"
+    (SMod _ _) -> error "Sym.getValue: mod is undefined"
     -- (Prelude.mod) <$> getValue p <*> getValue q
     (SAbs x  ) -> Prelude.abs   <$> getValue x
     (SAnd p q) -> (&&&)          <$> getValue p <*> getValue q
@@ -228,6 +228,7 @@ simplify steps =
 toAddress :: Sym -> Either Sym Address
 toAddress sym =
   case getValue (simplify Nothing sym) of
+    Just (CWord _) -> error "ISA.Types.Symbolic.toAddress: not implemented for CWord"
     Just (CInt i)  -> if (i >= 0) && (i <= fromIntegral (maxBound :: Address))
                       then Right (fromIntegral i)
                       else Left sym
@@ -237,6 +238,7 @@ toAddress sym =
 toImm :: Sym -> Either Sym (Imm (Data Int32))
 toImm sym =
     case getValue (simplify Nothing sym) of
+    Just (CWord _) -> error "ISA.Types.Symbolic.toImm: not implemented for CWord"
     Just (CInt  i) -> Right (Imm . MkData $ i)
     Just (CBool _) -> Left sym
     Nothing        -> Left sym

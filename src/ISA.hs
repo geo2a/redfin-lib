@@ -10,9 +10,9 @@ module ISA
     (demo)
   where
 
-import           Data.Int                        (Int32)
-import qualified Data.Map                        as Map
-import           Data.Maybe                      (fromJust)
+import           Data.Int                      (Int32)
+import qualified Data.Map                      as Map
+import           Data.Maybe                    (fromJust)
 
 import           ISA.Assembly
 import           ISA.Backend.Dependencies
@@ -21,19 +21,21 @@ import           ISA.Backend.Symbolic.List
 import           ISA.Backend.Symbolic.List.Run
 import           ISA.Types
 import           ISA.Types.Instruction
+import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Trace
 
-mkProgram :: Script -> [(Key, Sym)]
-mkProgram src =
-  let prog = assemble src
-      addrs = map Prog [0..]
-      ics   = [ SConst (CWord ic) | (InstructionCode ic) <- map (encode . snd) prog]
-  in zip addrs ics
-
 src_ex1 :: Script
 src_ex1 = do
+  add R0 0
+  add R1 1
+  goto_ct "end"
+  halt
+  "end" @@ halt
+
+src_ex2 :: Script
+src_ex2 = do
   add R0 0
   add R1 1
   goto_ct "end"
@@ -61,13 +63,11 @@ demo = do
   -- -- print (dependencies (instructionSemantics (snd . head $ program :: Instruction (Data Int32))))
   -- putStrLn ""
   putStrLn "Symbolic execution tree: "
-  -- let t = instructionSemantics
-  --       ((snd $ head program) :: Instruction (Data Sym)) readKey writeKey
-  -- let xs = runEngine t ctx
-  -- print $ xs
+
   let t = runModel 10 ctx
-  putStrLn (renderTrace show t)
-  writeTraceHtmlFile "/home/geo2a/Desktop/traces/trace.html" t
+      tracePath = "/home/geo2a/Desktop/traces/trace.html"
+  writeTraceHtmlFile tracePath t
+  putStrLn $ "Wrote trace into file " <> tracePath
 
   -- debugConsole 10 ctx
   pure ()

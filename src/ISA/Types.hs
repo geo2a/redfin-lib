@@ -79,6 +79,7 @@ newtype Imm a = Imm a
 instance Arbitrary a => Arbitrary (Imm a) where
   arbitrary = genericArbitrary uniform
 
+-- | A binary representation of an instruction
 newtype InstructionCode = InstructionCode Word32
   deriving (Eq, Ord, Num, Bits, FiniteBits, Generic)
   deriving Show via Word32

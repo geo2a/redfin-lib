@@ -16,10 +16,11 @@ module ISA.Types.Instruction.Decode
     (decode, symbolise, toInstruction) where
 
 import           Data.Bits
-import           Data.Int              (Int32)
+import           Data.Int                      (Int32)
 
 import           ISA.Types
 import           ISA.Types.Instruction
+import           ISA.Types.Instruction.Opcodes
 import           ISA.Types.Symbolic
 
 symbolise :: Instruction (Data Int32) -> Instruction (Data Sym)
@@ -28,6 +29,7 @@ symbolise (Instruction i) =
     Halt              -> mkI $ Halt
     Load   reg1 addr1 -> mkI $ Load   reg1 addr1
     Add    reg1 addr1 -> mkI $ Add    reg1 addr1
+    AddI   reg1 imm   -> mkI $ AddI   reg1 ((fmap (SConst . CInt)) <$> imm)
     Sub    reg1 addr1 -> mkI $ Sub    reg1 addr1
     Mul    reg1 addr1 -> mkI $ Mul    reg1 addr1
     Div    reg1 addr1 -> mkI $ Div    reg1 addr1
@@ -43,7 +45,6 @@ symbolise (Instruction i) =
     CmpGt  reg1 addr1 -> mkI $ CmpGt  reg1 addr1
     CmpLt  reg1 addr1 -> mkI $ CmpLt  reg1 addr1
 
-
 toInstruction :: Sym -> Either Sym (Instruction (Data Int32))
 toInstruction sym = case sym of
   (SConst (CWord ic)) -> case decode (InstructionCode ic) of
@@ -55,54 +56,57 @@ decode :: InstructionCode -> Maybe (Instruction (Data Int32))
 decode (InstructionCode code) =
     let expandedCode = blastLE code
         opcode = decodeOpcode expandedCode
-    in if | opcode == [f, f, f, f, f, f]  -> Just $ Instruction Halt
-          | opcode == [f, f, f, f, f, t]  -> Just $ Instruction $
-                Load (decodeRegister . extractRegister $ expandedCode)
-                     (fromBitsLE $ extractMemoryAddress expandedCode)
-          | opcode == [f, f, f, f, t, f]   -> Just $ Instruction $
-                LoadMI (decodeRegister . extractRegister $ expandedCode)
-                       (fromBitsLE $ extractMemoryAddress expandedCode)
-          | opcode == [f, f, f, f, t, t]  -> Just $ Instruction $
+    in case tag opcode of
+      Just TagHalt   -> Just $ Instruction Halt
+      Just TagLoad   -> Just $ Instruction $
+        Load (decodeRegister . extractRegister $ expandedCode)
+             (fromBitsLE $ extractMemoryAddress expandedCode)
+      Just TagSet    -> Just $ Instruction $
                 Set (decodeRegister . extractRegister $ expandedCode)
                     (fromBitsLE $ extractSImm8 expandedCode)
-          | opcode == [f, f, f, t, f, f]   -> Just $ Instruction $
+      Just TagStore  -> Just $ Instruction $
                 Store (decodeRegister . extractRegister $ expandedCode)
                       (fromBitsLE $ extractMemoryAddress expandedCode)
-          | opcode == [f, f, f, t, f, t]   -> Just $ Instruction $
+      Just TagAdd    -> Just $ Instruction $
                 Add (decodeRegister . extractRegister $ expandedCode)
                     (fromBitsLE $ extractMemoryAddress expandedCode)
-          | opcode == [f, f, f, t, t, f]   -> Just $ Instruction $
-                Jump (fromBitsLE $ extractSImm8Jump expandedCode)
-          | opcode == [f, t, f, f, f, t]   -> Just $ Instruction $
-                CmpEq (decodeRegister . extractRegister $ expandedCode)
-                    (fromBitsLE $ extractMemoryAddress expandedCode)
-          | opcode == [f, t, f, f, t, f]   -> Just $ Instruction $
-                CmpLt (decodeRegister . extractRegister $ expandedCode)
-                    (fromBitsLE $ extractMemoryAddress expandedCode)
-          | opcode == [f, t, f, f, t, t]   -> Just $ Instruction $
-                CmpGt (decodeRegister . extractRegister $ expandedCode)
-                    (fromBitsLE $ extractMemoryAddress expandedCode)
-          | opcode == [t, t, f, f, f, t]    -> Just $ Instruction $
-                JumpCt (fromBitsLE $ extractSImm8Jump expandedCode)
-          | opcode == [t, t, f, f, t, f]    -> Just $ Instruction $
-                JumpCf (fromBitsLE $ extractSImm8Jump expandedCode)
-          | opcode == [f, f, t, f, f, f]   -> Just $ Instruction $
+      Just TagAddI   -> Just $ Instruction $
+                AddI (decodeRegister . extractRegister $ expandedCode)
+                     (fromBitsLE $ extractSImm8 expandedCode)
+      Just TagSub    -> Just $ Instruction $
                 Sub (decodeRegister . extractRegister $ expandedCode)
                     (fromBitsLE $ extractMemoryAddress expandedCode)
-          | opcode == [f, f, t, f, f, t]   -> Just $ Instruction $
+      Just TagMul    -> Just $ Instruction $
                 Mul (decodeRegister . extractRegister $ expandedCode)
                     (fromBitsLE $ extractMemoryAddress expandedCode)
-          | opcode == [f, f, t, f, t, f]   -> Just $ Instruction $
+      Just TagDiv    -> Just $ Instruction $
                 Div (decodeRegister . extractRegister $ expandedCode)
                     (fromBitsLE $ extractMemoryAddress expandedCode)
-          | opcode == [f, f, t, f, t, t]   -> Just $ Instruction $
+      Just TagMod    -> Just $ Instruction $
                 Mod (decodeRegister . extractRegister $ expandedCode)
                     (fromBitsLE $ extractMemoryAddress expandedCode)
-          | opcode == [f, f, t, t, f, f]   -> Just $ Instruction $
+      Just TagAbs    -> Just $ Instruction $
                 Abs (decodeRegister . extractRegister $ expandedCode)
-          | otherwise -> Nothing
-      where f = False
-            t = True
+      Just TagJump   -> Just $ Instruction $
+        Jump (fromBitsLE $ extractSImm8Jump expandedCode)
+      Just TagLoadMI -> Just $ Instruction $
+        LoadMI (decodeRegister . extractRegister $ expandedCode)
+               (fromBitsLE $ extractMemoryAddress expandedCode)
+
+      Just TagCmpEq  -> Just $ Instruction $
+                CmpEq (decodeRegister . extractRegister $ expandedCode)
+                    (fromBitsLE $ extractMemoryAddress expandedCode)
+      Just TagCmpGt  -> Just $ Instruction $
+                CmpGt (decodeRegister . extractRegister $ expandedCode)
+                    (fromBitsLE $ extractMemoryAddress expandedCode)
+      Just TagCmpLt  -> Just $ Instruction $
+                CmpLt (decodeRegister . extractRegister $ expandedCode)
+                    (fromBitsLE $ extractMemoryAddress expandedCode)
+      Just TagJumpCt -> Just $ Instruction $
+                JumpCt (fromBitsLE $ extractSImm8Jump expandedCode)
+      Just TagJumpCf -> Just $ Instruction $
+                JumpCf (fromBitsLE $ extractSImm8Jump expandedCode)
+      Nothing -> Nothing
 
 fromBitsLE :: (FiniteBits a, Num a) => [Bool] -> a
 fromBitsLE = go 0 0
@@ -121,8 +125,8 @@ decodeRegister = \case
       _              -> error $ "Machine.Instruction.Decode.decodeRegister:"
                              <> "register must be encoded as a two-bit word"
 
-decodeOpcode :: [Bool] -> [Bool]
-decodeOpcode = take 6
+decodeOpcode :: [Bool] -> Opcode
+decodeOpcode = MkOpcode . take 6
 
 extractRegister :: [Bool] -> [Bool]
 extractRegister = take 2 . drop 6

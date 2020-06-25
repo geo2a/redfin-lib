@@ -23,18 +23,22 @@ library
   default-language: Haskell2010
   exposed-modules:
       ISA,
+      ISA.Assembly,
       ISA.Types,
       ISA.Types.Instruction,
+      ISA.Types.Instruction.Opcodes,
       ISA.Types.Instruction.Decode,
       ISA.Types.Instruction.Encode,
       ISA.Types.Symbolic,
-      ISA.Types.Symbolic.SMT
+      ISA.Types.Symbolic.SMT,
+      ISA.Types.Symbolic.Trace
   other-modules:
       FS,
       ISA.Semantics,
       ISA.Backend.IO,
       ISA.Backend.Dependencies,
-      ISA.Backend.Symbolic.List
+      ISA.Backend.Symbolic.List,
+      ISA.Backend.Symbolic.List.Run
   hs-source-dirs:
       src
   build-depends:
@@ -46,6 +50,7 @@ library
       containers,
       co-log-core,
       generic-random,
+      generics-sop,
       haskeline,
       microlens-platform,
       mtl,

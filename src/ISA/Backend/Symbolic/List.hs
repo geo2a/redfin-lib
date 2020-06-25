@@ -68,7 +68,6 @@ showKey ctx key =
       then show key <> ": " <> show (toInstruction v)
       else show key <> ": " <> show v
 
-
 instance Show Context where
   show ctx = unlines [ "Path constraint: " <> show (_pathCondition ctx)
                      , showKey ctx IR

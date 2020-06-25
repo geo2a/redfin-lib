@@ -11,7 +11,7 @@
 --
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic.Trace
-    ( Trace(..), mkTrace, renderTrace, writeTraceHtmlFile
+    ( Trace(..), mkTrace, writeTraceHtmlFile
     , Node(..), NodeId
     ) where
 
@@ -37,12 +37,7 @@ instance Ord (Node s) where
 instance Show (Node s) where
     show (Node nId _) = show nId
 
-renderNode :: (s -> String) -> Node s -> String
-renderNode shower node =
-  "Node Id: " <> show (nodeId node) <> "\n" <>
-  shower (nodeBody node)
-
--- | The symbolic execution trace
+-- | Symbolic execution trace
 newtype Trace s = Trace {unTrace :: Tree.Tree (Node s)}
     deriving Functor
 
@@ -52,17 +47,16 @@ instance Foldable Trace where
 instance Traversable Trace where
     traverse f (Trace tree) = Trace <$> traverse (\(Node n s) -> Node n <$> f s) tree
 
-renderTrace :: (s -> String) -> Trace s -> String
-renderTrace shower (Trace tree) =
-  TreeView.showTree (renderNode shower <$> tree)
-
+-- | Render a trace as an HTML string
 htmlTrace :: (s -> String) -> Trace s -> String
 htmlTrace shower (Trace tree) =
   TreeView.htmlTree Nothing $
-    fmap (\node -> TreeView.NodeInfo TreeView.InitiallyCollapsed (show (nodeId node))
-                                                            (shower (nodeBody node)))
+    fmap (\node -> TreeView.NodeInfo
+                   TreeView.InitiallyCollapsed (show (nodeId node))
+                                               (shower (nodeBody node)))
          tree
 
+-- | Render a trace as HTML and write the result into a file
 writeTraceHtmlFile :: Show s => FilePath -> Trace s -> IO ()
 writeTraceHtmlFile path trace = writeFile path (htmlTrace show trace)
 

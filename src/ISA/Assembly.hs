@@ -10,21 +10,19 @@
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
 module ISA.Assembly where
 
 
-import           Control.Arrow                (second)
-import           Control.Monad                (ap)
 import           Control.Monad.State
 import           Data.Int                     (Int32)
-import           Data.Int                     (Int8)
 import qualified Data.Map.Strict              as Map
 import qualified Data.Text                    as Text
 
 import           ISA.Types
 import           ISA.Types.Instruction
-import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
+import           ISA.Types.Symbolic
 
 decIfNeg :: Integral a => a -> a
 decIfNeg x | x < 0     = x - 1
@@ -85,6 +83,13 @@ assemble src =
     prg = reverse $ program $ snd $ runState src (MkAssemblerState [] labels 0)
     labels = collectLabels src
 
+mkProgram :: Script -> [(Key, Sym)]
+mkProgram src =
+  let prog = assemble src
+      addrs = map Prog [0..]
+      ics   = [ SConst (CWord ic) | (InstructionCode ic) <- map (encode . snd) prog]
+  in zip addrs ics
+
 instr :: Instruction (Data Int32) -> Script
 instr i = do
     s <- get
@@ -103,11 +108,8 @@ label name = do
     put $ s {labels = Map.insert name ic $ labels s}
 
 -- Instruction mnemonics
--- and   rX dmemaddr = instr (Instruction $ And rX dmemaddr)
--- or    rX dmemaddr = instr (Instruction $ Or  rX dmemaddr)
--- xor    rX dmemaddr = instr (Instruction $ Xor  rX dmemaddr)
-
 add   rX dmemaddr = instr (Instruction $ Add    rX dmemaddr)
+add_i rX imm      = instr (Instruction $ AddI   rX imm)
 sub   rX dmemaddr = instr (Instruction $ Sub    rX dmemaddr)
 mul   rX dmemaddr = instr (Instruction $ Mul    rX dmemaddr)
 div   rX dmemaddr = instr (Instruction $ Div    rX dmemaddr)

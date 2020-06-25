@@ -71,7 +71,6 @@ pipeline s =
             _ -> error $ "piplineStep: impossible happened:" <>
                          "fetchInstruction returned not a singleton."
 
-
 -- | Perform one step of symbolic execution
 step :: Context -> [Context]
 step s =
