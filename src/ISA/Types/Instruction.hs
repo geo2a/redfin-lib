@@ -54,6 +54,7 @@ data InstructionImpl (c :: (* -> *) -> Constraint) a where
   Add      :: Register -> Address -> InstructionImpl Applicative a
   AddI     :: Value a => Register -> Imm a -> InstructionImpl Applicative a
   Sub      :: Register -> Address -> InstructionImpl Applicative a
+  SubI     :: Value a => Register -> Imm a -> InstructionImpl Applicative a
   Mul      :: Register -> Address -> InstructionImpl Applicative a
   Div      :: Register -> Address -> InstructionImpl Applicative a
   Mod      :: Register -> Address -> InstructionImpl Applicative a
@@ -80,6 +81,7 @@ instance Show (InstructionImpl c a) where
     Add      reg addr  -> "Add "      ++ show reg ++ " " ++ show addr
     AddI     reg imm   -> "AddI "     ++ show reg ++ " " ++ show imm
     Sub      reg addr  -> "Sub "      ++ show reg ++ " " ++ show addr
+    SubI     reg imm   -> "SubI "     ++ show reg ++ " " ++ show imm
     Mul      reg addr  -> "Mul "      ++ show reg ++ " " ++ show addr
     Div      reg addr  -> "Div "      ++ show reg ++ " " ++ show addr
     Mod      reg addr  -> "Mod "      ++ show reg ++ " " ++ show addr
@@ -105,6 +107,7 @@ instrEq i j = case (i, j) of
   (Add    reg1 addr1, Add    reg2 addr2) -> reg1 == reg2 && addr1 == addr2
   (AddI   reg1 imm1 , AddI   reg2 imm2 ) -> reg1 == reg2 && imm1 == imm2
   (Sub    reg1 addr1, Sub    reg2 addr2) -> reg1 == reg2 && addr1 == addr2
+  (SubI   reg1 imm1 , SubI   reg2 imm2 ) -> reg1 == reg2 && imm1 == imm2
   (Mul    reg1 addr1, Mul    reg2 addr2) -> reg1 == reg2 && addr1 == addr2
   (Div    reg1 addr1, Div    reg2 addr2) -> reg1 == reg2 && addr1 == addr2
   (Mod    reg1 addr1, Mod    reg2 addr2) -> reg1 == reg2 && addr1 == addr2

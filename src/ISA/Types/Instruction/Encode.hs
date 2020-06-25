@@ -46,6 +46,7 @@ concretiseInstr = \case
     Instruction (JumpCt imm)   -> Instruction (JumpCt (concretiseImm imm))
     Instruction (JumpCf imm)   -> Instruction (JumpCf (concretiseImm imm))
     Instruction (Sub      r addr) -> Instruction (Sub r addr)
+    Instruction (SubI     r imm)  -> Instruction (SubI r (concretiseImm imm))
     Instruction (Mul      r addr) -> Instruction (Mul r addr)
     Instruction (Div      r addr) -> Instruction (Div r addr)
     Instruction (Mod      r addr) -> Instruction (Mod r addr)
@@ -102,6 +103,10 @@ encode i = case i of
     Instruction (Sub      r addr) ->
         fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeMemoryAddress addr
+                                            ++ pad 8
+    Instruction (SubI     r (Imm (MkData byte))) ->
+        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
+                                            ++ encodeByte (Imm byte)
                                             ++ pad 8
     Instruction (Mul      r addr) ->
         fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r

@@ -39,6 +39,7 @@ data InstructionTag where
   TagAdd      :: InstructionTag
   TagAddI     :: InstructionTag
   TagSub      :: InstructionTag
+  TagSubI     :: InstructionTag
   TagMul      :: InstructionTag
   TagDiv      :: InstructionTag
   TagMod      :: InstructionTag
@@ -66,6 +67,7 @@ toTag (Instruction i) =
     Add      _ _ -> TagAdd
     AddI     _ _ -> TagAddI
     Sub      _ _ -> TagSub
+    SubI     _ _ -> TagSubI
     Mul      _ _ -> TagMul
     Div      _ _ -> TagDiv
     Mod      _ _ -> TagMod

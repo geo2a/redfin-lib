@@ -31,6 +31,7 @@ symbolise (Instruction i) =
     Add    reg1 addr1 -> mkI $ Add    reg1 addr1
     AddI   reg1 imm   -> mkI $ AddI   reg1 ((fmap (SConst . CInt)) <$> imm)
     Sub    reg1 addr1 -> mkI $ Sub    reg1 addr1
+    SubI   reg1 imm   -> mkI $ SubI   reg1 ((fmap (SConst . CInt)) <$> imm)
     Mul    reg1 addr1 -> mkI $ Mul    reg1 addr1
     Div    reg1 addr1 -> mkI $ Div    reg1 addr1
     Mod    reg1 addr1 -> mkI $ Mod    reg1 addr1
@@ -76,6 +77,9 @@ decode (InstructionCode code) =
       Just TagSub    -> Just $ Instruction $
               Sub (decodeRegister . extractRegister $ expandedCode)
                   (fromBitsLE $ extractMemoryAddress expandedCode)
+      Just TagSubI   -> Just $ Instruction $
+              SubI (decodeRegister . extractRegister $ expandedCode)
+                   (fromBitsLE $ extractSImm8 expandedCode)
       Just TagMul    -> Just $ Instruction $
               Mul (decodeRegister . extractRegister $ expandedCode)
                   (fromBitsLE $ extractMemoryAddress expandedCode)

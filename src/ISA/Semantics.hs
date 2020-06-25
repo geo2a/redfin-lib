@@ -1,4 +1,3 @@
-
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -102,22 +101,23 @@ incrementIC read write =
 instructionSemantics :: Value a => Instruction a -> FS Key Selective Value a
 instructionSemantics (Instruction i) r w = case i of
     Halt           -> halt r w
-    -- Load reg addr  -> load reg addr r w
-    -- -- -- LoadMI reg addr -> loadMI reg addr r w
+    Load reg addr  -> error "ISA.Semantics.instructionSemantics : not implemented"
+    LoadMI reg addr -> error "ISA.Semantics.instructionSemantics : not implemented"
     Set reg imm    -> set reg imm r w
-    -- Store reg addr -> store reg addr r w
+    Store reg addr -> error "ISA.Semantics.instructionSemantics : not implemented"
     Add reg addr   -> add reg addr r w
-    -- Sub reg addr   -> sub reg addr r w
-    -- Mul reg addr   -> mul reg addr r w
-    -- Div reg addr   -> div reg addr r w
-    -- Mod reg addr   -> mod reg addr r w
-    -- Abs reg        -> abs reg r w
-    -- Jump simm8     -> jump simm8 r w
-    -- JumpZero simm8 -> jumpZero simm8 r w
+    AddI reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
+    Sub reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
+    SubI reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
+    Mul reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
+    Div reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
+    Mod reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
+    Abs reg        -> error "ISA.Semantics.instructionSemantics : not implemented"
+    Jump simm8     -> error "ISA.Semantics.instructionSemantics : not implemented"
 
     CmpEq reg addr -> cmpEq reg addr r w
-    -- CmpGt reg addr -> cmpGt reg addr r w
-    -- CmpLt reg addr -> cmpLt reg addr r w
+    CmpGt reg addr -> error "ISA.Semantics.instructionSemantics : not implemented"
+    CmpLt reg addr -> error "ISA.Semantics.instructionSemantics : not implemented"
 
     JumpCt simm8   -> jumpCt simm8 r w
-    -- JumpCf simm8   -> jumpCf simm8 r w
+    JumpCf simm8   -> error "ISA.Semantics.instructionSemantics : not implemented"
