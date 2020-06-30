@@ -15,7 +15,7 @@ import qualified Data.Map                      as Map
 import           Data.Maybe                    (fromJust)
 
 import           ISA.Assembly
-import           ISA.Backend.Dependencies
+-- import           ISA.Backend.Dependencies
 import           ISA.Backend.Symbolic.List
 -- import           ISA.Semantics
 import           ISA.Backend.Symbolic.List.Run
@@ -64,9 +64,9 @@ demo = do
   -- putStrLn ""
   putStrLn "Symbolic execution tree: "
 
-  let t = runModel 10 ctx
+  let t = runModel 100 ctx
       tracePath = "/home/geo2a/Desktop/traces/trace.html"
-  writeTraceHtmlFile tracePath t
+  writeTraceHtmlFile show tracePath t
   putStrLn $ "Wrote trace into file " <> tracePath
 
   -- debugConsole 10 ctx

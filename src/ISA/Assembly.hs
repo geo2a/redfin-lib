@@ -11,12 +11,14 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module ISA.Assembly where
 
 import           Control.Monad.State
 import           Data.Int                     (Int32)
 import qualified Data.Map.Strict              as Map
 import qualified Data.Text                    as Text
+import           Debug.Trace                  (trace)
 
 import           ISA.Types
 import           ISA.Types.Instruction
@@ -29,16 +31,21 @@ decIfNeg x | x < 0     = x - 1
 
 type Label = Text.Text
 
+-- | TODO: refactor into a bounded type
+progAddressSpace :: Int32
+progAddressSpace = 256
+
 -- | Unconditional go to a label
 goto :: Label -> Script
 goto name = do
     s <- get
     here <- instructionCounter <$> get
     case Map.lookup name (labels s) of
-         Nothing -> jmpi 0
+         Nothing -> error $ "ISA.Assembly.goto: no such label " <> show name-- jmpi 0
          Just there -> do
-             let offset = fromIntegral $ there - here - 1
-             jmpi offset
+             let offset  =
+                   ((fromIntegral there :: Int32) - (fromIntegral here :: Int32) - 1)
+             jmpi (fromIntegral offset)
 
 -- | Go to a label
 goto_ct :: Label -> Script
@@ -48,8 +55,9 @@ goto_ct name = do
     case Map.lookup name (labels s) of
          Nothing -> jmpi 0
          Just there -> do
-             let offset = fromIntegral $ there - here - 1
-             jmpi_ct offset
+             let offset  =
+                   ((fromIntegral there :: Int32) - (fromIntegral here :: Int32) - 1)
+             jmpi_ct (fromIntegral offset)
 
 goto_cf :: Label -> Script
 goto_cf name = do
@@ -58,8 +66,9 @@ goto_cf name = do
     case Map.lookup name (labels s) of
          Nothing -> jmpi 0
          Just there -> do
-             let offset = fromIntegral $ there - here - 1
-             jmpi_cf offset
+             let offset  =
+                   ((fromIntegral there :: Int32) - (fromIntegral here :: Int32) - 1)
+             jmpi_cf (fromIntegral offset)
 
 type Labels = Map.Map Label Address
 

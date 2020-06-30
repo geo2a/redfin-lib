@@ -16,34 +16,31 @@
 -- Semantics of ISA instructions
 -----------------------------------------------------------------------------
 module ISA.Semantics
-    ( halt
-    , add
-    , jumpCt
-    , whenS'
-    , instructionSemanticsS
+    ( instructionSemanticsS
     , instructionSemanticsM
     ) where
 
-import           Control.Selective
+-- import           Control.Selective
 import           Data.Bool             (bool)
 import           Prelude               hiding (Monad, Read, read, readIO)
 import qualified Prelude               (Monad)
 
 import           FS
+import           ISA.Selective
 import           ISA.Types
 import           ISA.Types.Instruction
 
 type Monad f = (Selective f, Prelude.Monad f)
 
 -----------------------------------------------------------------------------
--- | A valiant of 'Control.Selective.whenS' which, instead of returning @()@,
---   gives back the value of type @a@ on @True@ or @mempty@ on @False@.
---   This is essential to avoid redoing work just to make some semantics type-check.
-whenS' :: (Selective f, Monoid a) => f Bool -> f a -> f a
-whenS' x y = selector <*? effect
-  where
-    selector = bool (Right mempty) (Left ()) <$> x -- NB: maps True to Left ()
-    effect   = const                         <$> y
+-- -- | A valiant of 'Control.Selective.whenS' which, instead of returning @()@,
+-- --   gives back the value of type @a@ on @True@ or @mempty@ on @False@.
+-- --   This is essential to avoid redoing work just to make some semantics type-check.
+-- whenS' :: (Selective f, Monoid a) => f Bool -> f a -> f a
+-- whenS' x y = selector <*? effect
+--   where
+--     selector = bool (Right mempty) (Left ()) <$> x -- NB: maps True to Left ()
+--     effect   = const                         <$> y
 -----------------------------------------------------------------------------
 -----------------------------------------------------------------------------
 --------------- Semantics of instructions -----------------------------------
@@ -61,12 +58,12 @@ loadMI reg pointer read write =
     case toMemoryAddress x of
       Nothing   -> error $ "ISA.Semantics.loadMI: invalid address " <> show x
                  -- instead we actually need to rise a processor exception
-      Just addr -> load reg addr read write
+      Just addr -> write (Reg reg) (read (Addr addr))
 
 -- | Write an immediate argument to a register
 set :: Register -> Imm a -> FS Key Applicative Value a
 set reg (Imm imm) _ write =
-    write (Reg reg) (pure imm)
+  write (Reg reg) (pure imm)
 
 store :: Register -> Address -> FS Key Functor Value a
 store reg addr read write =
@@ -78,20 +75,14 @@ add reg addr read write =
       arg2 = read (Addr addr)
       result = (+) <$> arg1 <*> arg2
       -- when @result@ is zero we set @Zero@ flag to @true@
-  in whenS' (toBool <$> ((===) <$> write (Reg reg) result
-                               <*> pure (fromInteger 0))
-            )
-            (write (F Zero) (pure true))
+  in write (Reg reg) result
 
 addI :: Register -> Imm a -> FS Key Selective Value a
 addI reg (Imm imm) read write =
   let arg1 = read (Reg reg)
       arg2 = pure imm
       result = (+) <$> arg1 <*> arg2
-  in whenS' (toBool <$> ((===) <$> write (Reg reg) result
-                               <*> pure (fromInteger 0))
-            )
-            (write (F Zero) (pure true))
+  in write (Reg reg) result
 
 sub :: Register -> Address -> FS Key Selective Value a
 sub reg addr read write =
@@ -99,46 +90,45 @@ sub reg addr read write =
       arg2 = read (Addr addr)
       result = (-) <$> arg1 <*> arg2
       -- when @result@ is zero we set @Zero@ flag to @true@
-  in whenS' (toBool <$> ((===) <$> write (Reg reg) result
-                               <*> pure (fromInteger 0))
-            )
-            (write (F Zero) (pure true))
+  in write (Reg reg) result
 
 subI :: Register -> Imm a -> FS Key Selective Value a
 subI reg (Imm imm) read write =
   let arg1 = read (Reg reg)
       arg2 = pure imm
       result = (-) <$> arg1 <*> arg2
-  in whenS' (toBool <$> ((===) <$> write (Reg reg) result
-                          <*> pure (fromInteger 0))
-            )
-            (write (F Zero) (pure true))
-
+  in write (Reg reg) result
 
 -- | Compare the values in the register and memory cell
 cmpEq :: Register -> Address -> FS Key Selective Value a
 cmpEq reg addr = \read write ->
-    whenS' (toBool <$> ((===) <$> read (Reg reg)
-                              <*> read (Addr addr))
-           )
-           (write (F Condition) (pure true))
+  select ((===) <$> read (Reg reg)
+                <*> read (Addr addr))
+  (\x -> if x then (write (F Condition) (pure true))
+              else (write (F Condition) (pure (ISA.Types.not true))))
+  -- (write (F Condition) id)
+  (pure id)
+    -- whenS (toBool <$> ((===) <$> read (Reg reg)
+    --                          <*> read (Addr addr))
+    --       )
+    --       (write (F Condition) (pure true))
 
 cmpGt :: Register -> Address -> FS Key Selective Value a
 cmpGt reg addr = \read write ->
-  whenS' (toBool <$> (gt <$> read (Reg reg) <*> read (Addr addr)))
-         (write (F Condition) (pure true))
+  whenS (toBool <$> (gt <$> read (Reg reg) <*> read (Addr addr)))
+        (write (F Condition) (pure true))
 
 cmpLt :: Register -> Address -> FS Key Selective Value a
 cmpLt reg addr = \read write ->
-  whenS' (toBool <$> (lt <$> read (Reg reg) <*> read (Addr addr)))
-         (write (F Condition) (pure true))
+  whenS (toBool <$> (lt <$> read (Reg reg) <*> read (Addr addr)))
+        (write (F Condition) (pure true))
 
 -- | Perform jump if flag @Condition@ is set
 jumpCt :: Imm a -> FS Key Selective Value a
 jumpCt (Imm offset) read write =
-    whenS' (toBool <$> read (F Condition))
-           (write IC ((+) <$> pure offset
-                          <*> read IC))
+  whenS (toBool <$> read (F Condition))
+        (write IC ((+) <$> pure offset
+                       <*> read IC))
 
 -- | Perform unconditional jump
 jump :: Imm a -> FS Key Applicative Value a
@@ -166,7 +156,7 @@ instructionSemanticsS (Instruction i) r w = case i of
            ++ "LoadMI does not have Selective semantics "
     Set reg imm    -> set reg imm r w
     Store reg addr -> store reg addr r w
-    Add reg addr   -> sub reg addr r w
+    Add reg addr   -> add reg addr r w
     AddI reg imm   -> addI reg imm r w
     Sub reg addr   -> sub reg addr r w
     SubI reg addr   -> subI reg addr r w

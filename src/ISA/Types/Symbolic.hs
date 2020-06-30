@@ -117,12 +117,13 @@ instance Show Sym where
 
 instance Num Sym where
   x + y = SAdd x y
+  x - y = SSub x y
   x * y = SMul x y
   abs x = SAbs x
   signum _ = error "Sym.Num: signum is not defined"
   fromInteger x = SConst (CInt $ fromInteger x)
-  -- negate _ = error "Sym.Num: negate is not defined"
-  negate x = SSub 0 x
+  negate _ = error "Sym.Num: negate is not defined"
+  -- negate x = SSub 0 x
 
 instance Semigroup (Data Sym) where
   (MkData x) <> (MkData y) = MkData (SAdd x y)
@@ -133,12 +134,13 @@ instance Monoid (Data Sym) where
 instance Boolean Sym where
   true = SConst (CBool True)
   -- | Converting symbolic expressions to boolean always returns True
-  toBool _ = True
-  -- toBool x = case getValue x of
-  --              Nothing        -> error $ "symbolic value" <> show x
-  --              Just (CBool b) -> b
-  --              Just x -> error $ "ISA.Symbolic.Sym.toBool: non-boolean concrete value "
-  --                             <> show x
+  -- toBool _ = True
+  -- toBool _ = error "Hi from Sym.toBool"
+  toBool x = case getValue x of
+               Nothing        -> error $ "symbolic value" <> show x
+               Just (CBool b) -> trace (show b) b
+               Just x -> error $ "ISA.Symbolic.Sym.toBool: non-boolean concrete value "
+                              <> show x
   not x = SNot x
 
   x ||| y = SOr x y

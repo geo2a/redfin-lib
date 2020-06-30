@@ -31,12 +31,13 @@ module ISA.Backend.Symbolic.List
 import           Control.Monad.Reader
 import           Control.Monad.State          (evalState)
 import           Control.Monad.State.Class
-import           Control.Selective
+-- import           Control.Selective
 import qualified Data.Map.Strict              as Map
 import           GHC.Exts                     (Any)
 import           Prelude                      hiding (log, not, read, readIO)
 import           Unsafe.Coerce
 
+import           ISA.Selective
 import           ISA.Semantics
 import           ISA.Types
 import           ISA.Types.Instruction
@@ -118,27 +119,39 @@ instance Applicative Engine where
     (*>)  = (>>)
 
 instance Selective Engine where
-  select cond f = Engine $ \s0 -> do
-    (x, sAfterCond) <- runEngine cond s0
-    case x of
-      Left a -> do
-        (t, s) <- runEngine (popFmapArg >> popFmapArg) sAfterCond
-        case (trySolve . unsafeCoerce $ t) of
-          Trivial b -> if b then runEngine (($ a) <$> f) s
-                            else []
-          Nontrivial symbolic ->
-            -- the one where the path condition as conjoined with the @symbolic@ itself
-            let onTrue  = s { _pathCondition = SAnd symbolic (_pathCondition s) }
-            -- and the one where the path constraint is conjoined with the check's negation
-                onFalse = s { _pathCondition = SAnd (SNot symbolic) (_pathCondition s) }
-            in -- the resulting computation is now a concatenation of two lists:
-               -- the list where @symbolic@ holds and we execute @f@
-               (runEngine (($ a) <$> f) onTrue) ++
-               -- and the list where the negation @symbolic@ holds and we do not execute @f@
-               [((unsafeCoerce symbolic) :: b, onFalse)]
-      Right _ -> error $
-        "Engine.select: Broken assumption! first argument of select returned Right. " <>
-        "Check that all occurrences of whenS receive True in case of symbolic code."
+  select condition boolElim dataElim = Engine $ \s0 -> do
+    (cond, s) <- runEngine condition s0
+    case (trySolve . unsafeCoerce $ cond) of
+      Trivial True  -> runEngine (boolElim True) s
+      Trivial False -> runEngine (boolElim False) s
+      Nontrivial symbolic ->
+        let onTrue  = s { _pathCondition = SAnd symbolic (_pathCondition s) }
+            onFalse = s { _pathCondition = SAnd (SNot symbolic) (_pathCondition s) }
+        in (runEngine (($ (unsafeCoerce symbolic)) <$> dataElim) onTrue) ++
+           [((unsafeCoerce symbolic) :: b, onFalse)]
+
+-- instance Selective Engine where
+--   select cond f = Engine $ \s0 -> do
+--     (x, sAfterCond) <- runEngine cond s0
+--     case x of
+--       Left a -> do
+--         (t, s) <- runEngine (popFmapArg >> popFmapArg) sAfterCond
+--         case (trySolve . unsafeCoerce $ t) of
+--           Trivial b -> if b then runEngine (($ a) <$> f) s
+--                             else []
+--           Nontrivial symbolic ->
+--             -- the one where the path condition as conjoined with the @symbolic@ itself
+--             let onTrue  = s { _pathCondition = SAnd symbolic (_pathCondition s) }
+--             -- and the one where the path constraint is conjoined with the check's negation
+--                 onFalse = s { _pathCondition = SAnd (SNot symbolic) (_pathCondition s) }
+--             in -- the resulting computation is now a concatenation of two lists:
+--                -- the list where @symbolic@ holds and we execute @f@
+--                (runEngine (($ a) <$> f) onTrue) ++
+--                -- and the list where the negation @symbolic@ holds and we do not execute @f@
+--                [((unsafeCoerce symbolic) :: b, onFalse)]
+--       Right _ -> error $
+--         "Engine.select: Broken assumption! first argument of select returned Right. " <>
+--         "Check that all occurrences of whenS receive True in case of symbolic code."
   -- select cond f = Engine $ \s0 -> do
   --   -- perform the effectful computation passed as the first argument of select, i.e.
   --   -- the condition test in @whenS@/@ifS@

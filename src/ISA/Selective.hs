@@ -11,27 +11,29 @@
 -----------------------------------------------------------------------------
 
 module ISA.Selective
-    (Selective(..)) where
+    (Prop(..)
+    , Selective(..), selectM, ifS, whenS) where
 
--- -- | Branch on a Boolean value, skipping unnecessary effects.
--- ifS :: Selective f => f Bool -> f a -> f a -> f a
--- ifS x t e = branch (bool (Right ()) (Left ()) <$> x) (const <$> t) (const <$> e)
+import           Data.Bool
+
+data Prop a = Trivial Bool
+            | Nontrivial a
 
 class Applicative f => Selective f where
-  branch :: f (Either a b) -> f (a -> c) -> f (b -> c) -> f c
+  select :: f (Prop a) -> (Bool -> f b) -> f (a -> b) -> f b
+  -- whenProp :: f (Prop a) -> f a -> f
 
-  select :: f (Either a b) -> f (a -> b) -> f b
-  select x y = branch x y (pure id)
+selectM :: Monad f => f (Prop a) -> f (Bool -> b) -> f (a -> b) -> f b
+selectM condition boolElim dataElim = do
+  c <- condition
+  case c of
+    Trivial b    -> ($ b) <$> boolElim
+    Nontrivial d -> ($ d) <$> dataElim
 
-data Equality a = Trivial Bool
-                | NonTrivial a
+-- | Branch on a Boolean value, skipping unnecessary effects.
+ifS :: Selective f => f Bool -> f a -> f a -> f a
+ifS x t e = select (Trivial <$> x) (\x -> if x then t else e) (pure id)
 
-elimEquality :: b -> b -> (a -> b) -> Equality a -> b
-elimEquality onTrue onFalse onNonTrivial = \case
-  Trivial True  -> onTrue
-  Trivial False -> onFalse
-  NonTrivial x -> onNonTrivial x
-
--- decideEq :: Selective f => f (Equality a) -> f b -> f b -> f b -> f b
--- decideEq x onTrue onFalse onNonTrivial =
---   branch (elimEquality onFasle ontrue onNonTrivial <$> x)
+whenS :: (Selective f,  Monoid a) => f Bool -> f a -> f a
+whenS condition x =
+  select (Trivial <$> condition) (\cond -> if cond then x else pure mempty) (pure id)

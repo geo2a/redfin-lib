@@ -51,6 +51,8 @@ import           Generic.Random
 import           GHC.Generics    (Generic)
 import           Test.QuickCheck (Arbitrary, arbitrary)
 
+import           ISA.Selective
+
 -- | Data registers
 data Register = R0 | R1 | R2 | R3
   deriving (Show, Eq, Ord, Generic)
@@ -77,7 +79,7 @@ instance Arbitrary Flag where
 
 -- | Immediate argument
 newtype Imm a = Imm a
-  deriving (Functor, Eq, Num, Bits, FiniteBits, Generic)
+  deriving (Functor, Eq, Ord, Enum, Num, Real, Integral, Bits, FiniteBits, Generic)
   deriving Show via a
 
 instance Arbitrary a => Arbitrary (Imm a) where
@@ -92,7 +94,8 @@ instance Arbitrary InstructionCode where
   arbitrary = genericArbitrary uniform
 
 newtype Data a = MkData a
-  deriving (Functor, Eq, Ord, Num, Typeable, Bounded, Bits, FiniteBits, Generic)
+  deriving (Functor, Eq, Ord, Num, Enum, Real, Integral
+           , Typeable, Bounded, Bits, FiniteBits, Generic)
   deriving Show via a
 
 instance Arbitrary a => Arbitrary (Data a) where
@@ -159,10 +162,9 @@ instance Boolean (Data Int32) where
   x ||| y = if (toBool x ||| toBool y) then 1 else 0
   x &&& y = if (toBool x &&& toBool y) then 1 else 0
 
-
-data Prop a = Trivial Bool
-            | Nontrivial a
-            deriving (Show, Typeable)
+-- data Prop a = Trivial Bool
+--             | Nontrivial a
+--             deriving (Show, Typeable)
 
 instance Boolean (Prop a) where
   true = Trivial True

@@ -18,38 +18,39 @@ import qualified Data.Map                      as Map
 import           Data.Maybe                    (fromJust)
 
 import           ISA.Assembly
-import           ISA.Backend.Dependencies
+-- import           ISA.Backend.Dependencies
 import           ISA.Backend.Symbolic.List
 -- import           ISA.Semantics
 import           ISA.Backend.Symbolic.List.Run
 import           ISA.Types
 import           ISA.Types.Instruction
+import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Trace
 
 sumArrayLowLevel :: Script
 sumArrayLowLevel = do
-    let { pointer = 0; sum = 253; const_two = 255 } -- ; pointer_store
+    let { pointer = 0; sum = 253; array_start = 255 } -- ; pointer_store
     let { r0 = R0; r1 = R1; r2 = R2 }
-    ld_i r0 0
-    st r0 sum
+    -- ld_i r0 0
+    -- st r0 sum
     ld r1 pointer
-    add_i r1 1
-    st r1 pointer
+    -- add_i r1 1
+    -- st r1 pointer
 
-    -- compare the pointer variable to the constant 2 (stored in the cell 255)
-    "loop" @@ cmpeq r1 const_two
-    -- if pointer == 2 then terminate
+    -- compare the pointer variable to the array_start
+    "loop" @@ cmpeq r1 array_start
+    -- if pointer == array_start then terminate
     goto_ct "end"
     -- jmpi_ct 7
 
     ldmi r2 pointer
     add r2 sum
     st r2 sum
-    ld r1 pointer
+    -- ld r1 pointer
     sub_i r1 1
-    st r1 pointer
+    -- st r1 pointer
 
     goto "loop"
     "end" @@ ld r0 sum
@@ -58,6 +59,7 @@ sumArrayLowLevel = do
 showContext :: Context -> String
 showContext ctx =
   unlines [ "Path constraint: " <> show (_pathCondition ctx)
+  , showKey ctx IC
   , showKey ctx IR
   , showKey ctx (F Condition)
   , showKey ctx (F Halted)
@@ -66,6 +68,7 @@ showContext ctx =
   , showKey ctx (Reg R2)
   , showKey ctx (Addr 0)
   , showKey ctx (Addr 253)
+  , showKey ctx (Addr 255)
   ]
 
 demo_sum :: IO ()
@@ -75,12 +78,12 @@ demo_sum = do
                                                    , (IR, 0)
                                                    , (F Condition, SConst (CBool False))
                                                    , (F Halted, SConst (CBool False))
-                                                   , (Reg R0, SAny "r0")
-                                                   , (Reg R1, SAny "r1")
-                                                   , (Reg R2, SAny "r2")
-                                                   , (Addr 0, 0)
-                                                   , (Addr 253, SAny "sum")
-                                                   , (Addr 255, SConst (CInt 2))
+                                                   , (Reg R0, 0)
+                                                   , (Reg R1, 0)
+                                                   , (Reg R2, 0)
+                                                   , (Addr 0, 3)
+                                                   , (Addr 253, 0)
+                                                   , (Addr 255, 1)
 
                                                    , (Addr 1, SAny "x1")
                                                    , (Addr 2, SAny "x2")
@@ -96,7 +99,7 @@ demo_sum = do
   -- putStrLn ""
   putStrLn "Symbolic execution tree: "
 
-  let t = runModel 100 ctx
+  let t = runModel 8 ctx
       tracePath = "/home/geo2a/Desktop/traces/trace_sum.html"
   writeTraceHtmlFile showContext tracePath t
   putStrLn $ "Wrote trace into file " <> tracePath
