@@ -12,9 +12,9 @@
 -----------------------------------------------------------------------------
 
 module ISA.Types.Instruction.Encode
-    (encode) where
+    (encode
+    , concretiseInstr) where
 
-import           Data.Bits
 import           Data.Int                      (Int32)
 
 import           ISA.Types
@@ -123,15 +123,6 @@ encode i = case i of
     Instruction (Abs      r)      ->
         fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
                                             ++ pad 24
-    where pad k = replicate k False
-
-fromBitsLE :: (FiniteBits a, Num a) => [Bool] -> a
-fromBitsLE = go 0 0
-  where go acc _  []    = acc
-        go acc i (x:xs) = go (if x then (setBit acc i) else acc) (i+1) xs
-
-blastLE :: FiniteBits a => a -> [Bool]
-blastLE x = map (testBit x) [0 .. finiteBitSize x - 1]
 
 -- | 'Register' is encoded as a 2-bit word
 encodeRegister :: Register -> [Bool]

@@ -20,16 +20,20 @@ module ISA.Semantics
     , add
     , jumpCt
     , whenS'
-    , instructionSemantics
+    , instructionSemanticsS
+    , instructionSemanticsM
     ) where
 
 import           Control.Selective
 import           Data.Bool             (bool)
-import           Prelude               hiding (Read, read, readIO)
+import           Prelude               hiding (Monad, Read, read, readIO)
+import qualified Prelude               (Monad)
 
 import           FS
 import           ISA.Types
 import           ISA.Types.Instruction
+
+type Monad f = (Selective f, Prelude.Monad f)
 
 -----------------------------------------------------------------------------
 -- | A valiant of 'Control.Selective.whenS' which, instead of returning @()@,
@@ -48,10 +52,25 @@ whenS' x y = selector <*? effect
 halt :: FS Key Applicative Value a
 halt _ write = write (F Halted) (pure true)
 
+load :: Register -> Address -> FS Key Functor Value a
+load reg addr read write = write (Reg reg) (read (Addr addr))
+
+loadMI :: Addressable a => Register -> Address -> FS Key Monad Value a
+loadMI reg pointer read write =
+  read (Addr pointer) >>= \x ->
+    case toMemoryAddress x of
+      Nothing   -> error $ "ISA.Semantics.loadMI: invalid address " <> show x
+                 -- instead we actually need to rise a processor exception
+      Just addr -> load reg addr read write
+
 -- | Write an immediate argument to a register
 set :: Register -> Imm a -> FS Key Applicative Value a
 set reg (Imm imm) _ write =
     write (Reg reg) (pure imm)
+
+store :: Register -> Address -> FS Key Functor Value a
+store reg addr read write =
+  write (Addr addr) (read (Reg reg))
 
 add :: Register -> Address -> FS Key Selective Value a
 add reg addr read write =
@@ -62,7 +81,39 @@ add reg addr read write =
   in whenS' (toBool <$> ((===) <$> write (Reg reg) result
                                <*> pure (fromInteger 0))
             )
-            (write (F Condition) (pure true))
+            (write (F Zero) (pure true))
+
+addI :: Register -> Imm a -> FS Key Selective Value a
+addI reg (Imm imm) read write =
+  let arg1 = read (Reg reg)
+      arg2 = pure imm
+      result = (+) <$> arg1 <*> arg2
+  in whenS' (toBool <$> ((===) <$> write (Reg reg) result
+                               <*> pure (fromInteger 0))
+            )
+            (write (F Zero) (pure true))
+
+sub :: Register -> Address -> FS Key Selective Value a
+sub reg addr read write =
+  let arg1 = read (Reg reg)
+      arg2 = read (Addr addr)
+      result = (-) <$> arg1 <*> arg2
+      -- when @result@ is zero we set @Zero@ flag to @true@
+  in whenS' (toBool <$> ((===) <$> write (Reg reg) result
+                               <*> pure (fromInteger 0))
+            )
+            (write (F Zero) (pure true))
+
+subI :: Register -> Imm a -> FS Key Selective Value a
+subI reg (Imm imm) read write =
+  let arg1 = read (Reg reg)
+      arg2 = pure imm
+      result = (-) <$> arg1 <*> arg2
+  in whenS' (toBool <$> ((===) <$> write (Reg reg) result
+                          <*> pure (fromInteger 0))
+            )
+            (write (F Zero) (pure true))
+
 
 -- | Compare the values in the register and memory cell
 cmpEq :: Register -> Address -> FS Key Selective Value a
@@ -72,13 +123,15 @@ cmpEq reg addr = \read write ->
            )
            (write (F Condition) (pure true))
 
--- cmpGt :: Register -> Address -> FS Key Applicative Value a
--- cmpGt reg addr = \read write ->
---     write (F Condition) (S <$> read (Reg reg) <*> read (Addr addr))
+cmpGt :: Register -> Address -> FS Key Selective Value a
+cmpGt reg addr = \read write ->
+  whenS' (toBool <$> (gt <$> read (Reg reg) <*> read (Addr addr)))
+         (write (F Condition) (pure true))
 
--- cmpLt :: Register -> Address -> FS Key Applicative Value a
--- cmpLt reg addr = \read write ->
---     write (F Condition) (SLt <$> read (Reg reg) <*> read (Addr addr))
+cmpLt :: Register -> Address -> FS Key Selective Value a
+cmpLt reg addr = \read write ->
+  whenS' (toBool <$> (lt <$> read (Reg reg) <*> read (Addr addr)))
+         (write (F Condition) (pure true))
 
 -- | Perform jump if flag @Condition@ is set
 jumpCt :: Imm a -> FS Key Selective Value a
@@ -86,6 +139,12 @@ jumpCt (Imm offset) read write =
     whenS' (toBool <$> read (F Condition))
            (write IC ((+) <$> pure offset
                           <*> read IC))
+
+-- | Perform unconditional jump
+jump :: Imm a -> FS Key Applicative Value a
+jump (Imm offset) read write =
+  write IC ((+) <$> pure offset <*> read IC)
+
 -----------------------------------------------------------------------------
 
 -- | Increment the instruction counter.
@@ -98,26 +157,35 @@ incrementIC read write =
 -- fetchInstruction read write =
 --       read IC >>= \ic -> write IR (read (Prog ic))
 
-instructionSemantics :: Value a => Instruction a -> FS Key Selective Value a
-instructionSemantics (Instruction i) r w = case i of
+instructionSemanticsS :: Value a => Instruction a -> FS Key Selective Value a
+instructionSemanticsS (Instruction i) r w = case i of
     Halt           -> halt r w
-    Load reg addr  -> error "ISA.Semantics.instructionSemantics : not implemented"
-    LoadMI reg addr -> error "ISA.Semantics.instructionSemantics : not implemented"
+    Load reg addr  -> load reg addr r w
+    LoadMI reg addr ->
+      error $ "ISA.Semantics.instructionSemanticsS : "
+           ++ "LoadMI does not have Selective semantics "
     Set reg imm    -> set reg imm r w
-    Store reg addr -> error "ISA.Semantics.instructionSemantics : not implemented"
-    Add reg addr   -> add reg addr r w
-    AddI reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
-    Sub reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
-    SubI reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
+    Store reg addr -> store reg addr r w
+    Add reg addr   -> sub reg addr r w
+    AddI reg imm   -> addI reg imm r w
+    Sub reg addr   -> sub reg addr r w
+    SubI reg addr   -> subI reg addr r w
     Mul reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
     Div reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
     Mod reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
     Abs reg        -> error "ISA.Semantics.instructionSemantics : not implemented"
-    Jump simm8     -> error "ISA.Semantics.instructionSemantics : not implemented"
+    Jump simm8     -> jump simm8 r w
 
     CmpEq reg addr -> cmpEq reg addr r w
-    CmpGt reg addr -> error "ISA.Semantics.instructionSemantics : not implemented"
-    CmpLt reg addr -> error "ISA.Semantics.instructionSemantics : not implemented"
+    CmpGt reg addr -> cmpGt reg addr r w
+    CmpLt reg addr -> cmpLt reg addr r w
 
     JumpCt simm8   -> jumpCt simm8 r w
     JumpCf simm8   -> error "ISA.Semantics.instructionSemantics : not implemented"
+
+
+instructionSemanticsM ::
+  (Addressable a, Value a) => Instruction a -> FS Key Monad Value a
+instructionSemanticsM (Instruction i) r w = case i of
+  LoadMI reg addr -> loadMI reg addr r w
+  _               -> instructionSemanticsS (Instruction i) r w

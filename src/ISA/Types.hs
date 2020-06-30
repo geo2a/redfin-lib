@@ -21,6 +21,8 @@ module ISA.Types
       Register (..)
       -- ** memory location
     , Address (..)
+    -- * a typeclass representing things that could be converted to a memory location
+    , Addressable(..)
       -- ** flag
     , Flag (..)
       -- immediate argument
@@ -30,7 +32,7 @@ module ISA.Types
     -- packaged data
     , Data (..)
     -- equality check that may fail
-    , Equality(..), TryEq (..)
+    , Prop(..), TryEq (..), TryOrd(..)
     -- * Abstraction over possible locations in the ISA
     , Key(..), keyTag
 
@@ -38,6 +40,7 @@ module ISA.Types
     -- ** Booleans
     , Boolean (..)
     , Value
+    , blastLE, fromBitsLE, pad
     ) where
 
 import           Data.Bits
@@ -65,6 +68,7 @@ instance Arbitrary Address where
 
 -- | Flag
 data Flag = Halted
+          | Zero
           | Condition
   deriving (Show, Eq, Ord, Generic)
 
@@ -156,30 +160,47 @@ instance Boolean (Data Int32) where
   x &&& y = if (toBool x &&& toBool y) then 1 else 0
 
 
-data Equality a = Trivial Bool
-                | Nontrivial a
-                deriving (Show, Typeable)
+data Prop a = Trivial Bool
+            | Nontrivial a
+            deriving (Show, Typeable)
 
-instance Boolean (Equality a) where
+instance Boolean (Prop a) where
   true = Trivial True
-  not  = error "Equality.Boolean.not: not is undefined"
+  not  = error "Prop.Boolean.not: not is undefined"
   toBool t = case t of
     Trivial b    -> b
     Nontrivial _ -> True
-  (|||) = error "Equality.Boolean.|||: undefined"
-  (&&&) = error "Equality.Boolean.&&&: undefined"
+  (|||) = error "Prop.Boolean.|||: undefined"
+  (&&&) = error "Prop.Boolean.&&&: undefined"
 
 -- | This class abstracts an equality check with possible failure, i.e. in the
 --   case when the values are symbolic. In case of concrete types with an 'Eq'
---   instance '(===)' will always return @Right Bool@.
+--   instance '(===)' will always return @Trivial@.
 class TryEq a where
-  (===) :: a -> a -> Equality a
+  (===) :: a -> a -> Prop a
 
 -- instance Eq a => TryEq (Data a) where
 --   (MkData x) === (MkData y) = Trivial (x == y)
 
 instance TryEq (Data Int32) where
   (MkData x) === (MkData y) = Trivial (x == y)
+
+-- | Similar for TryEq, but for strict order
+class TryOrd a where
+  lt :: a -> a -> Prop a
+  gt :: a -> a -> Prop a
+
+class Addressable a where
+  toMemoryAddress :: a -> Maybe Address
+
+instance Addressable (Data Int32) where
+  toMemoryAddress x | x < 0 = Nothing
+                    | x >= fromIntegral (maxBound :: Address) = Nothing
+                    | otherwise = Just . fromBitsLE . extractMemoryAddress . blastLE $ x
+
+instance TryOrd (Data Int32) where
+  lt (MkData x) (MkData y) = Trivial (x < y)
+  gt (MkData x) (MkData y) = Trivial (x > y)
 
 instance Semigroup (Data Int32) where
   (<>) = (+)
@@ -189,5 +210,18 @@ instance Monoid (Data Int32) where
 
 -- | We now consider a value to be a numeric monoid which could also be converted
 --   into booleans
-type Value a = (Show a, TryEq a, Monoid a, Num a, Boolean a)
+type Value a = (Show a, TryEq a, TryOrd a, Monoid a, Num a, Boolean a)
 -----------------------------------------------------------------------------
+fromBitsLE :: (FiniteBits a, Num a) => [Bool] -> a
+fromBitsLE = go 0 0
+  where go acc _  []    = acc
+        go acc i (x:xs) = go (if x then (setBit acc i) else acc) (i+1) xs
+
+blastLE :: FiniteBits a => a -> [Bool]
+blastLE x = map (testBit x) [0 .. finiteBitSize x - 1]
+
+pad :: Int -> [Bool]
+pad k = replicate k False
+
+extractMemoryAddress :: [Bool] -> [Bool]
+extractMemoryAddress = (++ pad 24) . take 8 . drop 8

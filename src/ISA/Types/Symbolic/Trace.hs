@@ -52,13 +52,13 @@ htmlTrace :: (s -> String) -> Trace s -> String
 htmlTrace shower (Trace tree) =
   TreeView.htmlTree Nothing $
     fmap (\node -> TreeView.NodeInfo
-                   TreeView.InitiallyCollapsed (show (nodeId node))
+                   TreeView.InitiallyExpanded (show (nodeId node))
                                                (shower (nodeBody node)))
          tree
 
 -- | Render a trace as HTML and write the result into a file
-writeTraceHtmlFile :: Show s => FilePath -> Trace s -> IO ()
-writeTraceHtmlFile path trace = writeFile path (htmlTrace show trace)
+writeTraceHtmlFile :: (s -> String) -> FilePath -> Trace s -> IO ()
+writeTraceHtmlFile shower path trace = writeFile path (htmlTrace shower trace)
 
 mkTrace :: Node s -> [Trace s] -> Trace s
 mkTrace node children = Trace $ Tree.Node node (map unTrace children)

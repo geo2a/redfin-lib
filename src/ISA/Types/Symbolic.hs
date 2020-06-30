@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic
-    ( Concrete(..), Sym (..), simplify
+    ( Concrete(..), Sym (..), simplify, trySolve
     -- try to concertise symbolic values
     , getValue, toAddress, toImm, toInstructionCode
     ) where
@@ -95,8 +95,8 @@ data Sym where
     SOr    :: Sym -> Sym -> Sym
     SNot   :: Sym -> Sym
 
-deriving instance Eq Sym
-deriving instance Ord Sym
+-- deriving instance Eq Sym
+-- deriving instance Ord Sym
 deriving instance Typeable Sym
 
 instance Show Sym where
@@ -121,7 +121,8 @@ instance Num Sym where
   abs x = SAbs x
   signum _ = error "Sym.Num: signum is not defined"
   fromInteger x = SConst (CInt $ fromInteger x)
-  negate _ = error "Sym.Num: negate is not defined"
+  -- negate _ = error "Sym.Num: negate is not defined"
+  negate x = SSub 0 x
 
 instance Semigroup (Data Sym) where
   (MkData x) <> (MkData y) = MkData (SAdd x y)
@@ -133,6 +134,11 @@ instance Boolean Sym where
   true = SConst (CBool True)
   -- | Converting symbolic expressions to boolean always returns True
   toBool _ = True
+  -- toBool x = case getValue x of
+  --              Nothing        -> error $ "symbolic value" <> show x
+  --              Just (CBool b) -> b
+  --              Just x -> error $ "ISA.Symbolic.Sym.toBool: non-boolean concrete value "
+  --                             <> show x
   not x = SNot x
 
   x ||| y = SOr x y
@@ -140,7 +146,9 @@ instance Boolean Sym where
 
 instance Boolean (Data Sym) where
   true = MkData $ SConst (CBool True)
-  toBool (MkData x) = trace (show x) True
+  toBool (MkData x) =
+    -- trace (show x) True
+    toBool x
   not (MkData x) = MkData (SNot x)
 
   (MkData x) ||| (MkData y) = MkData (SOr x y)
@@ -149,8 +157,23 @@ instance Boolean (Data Sym) where
 instance TryEq Sym where
   x === y = Nontrivial (SEq x y)
 
+instance TryOrd Sym where
+  lt x y = Nontrivial (SLt x y)
+  gt x y = Nontrivial (SGt x y)
+
 instance TryEq (Data Sym) where
   (MkData x) === (MkData y) = Nontrivial (MkData $ SEq x y)
+
+instance TryOrd (Data Sym) where
+  lt (MkData x) (MkData y) = Nontrivial (MkData $ SLt x y)
+  gt (MkData x) (MkData y) = Nontrivial (MkData $ SGt x y)
+
+instance Addressable (Data Sym) where
+  toMemoryAddress (MkData x) =
+    case toAddress x of
+      Left _     -> Nothing
+      Right addr -> Just addr
+
 
 -----------------------------------------------------------------------------
 -- | Try to perform constant folding and get the resulting value. Return 'Nothing' on
@@ -213,6 +236,16 @@ tryReduce = \case
     (SLt (SConst 0) (SConst 0)) -> SConst (CBool False)
     (SLt x y) -> tryReduce x `SLt` tryReduce y
     s -> s
+
+-- | Try to solve a symbolic equality check by constant-folding
+trySolve :: Prop Sym -> Prop Sym
+trySolve (Trivial x) = Trivial x
+trySolve (Nontrivial x) =
+  case getValue x of
+    Nothing        -> Nontrivial x
+    Just (CBool b) -> Trivial b
+    Just i -> error $ "ISA.Symbolic.Sym.trySolve: non-boolean concrete value "
+              <> show i
 
 simplify :: (Maybe Int) -> Sym -> Sym
 simplify steps =

@@ -78,7 +78,7 @@ step s =
         instrSemantics = case decode ic of
                            Nothing -> error $ "Engine.readInstructionRegister: " <>
                                               "unknown instruction with code " <> show ic
-                           Just i -> instructionSemantics (symbolise i) readKey writeKey
+                           Just i -> instructionSemanticsM (symbolise i) readKey writeKey
     in map snd $ runEngine instrSemantics fetched
 
 runModelM :: MonadState NodeId m =>
@@ -86,16 +86,17 @@ runModelM :: MonadState NodeId m =>
 runModelM steps s = do
     n <- get
     modify (+ 1)
-    let h = case Map.lookup (F Halted) (_bindings s) of
+    let halted = case Map.lookup (F Halted) (_bindings s) of
           Just b  -> b
           Nothing -> error "Engine.runModel: uninitialised flag Halted!"
-    let halted    = h == SConst (CBool True)
-        newStates = step s
+    let newStates = step s
     if | steps <= 0 -> pure (mkTrace (Node n s) [])
        | otherwise  ->
-         if halted then pure (mkTrace (Node n s) [])
-                   else do children <- traverse (runModelM (steps - 1)) newStates
-                           pure $ mkTrace (Node n s) children
+         case halted of
+           SConst (CBool True) -> pure (mkTrace (Node n s) [])
+           _ -> do
+             children <- traverse (runModelM (steps - 1)) newStates
+             pure $ mkTrace (Node n s) children
 
 runModel :: Int -> Context -> Trace Context
 runModel steps s = evalState (runModelM steps s) 0
@@ -157,16 +158,17 @@ debugImpl steps ctx = do
       Just "quit" -> pure (mkTrace (Node n ctx) [])
       Just input -> do
         outputStrLn $ "Input was: " ++ input
-        let h = case Map.lookup (F Halted) (_bindings ctx) of
+        let halted = case Map.lookup (F Halted) (_bindings ctx) of
               Just b  -> b
               Nothing -> error "Engine.runModel: uninitialised flag Halted!"
-        let halted    = h == SConst (CBool True)
-            newStates = step ctx
+        let newStates = step ctx
         if | steps <= 0 -> pure (mkTrace (Node n ctx) [])
            | otherwise  ->
-             if halted then pure (mkTrace (Node n ctx) [])
-                       else do children <- traverse (debugImpl (steps - 1)) newStates
-                               pure $ mkTrace (Node n ctx) children
+             case halted of
+               SConst (CBool True) -> pure (mkTrace (Node n ctx) [])
+               _ -> do
+                 children <- traverse (debugImpl (steps - 1)) newStates
+                 pure $ mkTrace (Node n ctx) children
 
 debugConsole :: Int -> Context -> IO ()
 debugConsole steps ctx = do

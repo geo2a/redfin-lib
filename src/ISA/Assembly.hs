@@ -13,7 +13,6 @@
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
 module ISA.Assembly where
 
-
 import           Control.Monad.State
 import           Data.Int                     (Int32)
 import qualified Data.Map.Strict              as Map
@@ -111,6 +110,7 @@ label name = do
 add   rX dmemaddr = instr (Instruction $ Add    rX dmemaddr)
 add_i rX imm      = instr (Instruction $ AddI   rX imm)
 sub   rX dmemaddr = instr (Instruction $ Sub    rX dmemaddr)
+sub_i rX imm      = instr (Instruction $ SubI   rX imm)
 mul   rX dmemaddr = instr (Instruction $ Mul    rX dmemaddr)
 div   rX dmemaddr = instr (Instruction $ Div    rX dmemaddr)
 mod   rX dmemaddr = instr (Instruction $ Mod    rX dmemaddr)
@@ -129,7 +129,7 @@ cmpgt rX dmemaddr = instr (Instruction $ CmpGt rX dmemaddr)
 -- sub_si rX simm = write 0b100001 (register rX .|. simm8 simm)
 -- mul_si rX simm = write 0b100010 (register rX .|. simm8 simm)
 -- div_si rX simm = write 0b100011 (register rX .|. simm8 simm)
-ld_si  rX simm = instr (Instruction $ Set rX simm)
+ld_i  rX simm = instr (Instruction $ Set rX simm)
 
 -- sl_i   rX uimm = write 0b101100 (register rX .|. uimm8 uimm)
 -- sr_i   rX uimm = write 0b101101 (register rX .|. uimm8 uimm)

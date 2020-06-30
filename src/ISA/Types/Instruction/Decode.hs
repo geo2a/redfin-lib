@@ -13,9 +13,13 @@
 -----------------------------------------------------------------------------
 
 module ISA.Types.Instruction.Decode
-    (decode, symbolise, toInstruction) where
+    ( -- * decode an instruction from a binary instruction code
+      decode
+      -- * covert a concrete instruction into a symbolic one
+    , symbolise
+      -- * try to decode the instruction represented by a concrete symbolic instruction code
+    , toInstruction) where
 
-import           Data.Bits
 import           Data.Int                      (Int32)
 
 import           ISA.Types
@@ -23,6 +27,7 @@ import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Opcodes
 import           ISA.Types.Symbolic
 
+-- | Covert a concrete instruction into a symbolic one
 symbolise :: Instruction (Data Int32) -> Instruction (Data Sym)
 symbolise (Instruction i) =
   case i of
@@ -46,6 +51,7 @@ symbolise (Instruction i) =
     CmpGt  reg1 addr1 -> mkI $ CmpGt  reg1 addr1
     CmpLt  reg1 addr1 -> mkI $ CmpLt  reg1 addr1
 
+-- | Try to decode the instruction represented by a concrete symbolic instruction code
 toInstruction :: Sym -> Either Sym (Instruction (Data Int32))
 toInstruction sym = case sym of
   (SConst (CWord ic)) -> case decode (InstructionCode ic) of
@@ -111,14 +117,6 @@ decode (InstructionCode code) =
               JumpCf (fromBitsLE $ extractSImm8Jump expandedCode)
       Nothing -> Nothing
 
-fromBitsLE :: (FiniteBits a, Num a) => [Bool] -> a
-fromBitsLE = go 0 0
-  where go acc _  []    = acc
-        go acc i (x:xs) = go (if x then (setBit acc i) else acc) (i+1) xs
-
-blastLE :: FiniteBits a => a -> [Bool]
-blastLE x = map (testBit x) [0 .. finiteBitSize x - 1]
-
 decodeRegister :: [Bool] -> Register
 decodeRegister = \case
       [False, False] -> R0
@@ -142,6 +140,3 @@ extractSImm8 = (++ pad 24) . take 8 . drop 8
 
 extractSImm8Jump :: [Bool] -> [Bool]
 extractSImm8Jump = (++ pad 24) . take 8 . drop 6
-
-pad :: Int -> [Bool]
-pad k = replicate k False

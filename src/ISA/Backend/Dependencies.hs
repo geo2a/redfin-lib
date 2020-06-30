@@ -53,7 +53,7 @@ type InstructionLabel = String
 instructionGraph :: Value a => (Address, Instruction a)
                             -> Maybe (Graph (Either Key InstructionLabel))
 instructionGraph i@(addr, instr) = do
-    let (ins, outs) = dependencies (instructionSemantics instr)
+    let (ins, outs) = dependencies (instructionSemanticsS instr)
     let instrInfo = instructionLabel
     pure $ overlay (star (Right instrInfo) (map Left outs))
                    (transpose $ star (Right instrInfo) (map Left ins))
