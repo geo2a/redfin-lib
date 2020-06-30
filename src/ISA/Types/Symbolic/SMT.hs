@@ -83,6 +83,7 @@ symToSMT _ (SDiv _ _) = error "SMT.symToSMT: div is not yet defined"
 --   (SBV.svDiv) <$> symToSMT m l <*> symToSMT m r
 symToSMT _ (SMod _ _) = error "SMT.symToSMT: mod is not yet defined"
 --   (SBV.svMod) <$> symToSMT m l <*> symToSMT m r
+symToSMT _ (SConst (CWord w)) = pure (SBV.svInteger (SBV.KBounded False 16) (fromIntegral w))
 symToSMT _ (SConst (CInt i)) = pure (SBV.svInteger (SBV.KBounded True 32) (fromIntegral i))
 symToSMT _ (SConst (CBool b)) = pure (SBV.svBool b)
 symToSMT m (SAbs l) =
@@ -149,6 +150,7 @@ solve :: Sym -> Int -> Options
 solve expr fuel =
   case getValue (simplify (Just fuel) expr) of
     Just (CBool val) -> Literal val
+    Just (CWord w) -> error $ "Sym.solve: non-boolean literal " <> show w
     Just (CInt i) -> error $ "Sym.solve: non-boolean literal " <> show i
     Nothing ->
       let (SBV.SatResult result) = unsafePerformIO (sat expr)
