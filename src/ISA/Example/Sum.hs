@@ -40,7 +40,7 @@ sumArrayLowLevel = do
     -- st r1 pointer
 
     -- compare the pointer variable to the array_start
-    "loop" @@ cmpeq r1 array_start
+    "loop" @@ cmplt r1 array_start
     -- if pointer == array_start then terminate
     goto_ct "end"
     -- jmpi_ct 7
@@ -50,7 +50,7 @@ sumArrayLowLevel = do
     st r2 sum
     -- ld r1 pointer
     sub_i r1 1
-    -- st r1 pointer
+    st r1 pointer
 
     goto "loop"
     "end" @@ ld r0 sum
@@ -99,7 +99,7 @@ demo_sum = do
   -- putStrLn ""
   putStrLn "Symbolic execution tree: "
 
-  let t = runModel 8 ctx
+  let t = runModel 50 ctx
       tracePath = "/home/geo2a/Desktop/traces/trace_sum.html"
   writeTraceHtmlFile showContext tracePath t
   putStrLn $ "Wrote trace into file " <> tracePath

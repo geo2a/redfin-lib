@@ -120,8 +120,14 @@ cmpGt reg addr = \read write ->
 
 cmpLt :: Register -> Address -> FS Key Selective Value a
 cmpLt reg addr = \read write ->
-  whenS (toBool <$> (lt <$> read (Reg reg) <*> read (Addr addr)))
-        (write (F Condition) (pure true))
+  select (lt <$> read (Reg reg)
+             <*> read (Addr addr))
+  (\x -> if x then (write (F Condition) (pure true))
+              else (write (F Condition) (pure (ISA.Types.not true))))
+  -- (write (F Condition) id)
+  (pure id)
+  -- whenS (toBool <$> (lt <$> read (Reg reg) <*> read (Addr addr)))
+  --       (write (F Condition) (pure true))
 
 -- | Perform jump if flag @Condition@ is set
 jumpCt :: Imm a -> FS Key Selective Value a
