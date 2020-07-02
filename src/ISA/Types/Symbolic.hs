@@ -18,7 +18,7 @@ module ISA.Types.Symbolic
     , getValue, toAddress, toImm, toInstructionCode
     ) where
 
-import           Data.Int      (Int32)
+import           Data.Int      (Int32, Int8)
 import           Data.Text     (Text)
 import qualified Data.Text     as Text
 import           Data.Typeable
@@ -32,7 +32,7 @@ import           ISA.Types
 
 -- | Concrete values: either signed or unsigned integers, or booleans
 data Concrete where
-  CInt  :: Int32 -> Concrete
+  CInt32  :: Int32 -> Concrete
   CWord :: Word16 -> Concrete
   CBool :: Bool -> Concrete
 
@@ -40,26 +40,26 @@ deriving instance Eq Concrete
 deriving instance Ord Concrete
 
 instance Show Concrete where
-  show (CInt i)  = show i
-  show (CWord w) = show w
-  show (CBool b) = show b
+  show (CInt32 i) = show i
+  show (CWord w)  = show w
+  show (CBool b)  = show b
 
 instance Num Concrete where
-  (CInt x) + (CInt y) = CInt (x + y)
+  (CInt32 x) + (CInt32 y) = CInt32 (x + y)
   x        + y        = error $ "Concrete.Num.+: non-integer arguments " <> show x <> " "
                                                                          <> show y
-  (CInt x) * (CInt y) = CInt (x + y)
+  (CInt32 x) * (CInt32 y) = CInt32 (x + y)
   x        * y        = error $ "Concrete.Num.*: non-integer arguments " <> show x <> " "
                                                                          <> show y
-  abs (CInt x) = CInt (abs x)
-  abs x        = error $ "Concrete.Num.abs: non-integer argument " <> show x
+  abs (CInt32 x) = CInt32 (abs x)
+  abs x          = error $ "Concrete.Num.abs: non-integer argument " <> show x
 
-  signum (CInt x) = CInt (signum x)
+  signum (CInt32 x) = CInt32 (signum x)
   signum x        = error $ "Concrete.Num.signum: non-integer argument " <> show x
 
-  fromInteger x = CInt (fromInteger x)
+  fromInteger x = CInt32 (fromInteger x)
 
-  negate (CInt x) = CInt (negate x)
+  negate (CInt32 x) = CInt32 (negate x)
   negate x        = error $ "Concrete.Num.negate: non-integer argument " <> show x
 
 instance Boolean Concrete where
@@ -95,8 +95,8 @@ data Sym where
     SOr    :: Sym -> Sym -> Sym
     SNot   :: Sym -> Sym
 
--- deriving instance Eq Sym
--- deriving instance Ord Sym
+deriving instance Eq Sym
+deriving instance Ord Sym
 deriving instance Typeable Sym
 
 instance Show Sym where
@@ -121,7 +121,7 @@ instance Num Sym where
   x * y = SMul x y
   abs x = SAbs x
   signum _ = error "Sym.Num: signum is not defined"
-  fromInteger x = SConst (CInt $ fromInteger x)
+  fromInteger x = SConst (CInt32 $ fromInteger x)
   negate _ = error "Sym.Num: negate is not defined"
   -- negate x = SSub 0 x
 
@@ -231,9 +231,9 @@ tryReduce = \case
     (SOr x (SConst (CBool False))) -> tryReduce x
     (SOr x y) -> tryReduce x `SOr` tryReduce y
 
-    (SEq (SConst (CInt 0)) (SConst (CInt 0))) -> SConst (CBool True)
+    (SEq (SConst (CInt32 0)) (SConst (CInt32 0))) -> SConst (CBool True)
     (SEq x y) -> tryReduce x `SEq` tryReduce y
-    (SGt (SConst (CInt 0)) (SConst (CInt 0))) -> SConst (CBool False)
+    (SGt (SConst (CInt32 0)) (SConst (CInt32 0))) -> SConst (CBool False)
     (SGt x y) -> tryReduce x `SGt` tryReduce y
     (SLt (SConst 0) (SConst 0)) -> SConst (CBool False)
     (SLt x y) -> tryReduce x `SLt` tryReduce y
@@ -263,25 +263,33 @@ simplify steps =
 toAddress :: Sym -> Either Sym Address
 toAddress sym =
   case getValue (simplify Nothing sym) of
-    Just (CWord _) -> error "ISA.Types.Symbolic.toAddress: not implemented for CWord"
-    Just (CInt i)  -> if (i >= 0) && (i <= fromIntegral (maxBound :: Address))
-                      then Right (fromIntegral i)
-                      else Left sym
-    Just (CBool _) -> Left sym
-    Nothing        -> Left sym
+    Just (CWord _)  -> error "ISA.Types.Symbolic.toAddress: not implemented for CWord"
+    Just (CInt32 i) -> if (i >= fromIntegral (minBound :: Address))
+                       && (i <= fromIntegral (maxBound :: Address))
+                       then Right (fromIntegral i)
+                       else error $ "ISA.Types.Symbolic.toAddress: " <>
+                                    "the value " <> show i <> "is out of address space"
+    Just (CBool _)  -> error "ISA.Types.Symbolic.toAddress: not implemented for CBool"
+    Nothing         -> Left sym
 
-toImm :: Sym -> Either Sym (Imm (Data Int32))
+toImm :: Sym -> Either Sym (Imm (Data Int8))
 toImm sym =
     case getValue (simplify Nothing sym) of
-    Just (CWord _) -> error "ISA.Types.Symbolic.toImm: not implemented for CWord"
-    Just (CInt  i) -> Right (Imm . MkData $ i)
-    Just (CBool _) -> Left sym
-    Nothing        -> Left sym
+    Just (CWord _)   -> error "ISA.Types.Symbolic.toImm: not implemented for CWord"
+    Just (CInt32  i) -> if (i >= fromIntegral (minBound :: Int8))
+                        && (i <= fromIntegral (maxBound :: Int8))
+                        then Right (Imm . MkData $ fromIntegral i)
+                        else error $ "ISA.Types.Symbolic.toImm: " <>
+                                     "the value " <> show i <> "is not a valid immediate"
+    Just (CBool _)   -> error "ISA.Types.Symbolic.toImm: not implemented for CBool"
+    Nothing          -> Left sym
 
 toInstructionCode :: Sym -> Either Sym InstructionCode
 toInstructionCode sym =
     case getValue (simplify Nothing sym) of
-    Just (CInt  _) -> Left sym
-    Just (CWord w) -> Right (InstructionCode w)
-    Just (CBool _) -> Left sym
-    Nothing        -> Left sym
+    Just (CInt32  _) -> error $ "ISA.Types.Symbolic.toInstructionCode: " <>
+                                "not implemented for CInt32"
+    Just (CWord w)   -> Right (InstructionCode w)
+    Just (CBool _)   -> error $ "ISA.Types.Symbolic.toInstructionCode: " <>
+                                "not implemented for CBool"
+    Nothing          -> Left sym

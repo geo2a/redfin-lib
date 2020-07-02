@@ -34,18 +34,18 @@ symbolise (Instruction i) =
     Halt              -> mkI $ Halt
     Load   reg1 addr1 -> mkI $ Load   reg1 addr1
     Add    reg1 addr1 -> mkI $ Add    reg1 addr1
-    AddI   reg1 imm   -> mkI $ AddI   reg1 ((fmap (SConst . CInt)) <$> imm)
+    AddI   reg1 imm   -> mkI $ AddI   reg1 ((fmap (SConst . CInt32)) <$> imm)
     Sub    reg1 addr1 -> mkI $ Sub    reg1 addr1
-    SubI   reg1 imm   -> mkI $ SubI   reg1 ((fmap (SConst . CInt)) <$> imm)
+    SubI   reg1 imm   -> mkI $ SubI   reg1 ((fmap (SConst . CInt32)) <$> imm)
     Mul    reg1 addr1 -> mkI $ Mul    reg1 addr1
     Div    reg1 addr1 -> mkI $ Div    reg1 addr1
     Mod    reg1 addr1 -> mkI $ Mod    reg1 addr1
     Store  reg1 addr1 -> mkI $ Store  reg1 addr1
-    Set    reg1 imm1  -> mkI $ Set    reg1 ((fmap (SConst . CInt)) <$> imm1)
+    Set    reg1 imm1  -> mkI $ Set    reg1 ((fmap (SConst . CInt32)) <$> imm1)
     Abs    reg1       -> mkI $ Abs    reg1
-    Jump   offset1    -> mkI $ Jump   ((fmap (SConst . CInt)) <$> offset1)
-    JumpCt offset1    -> mkI $ JumpCt ((fmap (SConst . CInt)) <$> offset1)
-    JumpCf offset1    -> mkI $ JumpCf ((fmap (SConst . CInt)) <$> offset1)
+    Jump   offset1    -> mkI $ Jump   ((fmap (SConst . CInt32)) <$> offset1)
+    JumpCt offset1    -> mkI $ JumpCt ((fmap (SConst . CInt32)) <$> offset1)
+    JumpCf offset1    -> mkI $ JumpCf ((fmap (SConst . CInt32)) <$> offset1)
     LoadMI reg1 addr1 -> mkI $ LoadMI reg1 addr1
     CmpEq  reg1 addr1 -> mkI $ CmpEq  reg1 addr1
     CmpGt  reg1 addr1 -> mkI $ CmpGt  reg1 addr1

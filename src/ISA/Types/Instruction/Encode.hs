@@ -15,7 +15,7 @@ module ISA.Types.Instruction.Encode
     (encode
     , concretiseInstr) where
 
-import           Data.Int                      (Int32)
+import           Data.Int                      (Int32, Int8)
 
 import           ISA.Types
 import           ISA.Types.Instruction
@@ -23,14 +23,14 @@ import           ISA.Types.Instruction.Opcodes
 import           ISA.Types.Symbolic
 
 {-# WARNING concretiseImm "Throws a runtime exception is the argument is symbolic" #-}
-concretiseImm :: Imm (Data Sym) -> Imm (Data Int32)
-concretiseImm (Imm (MkData byte)) =
-  case toImm byte of
+concretiseImm :: Imm (Data Sym) -> Imm (Data Int8)
+concretiseImm (Imm (MkData i)) =
+  case toImm i of
     Right imm -> imm
     Left sym -> error $ "Instruction.encode: symbolic immediate argument"
                 <> show sym
 
-concretiseInstr :: Instruction (Data Sym) -> Instruction (Data Int32)
+concretiseInstr :: Instruction (Data Sym) -> Instruction (Data Int8)
 concretiseInstr = \case
     Instruction Halt -> Instruction  Halt
     Instruction (Load     r addr) -> Instruction (Load r addr)
@@ -53,10 +53,10 @@ concretiseInstr = \case
     Instruction (Abs      r)      -> Instruction (Abs r)
 
 encode :: Instruction (Data Int32) -> InstructionCode
-encode i = case i of
+encode i = InstructionCode $ case i of
     Instruction Halt -> 0
     Instruction (Load     r addr) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
+        fromBitsLEWord16 $ (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeMemoryAddress addr
                                             ++ pad 8
     Instruction (LoadMI   r addr) ->
@@ -123,6 +123,7 @@ encode i = case i of
     Instruction (Abs      r)      ->
         fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
                                             ++ pad 24
+    -- _ -> undefined
 
 -- | 'Register' is encoded as a 2-bit word
 encodeRegister :: Register -> [Bool]

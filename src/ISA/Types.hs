@@ -40,11 +40,11 @@ module ISA.Types
     -- ** Booleans
     , Boolean (..)
     , Value
-    , blastLE, fromBitsLE, pad
+    , blastLE, fromBitsLE, fromBitsLEInt8, fromBitsLEInt32, fromBitsLEWord16, pad
     ) where
 
 import           Data.Bits
-import           Data.Int        (Int32)
+import           Data.Int        (Int32, Int8)
 import           Data.Typeable
 import           Data.Word       (Word16, Word32)
 import           Generic.Random
@@ -154,6 +154,14 @@ instance Boolean Bool where
   x ||| y = x || y
   x &&& y = x && y
 
+instance Boolean (Data Int8) where
+  toBool (MkData x) = x /= 0
+  true = MkData 1
+  not  (MkData x) = if x == 0 then 1 else 0
+
+  x ||| y = if (toBool x ||| toBool y) then 1 else 0
+  x &&& y = if (toBool x &&& toBool y) then 1 else 0
+
 instance Boolean (Data Int32) where
   toBool (MkData x) = x /= 0
   true = MkData 1
@@ -181,8 +189,8 @@ instance Boolean (Prop a) where
 class TryEq a where
   (===) :: a -> a -> Prop a
 
--- instance Eq a => TryEq (Data a) where
---   (MkData x) === (MkData y) = Trivial (x == y)
+instance TryEq (Data Int8) where
+  (MkData x) === (MkData y) = Trivial (x == y)
 
 instance TryEq (Data Int32) where
   (MkData x) === (MkData y) = Trivial (x == y)
@@ -198,11 +206,22 @@ class Addressable a where
 instance Addressable (Data Int32) where
   toMemoryAddress x | x < 0 = Nothing
                     | x >= fromIntegral (maxBound :: Address) = Nothing
-                    | otherwise = Just . fromBitsLE . extractMemoryAddress . blastLE $ x
+                    | otherwise =
+                      Just . Address . fromBitsLEWord16 . extractMemoryAddress . blastLE $ x
+
+instance TryOrd (Data Int8) where
+  lt (MkData x) (MkData y) = Trivial (x < y)
+  gt (MkData x) (MkData y) = Trivial (x > y)
 
 instance TryOrd (Data Int32) where
   lt (MkData x) (MkData y) = Trivial (x < y)
   gt (MkData x) (MkData y) = Trivial (x > y)
+
+instance Semigroup (Data Int8) where
+  (<>) = (+)
+
+instance Monoid (Data Int8) where
+  mempty = 0
 
 instance Semigroup (Data Int32) where
   (<>) = (+)
@@ -219,7 +238,22 @@ fromBitsLE = go 0 0
   where go acc _  []    = acc
         go acc i (x:xs) = go (if x then (setBit acc i) else acc) (i+1) xs
 
-blastLE :: FiniteBits a => a -> [Bool]
+fromBitsLEInt32 :: [Bool] -> Int32
+fromBitsLEInt32 xs | length xs > 0 && length xs <= 32 = fromBitsLE xs
+                   | otherwise = error $ "ISA.Types.fromBitsLEInt32: " <>
+                                         "the argument does not fit into Int32"
+
+fromBitsLEWord16 :: [Bool] -> Word16
+fromBitsLEWord16 xs | length xs > 0 && length xs <= 16 = fromBitsLE xs
+                    | otherwise = error $ "ISA.Types.fromBitsLEWord16: " <>
+                                          "the argument does not fit into Word16"
+
+fromBitsLEInt8 :: [Bool] -> Int8
+fromBitsLEInt8 xs | length xs > 0 && length xs <= 8 = fromBitsLE xs
+                  | otherwise = error $ "ISA.Types.fromBitsLEInt8: " <>
+                                        "the argument does not fit into Int8"
+
+blastLE :: (FiniteBits a) => a -> [Bool]
 blastLE x = map (testBit x) [0 .. finiteBitSize x - 1]
 
 pad :: Int -> [Bool]
