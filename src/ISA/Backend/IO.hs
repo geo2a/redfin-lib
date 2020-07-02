@@ -13,8 +13,7 @@
 -----------------------------------------------------------------------------
 
 module ISA.Backend.IO
-    ( bootRuntimeIO
-    , example ) where
+    ( bootRuntimeIO) where
 
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Trans.Reader
@@ -61,12 +60,12 @@ simulateIO :: Env (Data Int32) -> FS Key Selective Value (Data Int32) -> IO (Dat
 simulateIO env comp = do
   runReaderT (comp readIO writeIO) env
 
-example :: IO ()
-example = do
-  env  <-
-    bootRuntimeIO [ (IC, 0)
-                  , (F Condition, 0)
-                  , (Reg R0, -1)
-                  , (Addr 0, 1)]
-  result <- simulateIO env (add R0 0)
-  print result
+-- example :: IO ()
+-- example = do
+--   env  <-
+--     bootRuntimeIO [ (IC, 0)
+--                   , (F Condition, 0)
+--                   , (Reg R0, -1)
+--                   , (Addr 0, 1)]
+--   result <- simulateIO env (add R0 0)
+--   print result
