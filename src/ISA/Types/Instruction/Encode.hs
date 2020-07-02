@@ -53,77 +53,58 @@ concretiseInstr = \case
     Instruction (Abs      r)      -> Instruction (Abs r)
 
 encode :: Instruction (Data Int32) -> InstructionCode
-encode i = InstructionCode $ case i of
-    Instruction Halt -> 0
-    Instruction (Load     r addr) ->
-        fromBitsLEWord16 $ (asBools . opcode $ i) ++ encodeRegister r
+encode i = InstructionCode . fromBitsLEWord16 $ case i of
+    Instruction Halt -> take 16 $ repeat False
+    Instruction (Load     r addr) -> (asBools . opcode $ i)
+                                     <> encodeRegister r
+                                     <> encodeMemoryAddress addr
+    Instruction (LoadMI   r addr) -> (asBools . opcode $ i)
+                                     <> encodeRegister r
+                                     <> encodeMemoryAddress addr
+    Instruction (Set      r (Imm (MkData byte))) -> (asBools . opcode $ i)
+                                                    <> encodeRegister r
+                                                    <> encodeByte (Imm byte)
+    Instruction (Store    r addr) -> (asBools . opcode $ i)
+                                     <> encodeRegister r
+                                     <> encodeMemoryAddress addr
+    Instruction (Add      r addr) -> (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeMemoryAddress addr
-                                            ++ pad 8
-    Instruction (LoadMI   r addr) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
-                                            ++ encodeMemoryAddress addr
-                                            ++ pad 8
-    Instruction (Set      r (Imm (MkData byte))) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
+    Instruction (AddI     r (Imm (MkData byte))) -> (asBools . opcode $ i)
+                                                 <> encodeRegister r
                                             ++ encodeByte (Imm byte)
-                                            ++ pad 8
-    Instruction (Store    r addr) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
+    Instruction (Jump     (Imm (MkData byte)))   -> (asBools . opcode $ i)
+                                                 <> encodeByte (Imm byte)
+                                                 <> pad 2
+    Instruction (CmpEq      r addr) -> (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeMemoryAddress addr
-                                            ++ pad 8
-    Instruction (Add      r addr) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
+    Instruction (CmpLt      r addr) -> (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeMemoryAddress addr
-                                            ++ pad 8
-    Instruction (AddI     r (Imm (MkData byte))) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
-                                            ++ encodeByte (Imm byte)
-                                            ++ pad 8
-    Instruction (Jump     (Imm (MkData byte)))   ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeByte (Imm byte)
-                                            ++ pad 18
-    Instruction (CmpEq      r addr) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
+    Instruction (CmpGt      r addr) -> (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeMemoryAddress addr
-                                            ++ pad 8
-    Instruction (CmpLt      r addr) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
-                                            ++ encodeMemoryAddress addr
-                                            ++ pad 8
-    Instruction (CmpGt      r addr) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
-                                            ++ encodeMemoryAddress addr
-                                            ++ pad 8
     Instruction (JumpCt (Imm (MkData byte)))   ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeByte (Imm byte)
-                                            ++ pad 18
+        (asBools . opcode $ i) ++ encodeByte (Imm byte)
+                                            ++ pad 2
     Instruction (JumpCf (Imm (MkData byte)))   ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeByte (Imm byte)
-                                            ++ pad 18
+        (asBools . opcode $ i) ++ encodeByte (Imm byte)
+                                            ++ pad 2
     Instruction (Sub      r addr) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
+        (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeMemoryAddress addr
-                                            ++ pad 8
     Instruction (SubI     r (Imm (MkData byte))) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
+        (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeByte (Imm byte)
-                                            ++ pad 8
     Instruction (Mul      r addr) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
+        (asBools . opcode $ i) ++ encodeRegister r
                                         ++ encodeMemoryAddress addr
-                                        ++ pad 8
     Instruction (Div      r addr) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
+        (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeMemoryAddress addr
-                                            ++ pad 8
     Instruction (Mod      r addr) ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
+        (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeMemoryAddress addr
-                                            ++ pad 8
     Instruction (Abs      r)      ->
-        fromBitsLE $ (asBools . opcode $ i) ++ encodeRegister r
-                                            ++ pad 24
-    -- _ -> undefined
+        (asBools . opcode $ i) ++ encodeRegister r
+                                            ++ pad 8
 
 -- | 'Register' is encoded as a 2-bit word
 encodeRegister :: Register -> [Bool]
@@ -139,4 +120,7 @@ encodeMemoryAddress = blastLE
 
 -- | 'Byte' is stored in the leading 8 bits (little-endian) of a 'Value'
 encodeByte :: Imm Int32 -> [Bool]
-encodeByte = take 8 . blastLE
+encodeByte x | x >= fromIntegral (minBound :: Int8)
+            && x <= fromIntegral (maxBound :: Int8) =
+  blastLE (fromIntegral x :: Int8)
+             | otherwise = error $ "encodeByte: doesn't fit into Int8"

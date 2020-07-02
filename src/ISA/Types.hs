@@ -40,13 +40,14 @@ module ISA.Types
     -- ** Booleans
     , Boolean (..)
     , Value
-    , blastLE, fromBitsLE, fromBitsLEInt8, fromBitsLEInt32, fromBitsLEWord16, pad
+    , blastLE, fromBitsLE, fromBitsLEInt8, fromBitsLEInt32
+    , fromBitsLEWord8, fromBitsLEWord16, pad
     ) where
 
 import           Data.Bits
 import           Data.Int        (Int32, Int8)
 import           Data.Typeable
-import           Data.Word       (Word16, Word32)
+import           Data.Word       (Word16, Word8)
 import           Generic.Random
 import           GHC.Generics    (Generic)
 import           Test.QuickCheck (Arbitrary, arbitrary)
@@ -61,9 +62,9 @@ instance Arbitrary Register where
   arbitrary = genericArbitrary uniform
 
 -- | Memory location
-newtype Address = Address Word16
+newtype Address = Address Word8
   deriving (Eq, Ord, Num, Real, Enum, Integral, Bounded, Bits, FiniteBits, Generic)
-  deriving Show via Word16
+  deriving Show via Word8
 
 instance Arbitrary Address where
   arbitrary = genericArbitrary uniform
@@ -207,7 +208,7 @@ instance Addressable (Data Int32) where
   toMemoryAddress x | x < 0 = Nothing
                     | x >= fromIntegral (maxBound :: Address) = Nothing
                     | otherwise =
-                      Just . Address . fromBitsLEWord16 . extractMemoryAddress . blastLE $ x
+                      Just . Address . fromBitsLEWord8 . extractMemoryAddress . blastLE $ x
 
 instance TryOrd (Data Int8) where
   lt (MkData x) (MkData y) = Trivial (x < y)
@@ -239,17 +240,23 @@ fromBitsLE = go 0 0
         go acc i (x:xs) = go (if x then (setBit acc i) else acc) (i+1) xs
 
 fromBitsLEInt32 :: [Bool] -> Int32
-fromBitsLEInt32 xs | length xs > 0 && length xs <= 32 = fromBitsLE xs
+fromBitsLEInt32 xs | length xs == 32 = fromBitsLE xs
                    | otherwise = error $ "ISA.Types.fromBitsLEInt32: " <>
                                          "the argument does not fit into Int32"
 
+fromBitsLEWord8 :: [Bool] -> Word8
+fromBitsLEWord8 xs | length xs == 8 = fromBitsLE xs
+                   | otherwise = error $ "ISA.Types.fromBitsLEWord16: " <>
+                                         "the argument does not fit into Word8"
+
 fromBitsLEWord16 :: [Bool] -> Word16
-fromBitsLEWord16 xs | length xs > 0 && length xs <= 16 = fromBitsLE xs
+fromBitsLEWord16 xs | length xs == 16 = fromBitsLE xs
                     | otherwise = error $ "ISA.Types.fromBitsLEWord16: " <>
-                                          "the argument does not fit into Word16"
+                                          "the argument " <> show xs <>
+                                          " does not fit into Word16"
 
 fromBitsLEInt8 :: [Bool] -> Int8
-fromBitsLEInt8 xs | length xs > 0 && length xs <= 8 = fromBitsLE xs
+fromBitsLEInt8 xs | length xs == 8 = fromBitsLE xs
                   | otherwise = error $ "ISA.Types.fromBitsLEInt8: " <>
                                         "the argument does not fit into Int8"
 
