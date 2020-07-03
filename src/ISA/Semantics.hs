@@ -102,39 +102,24 @@ subI reg (Imm imm) read write =
 -- | Compare the values in the register and memory cell
 cmpEq :: Register -> Address -> FS Key Selective Value a
 cmpEq reg addr = \read write ->
-  select ((===) <$> read (Reg reg)
-                <*> read (Addr addr))
-  (\x -> if x then (write (F Condition) (pure true))
-              else (write (F Condition) (pure (ISA.Types.not true))))
-  -- (write (F Condition) id)
-  (pure id)
-    -- whenS (toBool <$> ((===) <$> read (Reg reg)
-    --                          <*> read (Addr addr))
-    --       )
-    --       (write (F Condition) (pure true))
+    whenS ((===) <$> read (Reg reg) <*> read (Addr addr))
+          (write (F Condition) (pure true))
 
 cmpGt :: Register -> Address -> FS Key Selective Value a
 cmpGt reg addr = \read write ->
-  whenS (toBool <$> (gt <$> read (Reg reg) <*> read (Addr addr)))
+  whenS (gt <$> read (Reg reg) <*> read (Addr addr))
         (write (F Condition) (pure true))
 
 cmpLt :: Register -> Address -> FS Key Selective Value a
 cmpLt reg addr = \read write ->
-  select (lt <$> read (Reg reg)
-             <*> read (Addr addr))
-  (\x -> if x then (write (F Condition) (pure true))
-              else (write (F Condition) (pure (ISA.Types.not true))))
-  -- (write (F Condition) id)
-  (pure id)
-  -- whenS (toBool <$> (lt <$> read (Reg reg) <*> read (Addr addr)))
-  --       (write (F Condition) (pure true))
+  whenS (lt <$> read (Reg reg) <*> read (Addr addr))
+        (write (F Condition) (pure true))
 
 -- | Perform jump if flag @Condition@ is set
 jumpCt :: Imm a -> FS Key Selective Value a
 jumpCt (Imm offset) read write =
-  whenS (toBool <$> read (F Condition))
-        (write IC ((+) <$> pure offset
-                       <*> read IC))
+  whenS ((===) <$> read (F Condition) <*> pure true)
+        (write IC ((+) <$> pure offset <*> read IC))
 
 -- | Perform unconditional jump
 jump :: Imm a -> FS Key Applicative Value a

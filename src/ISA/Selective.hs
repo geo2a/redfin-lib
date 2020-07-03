@@ -34,6 +34,6 @@ selectM condition boolElim dataElim = do
 ifS :: Selective f => f Bool -> f a -> f a -> f a
 ifS x t e = select (Trivial <$> x) (\x -> if x then t else e) (pure id)
 
-whenS :: (Selective f,  Monoid a) => f Bool -> f a -> f a
+whenS :: (Selective f,  Monoid a) => f (Prop a) -> f a -> f a
 whenS condition x =
-  select (Trivial <$> condition) (\cond -> if cond then x else pure mempty) (pure id)
+  select condition (\cond -> if cond then x else pure mempty) (pure id)
