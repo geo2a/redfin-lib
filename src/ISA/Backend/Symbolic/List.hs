@@ -57,7 +57,6 @@ import           ISA.Types.Symbolic.Trace
 --     (TODO: come up with a better explanation for this)
 data Context = MkContext { _bindings      :: Map.Map Key Sym
                          , _pathCondition :: Sym
-                         , _fmapLog       :: [Any]
                          }
 
 showKey :: Context -> Key -> String
@@ -86,31 +85,12 @@ instance Show Context where
 data Engine a = Engine
     { runEngine :: Context -> [(a, Context)] }
 
-{-# WARNING pushFmapArg "This function uses @unsafeCoerce@." #-}
-pushFmapArg :: a -> Engine ()
-pushFmapArg res = do
-  s <- get
-  put $ s {_fmapLog = (unsafeCoerce res :: Any) : _fmapLog s}
-
-{-# WARNING popFmapArg "This function uses @unsafeCoerce@." #-}
-popFmapArg :: Engine a
-popFmapArg = do
-  s <- get
-  case (_fmapLog s) of
-    [] -> error "Engine.popFmapArg: empty _fmapLog!"
-    (res:rest) -> do
-      put $ s {_fmapLog = rest}
-      pure (unsafeCoerce res)
-
--- | The 'Functor' instance for @Engine@, besides fmapping the result of the
---   computations performs additional work: it logs the "purified" value of @fmap@'s
---   second argument via 'pushFmapArg'.
+-- | The 'Functor' instance for @Engine@
 instance Functor Engine where
   fmap f e =
     Engine $ \s0 -> do
       (res, s) <- runEngine e s0
-      ((), s') <- runEngine (pushFmapArg res) s
-      pure (f res, s')
+      pure (f res, s)
 
 -- | A standard 'Applicative' instance available for any 'Monad'.
 instance Applicative Engine where
@@ -129,72 +109,6 @@ instance Selective Engine where
             onFalse = s { _pathCondition = SAnd (SNot symbolic) (_pathCondition s) }
         in (runEngine (($ (unsafeCoerce symbolic)) <$> dataElim) onTrue) ++
            [((unsafeCoerce symbolic) :: b, onFalse)]
-
--- instance Selective Engine where
---   select cond f = Engine $ \s0 -> do
---     (x, sAfterCond) <- runEngine cond s0
---     case x of
---       Left a -> do
---         (t, s) <- runEngine (popFmapArg >> popFmapArg) sAfterCond
---         case (trySolve . unsafeCoerce $ t) of
---           Trivial b -> if b then runEngine (($ a) <$> f) s
---                             else []
---           Nontrivial symbolic ->
---             -- the one where the path condition as conjoined with the @symbolic@ itself
---             let onTrue  = s { _pathCondition = SAnd symbolic (_pathCondition s) }
---             -- and the one where the path constraint is conjoined with the check's negation
---                 onFalse = s { _pathCondition = SAnd (SNot symbolic) (_pathCondition s) }
---             in -- the resulting computation is now a concatenation of two lists:
---                -- the list where @symbolic@ holds and we execute @f@
---                (runEngine (($ a) <$> f) onTrue) ++
---                -- and the list where the negation @symbolic@ holds and we do not execute @f@
---                [((unsafeCoerce symbolic) :: b, onFalse)]
---       Right _ -> error $
---         "Engine.select: Broken assumption! first argument of select returned Right. " <>
---         "Check that all occurrences of whenS receive True in case of symbolic code."
-  -- select cond f = Engine $ \s0 -> do
-  --   -- perform the effectful computation passed as the first argument of select, i.e.
-  --   -- the condition test in @whenS@/@ifS@
-  --   (x, sAfterCond) <- runEngine cond s0
-  --   -- When we call selective combinators with symbolic values we always give them
-  --   -- something that will trigger the @Left@ branch in @select@. In case @x@ contains
-  --   -- a @Right@, we, for now, throw en exception.
-  --   case x of
-  --     Left a -> do
-  --       -- __BLACK MAGIC HERE__
-  --       -- We assume that @cond@ will have form @toBool <$> symbolicExpression@.
-  --       -- If @cond@ comes from @whenS@/@ifS@, it will be then @fmap@'ed one more
-  --       -- time with @bool (Right ()) (Left ())@ to translate @Bool@ into @Either () ()@.
-  --       -- Now, we need to analyse
-  --       -- the @symbolicExpression@ in order to decide whether to execute @f@ or not.
-  --       -- The @Functor@ instance for @Engine@ logs every value that is being @fmap@'ed
-  --       -- over, thus we extract the SECOND TO LAST one, ASSUMING THAT'S THE ONE WE NEED,
-  --       -- and unsafely coerce it to an equality check, i.e. a value of @Equality Sym@.
-  --       -- __NOTE:__ the assumption only holds for @whenS@. Since @ifS@ is implemented
-  --       -- via @branch@ and has more @fmap@s.
-  --       (t, s) <- runEngine (popFmapArg >> popFmapArg) sAfterCond
-  --       case (unsafeCoerce t) of
-  --         -- in case the equality check is trivial, e.g. contains a boolean value,
-  --         -- we can decide whether to execute @f@ or not based on this boolean
-  --         Trivial b      ->
-  --           if b
-  --             then runEngine (($ a) <$> f) s
-  --             else []
-  --         -- Otherwise, there is a non-trivial symbolic equality and we need to
-  --         -- create two possible worlds:
-  --         Nontrivial symbolic ->
-  --           -- the one where the path condition as conjoined with the @symbolic@ itself
-  --           let onTrue  = s { _pathCondition = SAnd symbolic (_pathCondition s) }
-  --           -- and the one where the path constraint is conjoined with the check's negation
-  --               onFalse = s { _pathCondition = SAnd (SNot symbolic) (_pathCondition s) }
-  --           in -- the resulting computation is now a concatenation of two lists:
-  --              -- the list where @symbolic@ holds and we execute @f@
-  --              (runEngine (($ a) <$> f) onTrue) ++
-  --              -- and the list where the negation @symbolic@ holds and we do not execute @f@
-  --              [((unsafeCoerce symbolic) :: b, onFalse)]
-  --     Right _ -> error $
-  --       "Engine.select: Broken assumption! first argument of select returned Right. " <>
-  --       "Check that all occurrences of whenS receive True in case of symbolic code."
 
 -- | A 'Monad' instance for 'Engine' is a combination of state and list monads:
 --   * 'return' embeds the value paired with the current state into a list

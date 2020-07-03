@@ -89,7 +89,6 @@ demo_sum = do
                                                    , (Addr 2, SAny "x2")
                                                    , (Addr 3, SAny "x3")
                                                    ] ++ mkProgram sumArrayLowLevel
-                      , _fmapLog = []
                       }
   -- let program = [(0, Instruction $ Add R0 0)]
   --     dataGraph =

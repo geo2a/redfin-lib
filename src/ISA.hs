@@ -54,7 +54,6 @@ demo = do
                                                    , (Addr 0, SAny "a0")
                                                    , (Addr 1, SAny "a1")
                                                    ] ++ mkProgram src_ex1
-                      , _fmapLog = []
                       }
   -- let program = [(0, Instruction $ Add R0 0)]
   --     dataGraph =
