@@ -47,13 +47,16 @@ type Monad f = (Selective f, Prelude.Monad f)
 -----------------------------------------------------------------------------
 --------------- Semantics of instructions -----------------------------------
 -----------------------------------------------------------------------------
+
 -- | Halt the execution.
 halt :: FS Key Applicative Value a
 halt _ write = write (F Halted) (pure true)
 
+-- | Load a value from a memory cell to a register
 load :: Register -> Address -> FS Key Functor Value a
 load reg addr read write = write (Reg reg) (read (Addr addr))
 
+-- | Load a value referenced by another  value in a memory cell to a register
 loadMI :: Addressable a => Register -> Address -> FS Key Monad Value a
 loadMI reg pointer read write =
   read (Addr pointer) >>= \x ->
@@ -67,6 +70,7 @@ set :: Register -> Imm a -> FS Key Applicative Value a
 set reg (Imm imm) _ write =
   write (Reg reg) (pure imm)
 
+-- | Store a value from a register to a memory cell
 store :: Register -> Address -> FS Key Functor Value a
 store reg addr read write =
   write (Addr addr) (read (Reg reg))
@@ -197,7 +201,6 @@ instructionSemanticsS (Instruction i) r w = case i of
 
     JumpCt simm8   -> jumpCt simm8 r w
     JumpCf simm8   -> jumpCf simm8 r w
-
 
 instructionSemanticsM ::
   (Addressable a, Value a) => Instruction a -> FS Key Monad Value a

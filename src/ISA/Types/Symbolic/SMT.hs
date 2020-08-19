@@ -79,12 +79,16 @@ symToSMT m (SSub l r) =
   (SBV.svMinus) <$> symToSMT m l <*> symToSMT m r
 symToSMT m (SMul l r) =
   (SBV.svTimes) <$> symToSMT m l <*> symToSMT m r
-symToSMT _ (SDiv _ _) = error "SMT.symToSMT: div is not yet defined"
---   (SBV.svDiv) <$> symToSMT m l <*> symToSMT m r
-symToSMT _ (SMod _ _) = error "SMT.symToSMT: mod is not yet defined"
---   (SBV.svMod) <$> symToSMT m l <*> symToSMT m r
-symToSMT _ (SConst (CWord w)) = pure (SBV.svInteger (SBV.KBounded False 16) (fromIntegral w))
-symToSMT _ (SConst (CInt32 i)) = pure (SBV.svInteger (SBV.KBounded True 32) (fromIntegral i))
+symToSMT m (SDiv l r) =
+  -- error "SMT.symToSMT: div is not yet defined"
+  (SBV.svDivide) <$> symToSMT m l <*> symToSMT m r
+symToSMT m (SMod l r) =
+  -- error "SMT.symToSMT: mod is not yet defined"
+  (SBV.svRem) <$> symToSMT m l <*> symToSMT m r
+symToSMT _ (SConst (CWord w)) =
+  pure (SBV.svInteger (SBV.KBounded False 16) (fromIntegral w))
+symToSMT _ (SConst (CInt32 i)) =
+  pure (SBV.svInteger (SBV.KBounded True 32) (fromIntegral i))
 symToSMT _ (SConst (CBool b)) = pure (SBV.svBool b)
 symToSMT m (SAbs l) =
   SBV.svAbs <$> symToSMT m l

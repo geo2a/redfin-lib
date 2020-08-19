@@ -11,12 +11,6 @@ import           ISA.Types.Symbolic
 --   * @_bindings@: keys (like register names, memory cells) mapped to their symbolic values
 --   * @_pathCondition@ : a symbolic expression which must hold for this state to be
 --     reachable
---   * @_fmapLog@: a stack of values of @fmap@'s second arguments.
---     Consider @fmap (f :: a -> b) (x :: Engine a)@, then after executing this
---     computations: @head (_fmapLog s)@ will contain the "purified" @x@, i.e.
---     a value of type @a@ coerced to 'GHC.Exts.Any'. This field is modified
---     via 'pushFmapArg' and 'popFmapArg' functions.
---     (TODO: come up with a better explanation for this)
 data Context = MkContext { _bindings      :: Map.Map Key Sym
                          , _pathCondition :: Sym
                          }
