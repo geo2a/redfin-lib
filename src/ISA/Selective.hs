@@ -12,9 +12,14 @@
 
 module ISA.Selective
     (Prop(..)
-    , Selective(..), selectM, ifS, whenS) where
+    , Selective(..), selectM, ifS, whenS
+    , S.Over(..)) where
 
-import           Data.Bool
+import qualified Control.Selective as S
+
+instance Monoid m => Selective (S.Over m) where
+  select (S.Over x) _ (S.Over y) = S.Over (x <> y)
+
 
 data Prop a = Trivial Bool
             | Nontrivial a

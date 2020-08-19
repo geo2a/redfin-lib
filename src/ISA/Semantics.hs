@@ -22,8 +22,10 @@ module ISA.Semantics
 
 -- import           Control.Selective
 import           Data.Bool             (bool)
-import           Prelude               hiding (Monad, Read, read, readIO)
-import qualified Prelude               (Monad)
+import           Prelude               hiding (Monad, Read, abs, div, mod, read,
+                                        readIO)
+import qualified Prelude               (Monad, Read, abs, div, mod, read,
+                                        readIO)
 
 import           FS
 import           ISA.Selective
@@ -89,7 +91,6 @@ sub reg addr read write =
   let arg1 = read (Reg reg)
       arg2 = read (Addr addr)
       result = (-) <$> arg1 <*> arg2
-      -- when @result@ is zero we set @Zero@ flag to @true@
   in write (Reg reg) result
 
 subI :: Register -> Imm a -> FS Key Selective Value a
@@ -97,6 +98,33 @@ subI reg (Imm imm) read write =
   let arg1 = read (Reg reg)
       arg2 = pure imm
       result = (-) <$> arg1 <*> arg2
+  in write (Reg reg) result
+
+mul :: Register -> Address -> FS Key Selective Value a
+mul reg addr read write =
+  let arg1 = read (Reg reg)
+      arg2 = read (Addr addr)
+      result = (*) <$> arg1 <*> arg2
+  in write (Reg reg) result
+
+div :: Register -> Address -> FS Key Selective Value a
+div reg addr read write =
+  let arg1 = read (Reg reg)
+      arg2 = read (Addr addr)
+      result = (Prelude.div) <$> arg1 <*> arg2
+  in write (Reg reg) result
+
+mod :: Register -> Address -> FS Key Selective Value a
+mod reg addr read write =
+  let arg1 = read (Reg reg)
+      arg2 = read (Addr addr)
+      result = (Prelude.mod) <$> arg1 <*> arg2
+  in write (Reg reg) result
+
+abs :: Register ->  FS Key Functor Value a
+abs reg read write =
+  let arg = read (Reg reg)
+      result = (Prelude.abs) <$> arg
   in write (Reg reg) result
 
 -- | Compare the values in the register and memory cell
@@ -119,6 +147,12 @@ cmpLt reg addr = \read write ->
 jumpCt :: Imm a -> FS Key Selective Value a
 jumpCt (Imm offset) read write =
   whenS ((===) <$> read (F Condition) <*> pure true)
+        (write IC ((+) <$> pure offset <*> read IC))
+
+-- | Perform jump if flag @Condition@ is set
+jumpCf :: Imm a -> FS Key Selective Value a
+jumpCf (Imm offset) read write =
+  whenS ((===) <$> read (F Condition) <*> pure (ISA.Types.not true))
         (write IC ((+) <$> pure offset <*> read IC))
 
 -- | Perform unconditional jump
@@ -151,10 +185,10 @@ instructionSemanticsS (Instruction i) r w = case i of
     AddI reg imm   -> addI reg imm r w
     Sub reg addr   -> sub reg addr r w
     SubI reg addr   -> subI reg addr r w
-    Mul reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
-    Div reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
-    Mod reg addr   -> error "ISA.Semantics.instructionSemantics : not implemented"
-    Abs reg        -> error "ISA.Semantics.instructionSemantics : not implemented"
+    Mul reg addr   -> mul reg addr r w
+    Div reg addr   -> div reg addr r w
+    Mod reg addr   -> mod reg addr r w
+    Abs reg        -> abs reg r w
     Jump simm8     -> jump simm8 r w
 
     CmpEq reg addr -> cmpEq reg addr r w
@@ -162,7 +196,7 @@ instructionSemanticsS (Instruction i) r w = case i of
     CmpLt reg addr -> cmpLt reg addr r w
 
     JumpCt simm8   -> jumpCt simm8 r w
-    JumpCf simm8   -> error "ISA.Semantics.instructionSemantics : not implemented"
+    JumpCf simm8   -> jumpCf simm8 r w
 
 
 instructionSemanticsM ::

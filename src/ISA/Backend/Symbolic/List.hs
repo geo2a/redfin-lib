@@ -1,4 +1,3 @@
-
 {-# LANGUAGE DeriveFunctor              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs               #-}
@@ -29,51 +28,16 @@ module ISA.Backend.Symbolic.List
     ) where
 
 import           Control.Monad.Reader
-import           Control.Monad.State          (evalState)
 import           Control.Monad.State.Class
 -- import           Control.Selective
-import qualified Data.Map.Strict              as Map
-import           GHC.Exts                     (Any)
-import           Prelude                      hiding (log, not, read, readIO)
+import qualified Data.Map.Strict            as Map
+import           Prelude                    hiding (log, not, read, readIO)
 import           Unsafe.Coerce
 
 import           ISA.Selective
-import           ISA.Semantics
 import           ISA.Types
-import           ISA.Types.Instruction
-import           ISA.Types.Instruction.Decode
 import           ISA.Types.Symbolic
-import           ISA.Types.Symbolic.Trace
-
--- | A record type for state of the symbolically executed computation
---   * @_bindings@: keys (like register names, memory cells) mapped to their symbolic values
---   * @_pathCondition@ : a symbolic expression which must hold for this state to be
---     reachable
---   * @_fmapLog@: a stack of values of @fmap@'s second arguments.
---     Consider @fmap (f :: a -> b) (x :: Engine a)@, then after executing this
---     computations: @head (_fmapLog s)@ will contain the "purified" @x@, i.e.
---     a value of type @a@ coerced to 'GHC.Exts.Any'. This field is modified
---     via 'pushFmapArg' and 'popFmapArg' functions.
---     (TODO: come up with a better explanation for this)
-data Context = MkContext { _bindings      :: Map.Map Key Sym
-                         , _pathCondition :: Sym
-                         }
-
-showKey :: Context -> Key -> String
-showKey ctx key =
-  case Map.lookup key (_bindings ctx) of
-    Nothing -> "uninitialised"
-    Just v  ->
-      if key == IR
-      then show key <> ": " <> show (toInstruction v)
-      else show key <> ": " <> show v
-
-instance Show Context where
-  show ctx = unlines [ "Path constraint: " <> show (_pathCondition ctx)
-                     , showKey ctx IR
-                     , showKey ctx (F Condition)
-                     , showKey ctx (F Halted)
-                     ]
+import           ISA.Types.Symbolic.Context
 
 -- | A Symbolic Execution Engine is a combination of State and List monads:
 --   given a state, it produces a list of new possible states. Imagine conditional

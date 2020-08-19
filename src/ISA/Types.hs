@@ -232,7 +232,7 @@ instance Monoid (Data Int32) where
 
 -- | We now consider a value to be a numeric monoid which could also be converted
 --   into booleans
-type Value a = (Show a, TryEq a, TryOrd a, Monoid a, Num a, Boolean a)
+type Value a = (Show a, TryEq a, TryOrd a, Monoid a, Num a, Integral a, Boolean a)
 -----------------------------------------------------------------------------
 fromBitsLE :: (FiniteBits a, Num a) => [Bool] -> a
 fromBitsLE = go 0 0

@@ -13,28 +13,31 @@
 module ISA.Example.MotorControl
     () where
 
-import           Control.Monad           (filterM)
+import           Control.Monad                 (filterM)
 import           Control.Selective
-import           Data.Foldable           (sequenceA_)
-import           Data.Maybe              (fromJust)
-import           Prelude                 hiding (div, mod)
+import           Data.Foldable                 (sequenceA_)
+import           Data.Int
+import           Data.Maybe                    (fromJust)
+import           Prelude                       hiding (div, mod)
 import           System.CPUTime
-import           System.IO.Unsafe        (unsafePerformIO)
-import           Text.Pretty.Simple      (pPrint)
+import           System.IO.Unsafe              (unsafePerformIO)
+import           Text.Pretty.Simple            (pPrint)
 import           Text.Printf
 -- import qualified Data.Tree as Tree
-import qualified Data.Map.Strict         as Map
-import qualified Data.SBV                as SBV
-import           Machine.Assembly
-import           Machine.Decode
-import           Machine.Encode
-import           Machine.Examples.Common
-import qualified Machine.Semantics       as S
-import qualified Machine.SMT             as SMT
-import           Machine.Symbolic
-import           Machine.Types
-import           Machine.Types.State
-import           Machine.Types.Trace
+import qualified Data.Map.Strict               as Map
+import qualified Data.SBV                      as SBV
+
+import           ISA.Assembly
+import           ISA.Backend.Dependencies
+import           ISA.Backend.Symbolic.List
+import           ISA.Backend.Symbolic.List.Run
+import           ISA.Semantics
+import           ISA.Types
+import           ISA.Types.Instruction
+import           ISA.Types.Instruction.Decode
+import           ISA.Types.Instruction.Encode
+import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.Trace
 
 
 -- -- | The loop body of a stepper motor control program.
@@ -125,11 +128,12 @@ import           Machine.Types.Trace
 mc_loop :: Script
 mc_loop = do
     let { a_max = 0; v_max = 1; dist = 2; s = 3; v = 4; s_decel = 5;
-          decel_steps = 6; temp = 7; v_next = 8; }
+          decel_steps = 6; temp = 7; v_next = 8;
+          r0 = R0; r1 = R1; r2 = R2; r3 = R3 }
     ld r0 v
     div r0 a_max
     st r0 decel_steps
-    ld_si r1 1
+    ld_i r1 1
     st r1 temp
     add r0 temp
     st r0 temp
@@ -182,7 +186,7 @@ mc_loop = do
     "set_v" @@ st r1 v
 
     -- speed check
-    ld_si r0 0
+    ld_i r0 0
     st r0 temp
     cmpeq r1 temp                     -- v == 0?
     goto_cf "inc_s"                   -- speed is non-zero: continue
@@ -205,6 +209,51 @@ mc_loop = do
 
     halt
 
+showContext :: Context -> String
+showContext ctx =
+  unlines [ "Path constraint: " <> show (_pathCondition ctx)
+  , showKey ctx IC
+  , showKey ctx IR
+  , showKey ctx (F Condition)
+  , showKey ctx (F Halted)
+  , showKey ctx (Reg R0)
+  , showKey ctx (Reg R1)
+  , showKey ctx (Reg R2)
+  , showKey ctx (Addr 3)
+  , showKey ctx (Addr 4)
+  ]
+
+demo :: IO ()
+demo = do
+  let ctx = MkContext { _pathCondition = SConst (CBool True)
+                      , _bindings = Map.fromList $ [ (IC, SConst 0)
+                                                   , (IR, 0)
+                                                   , (F Condition, SConst (CBool False))
+                                                   , (F Halted, SConst (CBool False))
+                                                   , (Reg R0, 0)
+                                                   , (Reg R1, 0)
+                                                   , (Reg R2, 0)
+
+                                                   , (Addr 0, SAny "a_max")
+                                                   , (Addr 1, SAny "v_max")
+                                                   , (Addr 2, SAny "dist")
+                                                   , (Addr 3, SAny "s")
+                                                   , (Addr 4, SAny "v")
+                                                   ] ++ mkProgram mc_loop
+                      }
+  let dataGraph =
+        fromJust $ programDataGraph (assemble mc_loop)
+  writeFile "/home/geo2a/Desktop/traces/graph_motor.dot" (drawGraph dataGraph)
+
+  putStrLn ""
+  let t = runModel 50 ctx
+      tracePath = "/home/geo2a/Desktop/traces/trace_motor.html"
+  writeTraceHtmlFile showContext tracePath t
+  putStrLn $ "Wrote trace into file " <> tracePath
+
+  -- debugConsole 10 ctx
+  pure ()
+
 ---------------- Loop Body Analysis --------------------------------------------
 -- | To check properties of programs, we take the following approach:
 --   (1) Obtain a binary tree-shaped trace by /bounded/ symbolic execution
@@ -225,96 +274,96 @@ mc_loop = do
 --       @Unsatisfiable@, i.e. there are no assignments of the variables which
 --       satisfy the /negation/ of the property to check, considering the
 --       preconditions and path constraints.
-motorControlBodyExample :: Int -> IO ()
-motorControlBodyExample steps = do
-    let a_max = SAny "a_max"
-        v_max = SAny "v_max"
-        dist  = SAny "dist"
-    -- ^ @a_max@, @v_max@ and @dist@ are the parameters of the algorithm.
-    -- To verify the loop invariant, we will need to check it for every
-    -- permitted value of @a_max@, @v_max@ and @dist@
-        s     = SAny "s"
-        v     = SAny "v"
-    -- ^ @s@ and @v@ are the internal state of the loop:
-    --   the distance travelled and the current velocity.
-    --   We universally quantify over @s@ and @v@ and thus checking the loop
-    --   invariant for every possible iterations of the loop.
-        mem = initialiseMemory [ (0, a_max)
-                               , (1, v_max)
-                               , (2, dist)
-                               , (3, s)
-                               , (4, v)
-                               ]
-        initialState = boot (assemble mc_loop) mem
+-- motorControlBodyExample :: Int -> IO ()
+-- motorControlBodyExample steps = do
+--     let a_max = SAny "a_max"
+--         v_max = SAny "v_max"
+--         dist  = SAny "dist"
+--     -- ^ @a_max@, @v_max@ and @dist@ are the parameters of the algorithm.
+--     -- To verify the loop invariant, we will need to check it for every
+--     -- permitted value of @a_max@, @v_max@ and @dist@
+--         s     = SAny "s"
+--         v     = SAny "v"
+--     -- ^ @s@ and @v@ are the internal state of the loop:
+--     --   the distance travelled and the current velocity.
+--     --   We universally quantify over @s@ and @v@ and thus checking the loop
+--     --   invariant for every possible iterations of the loop.
+--         mem = initialiseMemory [ (0, a_max)
+--                                , (1, v_max)
+--                                , (2, dist)
+--                                , (3, s)
+--                                , (4, v)
+--                                ]
+--         initialState = boot (assemble mc_loop) mem
 
-    -- Now we perform symbolic simulation with @runModel@ and obtain
-    -- a binary tree-shaped trace.
-    let trace = runModel steps initialState
-    -- and split the tree on paths
-    -- (at the moment, we do not share the common prefixes)
-        ps = paths (unTrace trace)
-    putStrLn $ "Non-trivial paths: " <> show (length ps)
-    -- ps' <- filterM (\p -> not <$> isDead preconditions p) ps
-    -- putStrLn $ "Reachable paths: " <> show (length ps')
-    -- putStrLn $ "Reachable paths: "   <> show (length ps')
-    putStrLn "--------------------------------------------------"
+--     -- Now we perform symbolic simulation with @runModel@ and obtain
+--     -- a binary tree-shaped trace.
+--     let trace = runModel steps initialState
+--     -- and split the tree on paths
+--     -- (at the moment, we do not share the common prefixes)
+--         ps = paths (unTrace trace)
+--     putStrLn $ "Non-trivial paths: " <> show (length ps)
+--     -- ps' <- filterM (\p -> not <$> isDead preconditions p) ps
+--     -- putStrLn $ "Reachable paths: " <> show (length ps')
+--     -- putStrLn $ "Reachable paths: "   <> show (length ps')
+--     putStrLn "--------------------------------------------------"
 
-    -- The following command will pretty-print the trace. Handle with care, and
-    -- use only with small amounts of @steps@, otherwise it's not likely to feet
-    -- in the screen space.
-    -- putStrLn $ renderTrace trace
+--     -- The following command will pretty-print the trace. Handle with care, and
+--     -- use only with small amounts of @steps@, otherwise it's not likely to feet
+--     -- in the screen space.
+--     -- putStrLn $ renderTrace trace
 
-    -- Check the property for every path
-    mapM_ (processPath) (zip [1..] ps)
-    where
-        -- Formulate the preconditions that must hold at the start of every
-        -- iteration of the loop
-        preconditions :: State -> Sym Bool
-        preconditions initState =
-            let a_max = (Map.!) (memory initState) 0
-                v_max = (Map.!) (memory initState) 1
-                dist  = (Map.!) (memory initState) 2
-                s     = (Map.!) (memory initState) 3
-                v     = (Map.!) (memory initState) 4
-            in
-            -- @v@ must be in range [0, v_max]
-                ((v `SGt` (SConst $ -1)) `SAnd` (v `SLt` (SAdd v_max (SConst 1))))
-                `SAnd`
-                -- @s@ must be in range [0, dist]
-                ((s `SGt` (SConst $ -1)) `SAnd` (s `SLt` (SAdd dist (SConst 1))))
-                `SAnd`
-                -- @a_max@ must be <= v_max
-                (SLt a_max (SAdd v_max (SConst 1)))
-                `SAnd`
-                (v_max `SGt` (SConst 0) `SAnd` (v_max `SLt` (SConst $ 30)))
-                `SAnd`
-                (a_max `SGt` (SConst 0) `SAnd` (a_max `SLt` (SConst $ 30)))
+--     -- Check the property for every path
+--     mapM_ (processPath) (zip [1..] ps)
+--     where
+--         -- Formulate the preconditions that must hold at the start of every
+--         -- iteration of the loop
+--         preconditions :: State -> Sym Bool
+--         preconditions initState =
+--             let a_max = (Map.!) (memory initState) 0
+--                 v_max = (Map.!) (memory initState) 1
+--                 dist  = (Map.!) (memory initState) 2
+--                 s     = (Map.!) (memory initState) 3
+--                 v     = (Map.!) (memory initState) 4
+--             in
+--             -- @v@ must be in range [0, v_max]
+--                 ((v `SGt` (SConst $ -1)) `SAnd` (v `SLt` (SAdd v_max (SConst 1))))
+--                 `SAnd`
+--                 -- @s@ must be in range [0, dist]
+--                 ((s `SGt` (SConst $ -1)) `SAnd` (s `SLt` (SAdd dist (SConst 1))))
+--                 `SAnd`
+--                 -- @a_max@ must be <= v_max
+--                 (SLt a_max (SAdd v_max (SConst 1)))
+--                 `SAnd`
+--                 (v_max `SGt` (SConst 0) `SAnd` (v_max `SLt` (SConst $ 30)))
+--                 `SAnd`
+--                 (a_max `SGt` (SConst 0) `SAnd` (a_max `SLt` (SConst $ 30)))
 
-        -- | Check that @v@ doesn't exceed @v_max@ at a certain state
-        invariant :: State -> Sym Bool
-        invariant state =
-            let v     = (Map.!) (memory state) 4
-                v_max = (Map.!) (memory state) 1
-                v_next = (Map.!) (memory state) 8
-            in SLt v (SAdd v_max (SConst 1))
+--         -- | Check that @v@ doesn't exceed @v_max@ at a certain state
+--         invariant :: State -> Sym Bool
+--         invariant state =
+--             let v     = (Map.!) (memory state) 4
+--                 v_max = (Map.!) (memory state) 1
+--                 v_next = (Map.!) (memory state) 8
+--             in SLt v (SAdd v_max (SConst 1))
 
-        processPath :: (Int, Path (Node State)) -> IO ()
-        processPath (pathId, path) = do
-            dead <- isDead preconditions path
-            if dead then pure () -- putStrLn "dead"
-            else do
-                putStrLn $ "Path id: "       <> show      pathId
-                putStrLn $ "Nodes in path: " <> show (length path)
-                s <- solvePath path preconditions invariant (const (SConst True))
-                print s
-                -- s <- solvePath path
-                -- let sbvVC = SMT.toSMT [symVC]
-                -- satStart  <- getCPUTime
-                -- satResult <- SBV.satWith SMT.prover sbvVC
-                -- satFinish <- getCPUTime
-                -- putStrLn $ "Find VC : "      <> show symVC
-                -- putStrLn $ show satResult
-            putStrLn $ "--------------------------------------------"
+--         processPath :: (Int, Path (Node State)) -> IO ()
+--         processPath (pathId, path) = do
+--             dead <- isDead preconditions path
+--             if dead then pure () -- putStrLn "dead"
+--             else do
+--                 putStrLn $ "Path id: "       <> show      pathId
+--                 putStrLn $ "Nodes in path: " <> show (length path)
+--                 s <- solvePath path preconditions invariant (const (SConst True))
+--                 print s
+--                 -- s <- solvePath path
+--                 -- let sbvVC = SMT.toSMT [symVC]
+--                 -- satStart  <- getCPUTime
+--                 -- satResult <- SBV.satWith SMT.prover sbvVC
+--                 -- satFinish <- getCPUTime
+--                 -- putStrLn $ "Find VC : "      <> show symVC
+--                 -- putStrLn $ show satResult
+--             putStrLn $ "--------------------------------------------"
 
 -- | Generate a data-flow graph of the motor control program's loop body
 --   and write it to an .dot file
@@ -324,4 +373,4 @@ motorControlBodyExample steps = do
 mtLoopGraph :: FilePath -> IO ()
 mtLoopGraph fname =
     writeFile fname $
-        S.drawGraph $ fromJust $ S.programDataGraph (assemble mc_loop)
+        drawGraph $ fromJust $ programDataGraph (assemble mc_loop)

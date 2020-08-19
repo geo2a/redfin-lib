@@ -41,7 +41,8 @@ goto name = do
     s <- get
     here <- instructionCounter <$> get
     case Map.lookup name (labels s) of
-         Nothing -> error $ "ISA.Assembly.goto: no such label " <> show name-- jmpi 0
+         Nothing -> jmpi 0
+           -- error $ "ISA.Assembly.goto: no such label " <> show name-- jmpi 0
          Just there -> do
              let offset  =
                    ((fromIntegral there :: Int32) - (fromIntegral here :: Int32) - 1)

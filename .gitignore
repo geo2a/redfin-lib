@@ -1,6 +1,8 @@
 .stack-work/
+dist-newstyle/
 *~
 *#
 *.smt2
 stack.yaml.lock
 *.el
+TAGS

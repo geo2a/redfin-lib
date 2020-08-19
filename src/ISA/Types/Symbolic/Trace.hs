@@ -21,6 +21,7 @@ import           Data.Word                    (Word16)
 import           ISA.Types
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
+import           ISA.Types.Symbolic.Context
 
 type NodeId = Int
 
@@ -48,19 +49,20 @@ instance Traversable Trace where
     traverse f (Trace tree) = Trace <$> traverse (\(Node n s) -> Node n <$> f s) tree
 
 -- | Render a trace as an HTML string
-htmlTrace :: (s -> String) -> Trace s -> String
+htmlTrace :: (Context -> String) -> Trace Context -> String
 htmlTrace shower (Trace tree) =
   TreeView.htmlTree Nothing $
     fmap (\node -> TreeView.NodeInfo
-                   TreeView.InitiallyExpanded (show (nodeId node))
+                   TreeView.InitiallyExpanded (show (nodeId node) <> " | " <>
+                                               showIR (nodeBody node))
                                                (shower (nodeBody node)))
          tree
 
 -- | Render a trace as HTML and write the result into a file
-writeTraceHtmlFile :: (s -> String) -> FilePath -> Trace s -> IO ()
+writeTraceHtmlFile :: (Context -> String) -> FilePath -> Trace Context -> IO ()
 writeTraceHtmlFile shower path trace = writeFile path (htmlTrace shower trace)
 
-mkTrace :: Node s -> [Trace s] -> Trace s
+mkTrace :: Node Context -> [Trace Context] -> Trace Context
 mkTrace node children = Trace $ Tree.Node node (map unTrace children)
 
 -- -- | Impose a path constraint on every state in the trace.

@@ -62,6 +62,29 @@ instance Num Concrete where
   negate (CInt32 x) = CInt32 (negate x)
   negate x        = error $ "Concrete.Num.negate: non-integer argument " <> show x
 
+instance Enum Concrete where
+  toEnum x = CInt32 (fromIntegral x)
+
+  fromEnum (CInt32 x) = fromIntegral x
+  fromEnum (CWord x)  = fromIntegral x
+  fromEnum (CBool x)  = if x then 1 else 0
+
+instance Real Concrete where
+  toRational (CInt32 x) = toRational x
+  toRational (CWord x) = toRational x
+  toRational (CBool x) = error $ "Concrete.Real.toRational: non integer argument " <> show x
+
+instance Integral Concrete where
+  (CInt32 x) `quotRem` (CInt32 y) = let (q, r) = x `quotRem` y in (CInt32 q, CInt32 r)
+  (CWord x) `quotRem` (CWord y) = let (q, r) = x `quotRem` y in (CWord q, CWord r)
+  x `quotRem` y =
+    error $ "Concrete.Integral.quotRem: incompatible arguments " <> show x <> " " <> show y
+
+  toInteger (CInt32 x) = toInteger x
+  toInteger (CWord x)  = toInteger x
+  toInteger (CBool x)  =
+    error $ "Concrete.Integral.toInteger: non integer argument " <> show x
+
 instance Boolean Concrete where
   toBool (CBool b) = b
   toBool x         = error $ "Concrete.Boolean.toBool: non-boolean argument " <> show x
@@ -125,6 +148,25 @@ instance Num Sym where
   negate _ = error "Sym.Num: negate is not defined"
   -- negate x = SSub 0 x
 
+instance Enum Sym where
+  toEnum x = SConst (CInt32 (fromIntegral x))
+
+  fromEnum x = case getValue x of
+    Nothing  -> error $ "Sym.Enum.fromEnum: symbolic value " <> show x
+    Just val -> fromEnum val
+
+instance Real Sym where
+  toRational x = case getValue x of
+    Nothing  -> error $ "Sym.Real.toRational: symbolic value " <> show x
+    Just val -> toRational val
+
+instance Integral Sym where
+  x `div` y = SDiv x y
+  x `mod` y = SMod x y
+
+  _ `quotRem` _ = error $ "Sym.Integral.quotRem: not implemented"
+  toInteger _ = error $ "Sym.Integral.toInteger: not implemented"
+
 instance Semigroup (Data Sym) where
   (MkData x) <> (MkData y) = MkData (SAdd x y)
 
@@ -187,10 +229,8 @@ getValue = \case
     (SAdd p q) -> (+)           <$> getValue p <*> getValue q
     (SSub p q) -> (-)           <$> getValue p <*> getValue q
     (SMul p q) -> (*)           <$> getValue p <*> getValue q
-    (SDiv _ _) -> error "Sym.getValue: div is undefined"
-    -- (Prelude.div) <$> getValue p <*> getValue q
-    (SMod _ _) -> error "Sym.getValue: mod is undefined"
-    -- (Prelude.mod) <$> getValue p <*> getValue q
+    (SDiv p q) -> Prelude.div   <$> getValue p <*> getValue q
+    (SMod p q) -> (Prelude.mod) <$> getValue p <*> getValue q
     (SAbs x  ) -> Prelude.abs   <$> getValue x
     (SAnd p q) -> (&&&)          <$> getValue p <*> getValue q
     (SOr  p q) -> (|||)          <$> getValue p <*> getValue q

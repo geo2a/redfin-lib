@@ -49,8 +49,8 @@ fetchInstruction =
             <> show sym
 
 incrementInstructionCounter :: Engine ()
-incrementInstructionCounter =
-  void $ writeKey IC ((+ 1) <$> readKey IC)
+incrementInstructionCounter = do
+  void $ writeKey IC ((simplify Nothing <$>) <$> (+ 1) <$> readKey IC)
 
 readInstructionRegister :: Engine InstructionCode
 readInstructionRegister =  do
