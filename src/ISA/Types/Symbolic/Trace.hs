@@ -11,16 +11,13 @@
 --
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic.Trace
-    ( Trace(..), mkTrace, writeTraceHtmlFile
+    ( Trace(..), mkTrace, subsetTrace, traceDepth, writeTraceHtmlFile
+    , Path, paths
     , Node(..), NodeId
     ) where
 
-import qualified Data.Tree                    as Tree
-import qualified Data.Tree.View               as TreeView
-import           Data.Word                    (Word16)
-import           ISA.Types
-import           ISA.Types.Instruction.Decode
-import           ISA.Types.Instruction.Encode
+import qualified Data.Tree                  as Tree
+import qualified Data.Tree.View             as TreeView
 import           ISA.Types.Symbolic.Context
 
 type NodeId = Int

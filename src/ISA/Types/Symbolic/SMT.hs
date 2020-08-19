@@ -14,19 +14,21 @@ module ISA.Types.Symbolic.SMT
     ( -- get the list of free variables in a symbolic expression
       gatherFree
       -- check if the expression is satisfiable
-    , sat, Options (..), solve
+    , Solution (..), isSat, solve, solveWithFuel, solveContext, solvePath
       -- helper functions
-    , conjoin, isSat, isUnsat
+    , conjoin
     ) where
 
-import qualified Data.Map.Strict    as Map
-import qualified Data.SBV.Dynamic   as SBV
-import qualified Data.Set           as Set
-import           Data.Text          (Text)
-import qualified Data.Text          as Text
-import           System.IO.Unsafe   (unsafePerformIO)
+import qualified Data.Map.Strict            as Map
+import qualified Data.SBV.Dynamic           as SBV
+import qualified Data.Set                   as Set
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import           System.IO.Unsafe           (unsafePerformIO)
 
 import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.Context
+import           ISA.Types.Symbolic.Trace
 
 -- | Walk the constraint gathering up the free variables.
 gatherFree :: Sym -> Set.Set Sym
@@ -132,33 +134,50 @@ solver = SBV.z3 { SBV.verbose = True
                 , SBV.printBase = 16
                 }
 
-isSat :: SBV.SatResult -> Bool
-isSat (SBV.SatResult r) = case r of
-  (SBV.Satisfiable _ _) -> True
-  _                     -> False
+-- isSat :: SBV.SatResult -> Bool
+-- isSat (SBV.SatResult r) = case r of
+--   (SBV.Satisfiable _ _) -> True
+--   _                     -> False
 
-isUnsat :: SBV.SatResult -> Bool
-isUnsat (SBV.SatResult r) = case r of
-  (SBV.Unsatisfiable _ _) -> True
-  _                       -> False
+-- isUnsat :: SBV.SatResult -> Bool
+-- isUnsat (SBV.SatResult r) = case r of
+--   (SBV.Unsatisfiable _ _) -> True
+--   _                       -> False
 -----------------------------------------------------------------------------
-data Options = DeadEnd
-             -- ^ the path constraint is unsatisfiable
-             | Literal Bool
-             -- ^ the path constraint is a literal boolean value, continue in this world
-             | Sat Sym
-             -- ^ the path constraint is a satisfiable symbolic boolean -- need to create
-             --   two worlds: for it and its negation
+data Solution = Unsat
+              -- ^ the path constraint is unsatisfiable, i.e. False
+              | Sat Sym
+              -- ^ the path constraint is a satisfiable symbolic boolean
+  deriving Show
 
-solve :: Sym -> Int -> Options
-solve expr fuel =
+isSat :: Solution -> Bool
+isSat = \case Unsat -> False
+              Sat _ -> True
+
+-- | Solve a boolean symbolic expression:
+--   * first, try to perform constant folding (via a Haskell function) for 'fuel' steps
+--   * if the value is indeed symbolic, call the SMT solver via unsafePerformIO
+solveWithFuel :: Sym -> Int -> Solution
+solveWithFuel expr fuel =
   case getValue (simplify (Just fuel) expr) of
-    Just (CBool val) -> Literal val
-    Just (CWord w) -> error $ "Sym.solve: non-boolean literal " <> show w
-    Just (CInt32 i) -> error $ "Sym.solve: non-boolean literal " <> show i
+    Just (CBool val) -> if val then Sat (SConst (CBool True)) else Unsat
+    Just (CWord w) -> error $ "Sym.solveWithFuel: non-boolean literal " <> show w
+    Just (CInt32 i) -> error $ "Sym.solveWithFuel: non-boolean literal " <> show i
     Nothing ->
       let (SBV.SatResult result) = unsafePerformIO (sat expr)
       in case result of
-           SBV.Unsatisfiable _ _ -> DeadEnd
+           SBV.Unsatisfiable _ _ -> Unsat
            SBV.Satisfiable _ _   -> Sat (expr)
-           _                     -> error "Sym.solveBoolExpr: fatal error!"
+           _                     -> error "Sym.solveWithFuel: fatal error!"
+
+-- | A variant of 'solveWithFuel' which uses a default fuel value
+solve :: Sym -> Solution
+solve expr = solveWithFuel expr defaultFuel
+  where defaultFuel = 100
+
+-- | Solve the path condition of a context
+solveContext :: Context -> (Context, Solution)
+solveContext ctx = (ctx, solve (_pathCondition ctx))
+
+solvePath :: Path Context -> Path Solution
+solvePath path = map (snd . solveContext) path
