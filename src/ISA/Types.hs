@@ -175,14 +175,26 @@ instance Boolean (Data Int32) where
 --             | Nontrivial a
 --             deriving (Show, Typeable)
 
-instance Boolean (Prop a) where
+instance Boolean a => Boolean (Prop a) where
   true = Trivial True
   not  = error "Prop.Boolean.not: not is undefined"
   toBool t = case t of
     Trivial b    -> b
     Nontrivial _ -> True
-  (|||) = error "Prop.Boolean.|||: undefined"
-  (&&&) = error "Prop.Boolean.&&&: undefined"
+  x ||| y =
+    case (x, y) of
+      (Trivial a, Trivial b)       -> Trivial (a || b)
+      (Trivial a , Nontrivial b)   -> if a then Trivial True else Nontrivial b
+      (Nontrivial a, Trivial b)    -> if b then Trivial True else Nontrivial a
+      (Nontrivial a, Nontrivial b) -> Nontrivial (a ||| b)
+  x &&& y =
+    case (x, y) of
+      (Trivial a, Trivial b)       -> Trivial (a && b)
+      (Trivial a , Nontrivial b)   -> if a then Nontrivial b else Trivial False
+      (Nontrivial a, Trivial b)    -> if b then Nontrivial a else Trivial False
+      (Nontrivial a, Nontrivial b) -> Nontrivial (a &&& b)
+    -- error "Prop.Boolean.|||: undefined"
+  -- (&&&) = error "Prop.Boolean.&&&: undefined"
 
 -- | This class abstracts an equality check with possible failure, i.e. in the
 --   case when the values are symbolic. In case of concrete types with an 'Eq'
@@ -232,7 +244,9 @@ instance Monoid (Data Int32) where
 
 -- | We now consider a value to be a numeric monoid which could also be converted
 --   into booleans
-type Value a = (Show a, TryEq a, TryOrd a, Monoid a, Num a, Integral a, Boolean a)
+type Value a =
+  (Show a, TryEq a, TryOrd a, Monoid a, Num a, Integral a, Bounded a, Boolean a)
+
 -----------------------------------------------------------------------------
 fromBitsLE :: (FiniteBits a, Num a) => [Bool] -> a
 fromBitsLE = go 0 0

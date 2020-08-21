@@ -85,6 +85,10 @@ instance Integral Concrete where
   toInteger (CBool x)  =
     error $ "Concrete.Integral.toInteger: non integer argument " <> show x
 
+instance Bounded Concrete where
+  maxBound = CInt32 (maxBound :: Int32)
+  minBound = CInt32 (minBound :: Int32)
+
 instance Boolean Concrete where
   toBool (CBool b) = b
   toBool x         = error $ "Concrete.Boolean.toBool: non-boolean argument " <> show x
@@ -166,6 +170,10 @@ instance Integral Sym where
 
   _ `quotRem` _ = error $ "Sym.Integral.quotRem: not implemented"
   toInteger _ = error $ "Sym.Integral.toInteger: not implemented"
+
+instance Bounded Sym where
+  maxBound = SConst maxBound
+  minBound = SConst minBound
 
 instance Semigroup (Data Sym) where
   (MkData x) <> (MkData y) = MkData (SAdd x y)
