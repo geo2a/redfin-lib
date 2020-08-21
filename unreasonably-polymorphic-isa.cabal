@@ -7,7 +7,7 @@ homepage:       https://github.com/geo2a/unreasonably-polymorphic-isa#readme
 bug-reports:    https://github.com/geo2a/unreasonably-polymorphic-isa/issues
 author:         Georgy Lukyanov
 maintainer:     mail@geo2a.info
-copyright:      2019 Georgy Lukyanov
+copyright:      2019-2020 Georgy Lukyanov
 license:        MIT
 license-file:   LICENSE
 build-type:     Simple
@@ -40,13 +40,12 @@ library
       ISA.Backend.Dependencies,
       ISA.Backend.Symbolic.List,
       ISA.Backend.Symbolic.List.Run
+      ISA.Types.Symbolic.Context
   hs-source-dirs:
       src
   build-depends:
       algebraic-graphs,
       base >=4.7 && <5,
-      blaze-html,
-      blaze-markup,
       constraint,
       containers,
       co-log-core,
@@ -73,9 +72,7 @@ library
                     -fno-warn-name-shadowing
                     -Wcompat
                     -Wincomplete-record-updates
-                    -Wincomplete-uni-replacements
                     -Wredundant-constraints
-                    -Werror=incomplete-replacements
 
 test-suite tests
   GHC-options:     -Wall
