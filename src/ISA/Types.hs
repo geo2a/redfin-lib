@@ -73,6 +73,7 @@ instance Arbitrary Address where
 data Flag = Halted
           | Zero
           | Condition
+          | Overflow
   deriving (Show, Eq, Ord, Generic)
 
 instance Arbitrary Flag where

@@ -1,17 +1,18 @@
 -----------------------------------------------------------------------------
 -- |
--- Module     : ISA.Example.Sum
+-- Module     : ISA.Example.Add
 -- Copyright  : (c) Georgy Lukyanov 2019-2020
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 
--- Example program that finds the sum of numbers in an array
+-- A really basic example of a program that adds two numbers to
+-- demonstrate integer overflow detection and functional verification
 
 -----------------------------------------------------------------------------
-module ISA.Example.Sum
-    (demo_sum)
-  where
+module ISA.Example.Add (
+  demo_add
+  ) where
 
 import           Data.Int                      (Int32)
 import qualified Data.Map                      as Map
@@ -30,31 +31,12 @@ import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Symbolic.Trace
 
-sumArrayLowLevel :: Script
-sumArrayLowLevel = do
-    let { pointer = 0; sum = 253; array_start = 255 } -- ; pointer_store
-    let { r0 = R0; r1 = R1; r2 = R2 }
-    -- ld_i r0 0
-    -- st r0 sum
-    ld r1 pointer
-    -- add_i r1 1
-    -- st r1 pointer
-
-    -- compare the pointer variable to the array_start
-    "loop" @@ cmplt r1 array_start
-    -- if pointer == array_start then terminate
-    goto_ct "end"
-    -- jmpi_ct 7
-
-    ldmi r2 pointer
-    add r2 sum
-    st r2 sum
-    -- ld r1 pointer
-    sub_i r1 1
-    st r1 pointer
-
-    goto "loop"
-    "end" @@ ld r0 sum
+addLowLevel :: Script
+addLowLevel = do
+    let { x = 0; y = 1 } -- ; pointer_store
+    let { r0 = R0 }
+    ld r0 x
+    add r0 y
     halt
 
 showContext :: Context -> String
@@ -66,35 +48,27 @@ showContext ctx =
   , showKey ctx (F Halted)
   , showKey ctx (F Overflow)
   , showKey ctx (Reg R0)
-  , showKey ctx (Reg R1)
-  , showKey ctx (Reg R2)
   , showKey ctx (Addr 0)
-  , showKey ctx (Addr 253)
-  , showKey ctx (Addr 255)
+  , showKey ctx (Addr 1)
   ]
 
-demo_sum :: IO ()
-demo_sum = do
+demo_add :: IO ()
+demo_add = do
   -- let ctx = MkContext { _pathCondition = SConst (CBool True)
-  let ctx = MkContext { _pathCondition = ((SGt (SAny "x1") 0) &&& (SLt (SAny "x1") 100))
-                                     &&& ((SGt (SAny "x2") 0) &&& (SLt (SAny "x2") 100))
-                                     &&& ((SGt (SAny "x3") 0) &&& (SLt (SAny "x3") 100))
+  let ctx = MkContext { _pathCondition = true
+                        -- ((SGt (SAny "x") 0) &&& (SLt (SAny "x") 100))
+                        --              &&& ((SGt (SAny "y") 0) &&& (SLt (SAny "y") 100))
                       , _bindings = Map.fromList $ [ (IC, SConst 0)
                                                    , (IR, 0)
                                                    , (F Condition, SConst (CBool False))
                                                    , (F Halted, SConst (CBool False))
                                                    , (F Overflow, SConst (CBool False))
                                                    , (Reg R0, 0)
-                                                   , (Reg R1, 0)
-                                                   , (Reg R2, 0)
-                                                   , (Addr 0, 3)
-                                                   , (Addr 253, 0)
-                                                   , (Addr 255, 1)
-
-                                                   , (Addr 1, SAny "x1")
-                                                   , (Addr 2, SAny "x2")
-                                                   , (Addr 3, SAny "x3")
-                                                   ] ++ mkProgram sumArrayLowLevel
+                                                   , (Addr 0, SAny "x")
+                                                   , (Addr 1, SAny "y")
+                                                   -- , (Addr 0, maxBound)
+                                                   -- , (Addr 1, 1)
+                                                   ] ++ mkProgram addLowLevel
                       }
   -- let program = [(0, Instruction $ Add R0 0)]
   --     dataGraph =
@@ -105,16 +79,16 @@ demo_sum = do
   putStrLn "Symbolic execution tree: "
 
   let t = runModel 1000 ctx
-      tracePath = "/home/geo2a/Desktop/traces/trace_sum.html"
+      tracePath = "/home/geo2a/Desktop/traces/trace_add.html"
   writeTraceHtmlFile showContext tracePath t
   putStrLn $ "Wrote trace into file " <> tracePath
 
   let ps = map (map nodeBody) $ paths (unTrace t)
-      leaves = map (last . map nodeBody) $ paths (unTrace t)
+  --     leaves = map (last . map nodeBody) $ paths (unTrace t)
       ps' = map solvePath ps
-      overflownPaths = filter id $ map (any isSat) ps'
+      overflownPaths = filter id $ map (all isSat) ps'
   print $ ps'
-  print overflownPaths
+  -- print overflownPaths
   -- Ok, it's kinda working, but not really: job for tomorrow is
   -- to find out a good way to establish preconditions
   -- if all id ps'' then

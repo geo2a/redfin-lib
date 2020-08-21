@@ -20,12 +20,15 @@ module ISA.Types.Symbolic.SMT
     ) where
 
 import qualified Data.Map.Strict            as Map
+import           Data.Maybe                 (fromJust)
 import qualified Data.SBV.Dynamic           as SBV
 import qualified Data.Set                   as Set
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
+import           Prelude                    hiding (not)
 import           System.IO.Unsafe           (unsafePerformIO)
 
+import           ISA.Types
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Context
 import           ISA.Types.Symbolic.Trace
@@ -111,17 +114,6 @@ sat expr = do
   let smtExpr = toSMT [expr]
   SBV.satWith solver smtExpr
 
--- -- -- | Solve the path constraints in a symbolic execution state
--- -- solveSym :: State -> IO SolvedState
--- -- solveSym state = do
--- --     let smtExpr = toSMT . map snd $ pathConstraintList state
--- --     SBV.SatResult smtRes <- SBV.satWith prover smtExpr
--- --     pure (SolvedState state smtRes)
-
--- -- -- | Traverse a symbolic execution trace and solve path constraints in every node
--- -- solveTrace :: Trace State -> IO (Trace SolvedState)
--- -- solveTrace = traverse solveSym
-
 conjoinSBV :: [SBV.SVal] -> SBV.SVal
 conjoinSBV = foldr (\x y -> SBV.svAnd x y) (SBV.svBool True)
 
@@ -131,7 +123,7 @@ conjoin cs = foldr (\x y -> SAnd x y) (SConst (CBool True)) cs
 solver :: SBV.SMTConfig
 solver = SBV.z3 { SBV.verbose = True
                 , SBV.redirectVerbose = Just "log.smt2"
-                , SBV.printBase = 16
+                -- , SBV.printBase = 16
                 }
 
 -- isSat :: SBV.SatResult -> Bool
@@ -154,7 +146,7 @@ isSat :: Solution -> Bool
 isSat = \case Unsat -> False
               Sat _ -> True
 
--- | Solve a boolean symbolic expression:
+-- | Check satisfiability of a boolean symbolic expression:
 --   * first, try to perform constant folding (via a Haskell function) for 'fuel' steps
 --   * if the value is indeed symbolic, call the SMT solver via unsafePerformIO
 solveWithFuel :: Sym -> Int -> Solution
@@ -177,7 +169,8 @@ solve expr = solveWithFuel expr defaultFuel
 
 -- | Solve the path condition of a context
 solveContext :: Context -> (Context, Solution)
-solveContext ctx = (ctx, solve (_pathCondition ctx))
+solveContext ctx = (ctx, solve $
+                     (_pathCondition ctx) &&& (fromJust (getBinding (F Overflow) ctx)))
 
-solvePath :: Path Context -> Path Solution
-solvePath path = map (snd . solveContext) path
+solvePath :: Path Context -> (Context -> Sym) -> Path Solution
+solvePath path consider = map (solve . consider) path

@@ -1,5 +1,5 @@
 module ISA.Types.Symbolic.Context
-  (Context(..), showKey, showIR) where
+  (Context(..), getBinding, showKey, showIR) where
 
 import qualified Data.Map.Strict              as Map
 
@@ -14,6 +14,8 @@ import           ISA.Types.Symbolic
 data Context = MkContext { _bindings      :: Map.Map Key Sym
                          , _pathCondition :: Sym
                          }
+getBinding :: Key -> Context -> Maybe Sym
+getBinding key ctx = Map.lookup key (_bindings ctx)
 
 showKey :: Context -> Key -> String
 showKey ctx key =
@@ -38,4 +40,5 @@ instance Show Context where
                      , showKey ctx IR
                      , showKey ctx (F Condition)
                      , showKey ctx (F Halted)
+                     , showKey ctx (F Overflow)
                      ]

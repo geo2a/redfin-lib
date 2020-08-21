@@ -75,13 +75,26 @@ store :: Register -> Address -> FS Key Functor Value a
 store reg addr read write =
   write (Addr addr) (read (Reg reg))
 
+-- | A pure check for integer overflow during addition.
+willOverflowPure :: Value a => a -> a -> Prop a
+willOverflowPure x y =
+    let o1 = gt y 0
+        o2 = gt x((-) maxBound y)
+        o3 = lt y 0
+        o4 = lt x((-) minBound y)
+    in  (|||) ((&&&) o1 o2)
+              ((&&&) o3 o4)
+
 add :: Register -> Address -> FS Key Selective Value a
 add reg addr read write =
   let arg1 = read (Reg reg)
       arg2 = read (Addr addr)
+      o = willOverflowPure <$> arg1 <*> arg2
       result = (+) <$> arg1 <*> arg2
       -- when @result@ is zero we set @Zero@ flag to @true@
-  in write (Reg reg) result
+  in
+    whenS o (write (F Overflow) (pure true)) *>
+    write (Reg reg) result
 
 addI :: Register -> Imm a -> FS Key Selective Value a
 addI reg (Imm imm) read write =
