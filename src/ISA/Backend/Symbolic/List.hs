@@ -71,8 +71,10 @@ instance Selective Engine where
       Nontrivial symbolic ->
         let onTrue  = s { _pathCondition = SAnd symbolic (_pathCondition s) }
             onFalse = s { _pathCondition = SAnd (SNot symbolic) (_pathCondition s) }
-        in (runEngine (($ (unsafeCoerce symbolic)) <$> dataElim) onTrue) ++
-           [((unsafeCoerce symbolic) :: b, onFalse)]
+        in runEngine (boolElim True *> (($ (unsafeCoerce symbolic)) <$> dataElim)) onTrue
+           ++
+           runEngine (boolElim False *> pure (unsafeCoerce symbolic)) onFalse
+           -- [((unsafeCoerce symbolic) :: b, onFalse)]
 
 -- | A 'Monad' instance for 'Engine' is a combination of state and list monads:
 --   * 'return' embeds the value paired with the current state into a list
