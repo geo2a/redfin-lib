@@ -23,24 +23,29 @@ library
   default-language: Haskell2010
   exposed-modules:
       ISA,
-      ISA.Assembly,
-      ISA.Types,
-      ISA.Types.Instruction,
-      ISA.Types.Instruction.Opcodes,
-      ISA.Types.Instruction.Decode,
-      ISA.Types.Instruction.Encode,
-      ISA.Types.Symbolic,
-      ISA.Types.Symbolic.SMT,
-      ISA.Types.Symbolic.Trace
-  other-modules:
       FS,
+      ISA.Assembly,
       ISA.Selective,
       ISA.Semantics,
+
+      ISA.Types,
+      ISA.Types.Instruction,
+      ISA.Types.Instruction.Decode,
+      ISA.Types.Instruction.Encode,
+      ISA.Types.Instruction.Opcodes,
+      ISA.Types.Symbolic,
+      ISA.Types.Symbolic.Context,
+      ISA.Types.Symbolic.SMT,
+      ISA.Types.Symbolic.Trace
+
+      ISA.Backend.Symbolic.List,
+      ISA.Backend.Symbolic.List.Run,
       ISA.Backend.IO,
       ISA.Backend.Dependencies,
-      ISA.Backend.Symbolic.List,
-      ISA.Backend.Symbolic.List.Run
-      ISA.Types.Symbolic.Context
+
+      ISA.Example.Add,
+      ISA.Example.Sum,
+      ISA.Example.MotorControl
   hs-source-dirs:
       src
   build-depends:
@@ -54,8 +59,8 @@ library
       haskeline,
       microlens-platform,
       mtl,
-      sbv,
       selective,
+      sbv >= 8.6,
       pretty-simple,
       text,
       transformers,
