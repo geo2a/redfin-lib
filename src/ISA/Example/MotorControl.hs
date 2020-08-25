@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-unused-binds #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Example.MotorControl

@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-unused-binds #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Example.Add
@@ -85,9 +87,9 @@ demo_add = do
 
   let ps = map (map nodeBody) $ paths (unTrace t)
   --     leaves = map (last . map nodeBody) $ paths (unTrace t)
-      ps' = map solvePath ps
-      overflownPaths = filter id $ map (all isSat) ps'
-  print $ ps'
+  --     ps' = map solvePath ps
+  --     overflownPaths = filter id $ map (all isSat) ps'
+  -- print $ ps'
   -- print overflownPaths
   -- Ok, it's kinda working, but not really: job for tomorrow is
   -- to find out a good way to establish preconditions

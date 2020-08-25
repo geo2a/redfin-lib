@@ -1,9 +1,7 @@
-{-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE GADTs           #-}
+
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -20,12 +18,8 @@ module ISA.Semantics
     , instructionSemanticsM
     ) where
 
--- import           Control.Selective
-import           Data.Bool             (bool)
-import           Prelude               hiding (Monad, Read, abs, div, mod, read,
-                                        readIO)
-import qualified Prelude               (Monad, Read, abs, div, mod, read,
-                                        readIO)
+import           Prelude               hiding (Monad, abs, div, mod)
+import qualified Prelude               (Monad, abs, div, mod)
 
 import           FS
 import           ISA.Selective
@@ -179,21 +173,16 @@ jump (Imm offset) read write =
 
 -----------------------------------------------------------------------------
 
--- | Increment the instruction counter.
-incrementIC :: Value a => FS Key Functor Value a
-incrementIC read write =
-  write IC ((+ 1) <$> read IC)
-
 -- -- | Aha! fetching an instruction is Monadic!
 -- fetchInstruction :: Value a => FS Key Prelude.Monad Value a
 -- fetchInstruction read write =
 --       read IC >>= \ic -> write IR (read (Prog ic))
 
-instructionSemanticsS :: Value a => Instruction a -> FS Key Selective Value a
+instructionSemanticsS :: Instruction a -> FS Key Selective Value a
 instructionSemanticsS (Instruction i) r w = case i of
     Halt           -> halt r w
     Load reg addr  -> load reg addr r w
-    LoadMI reg addr ->
+    LoadMI _ _ ->
       error $ "ISA.Semantics.instructionSemanticsS : "
            ++ "LoadMI does not have Selective semantics "
     Set reg imm    -> set reg imm r w
@@ -216,7 +205,7 @@ instructionSemanticsS (Instruction i) r w = case i of
     JumpCf simm8   -> jumpCf simm8 r w
 
 instructionSemanticsM ::
-  (Addressable a, Value a) => Instruction a -> FS Key Monad Value a
+  (Addressable a) => Instruction a -> FS Key Monad Value a
 instructionSemanticsM (Instruction i) r w = case i of
   LoadMI reg addr -> loadMI reg addr r w
   _               -> instructionSemanticsS (Instruction i) r w

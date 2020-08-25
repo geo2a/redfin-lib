@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-unused-binds #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Example.Sum
@@ -109,12 +111,12 @@ demo_sum = do
   writeTraceHtmlFile showContext tracePath t
   putStrLn $ "Wrote trace into file " <> tracePath
 
-  let ps = map (map nodeBody) $ paths (unTrace t)
-      leaves = map (last . map nodeBody) $ paths (unTrace t)
-      ps' = map solvePath ps
-      overflownPaths = filter id $ map (any isSat) ps'
-  print $ ps'
-  print overflownPaths
+  -- let ps = map (map nodeBody) $ paths (unTrace t)
+  --     leaves = map (last . map nodeBody) $ paths (unTrace t)
+  --     ps' = map solvePath ps
+  --     overflownPaths = filter id $ map (any isSat) ps'
+  -- print $ ps'
+  -- print overflownPaths
   -- Ok, it's kinda working, but not really: job for tomorrow is
   -- to find out a good way to establish preconditions
   -- if all id ps'' then
