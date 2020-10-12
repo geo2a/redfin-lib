@@ -1,7 +1,10 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module ISA.Types.Symbolic.Context
   (Context(..), getBinding, showKey, showIR) where
 
 import qualified Data.Map.Strict              as Map
+import           GHC.Generics
 
 import           ISA.Types
 import           ISA.Types.Instruction.Decode
@@ -14,6 +17,8 @@ import           ISA.Types.Symbolic
 data Context = MkContext { _bindings      :: Map.Map Key Sym
                          , _pathCondition :: Sym
                          }
+  deriving (Generic)
+
 getBinding :: Key -> Context -> Maybe Sym
 getBinding key ctx = Map.lookup key (_bindings ctx)
 

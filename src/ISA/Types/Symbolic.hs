@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
@@ -24,6 +25,7 @@ import qualified Data.Text     as Text
 import           Data.Typeable
 import           Data.Word     (Word16)
 import           Debug.Trace
+import           GHC.Generics
 import           Prelude       hiding (not)
 
 import           ISA.Types
@@ -125,6 +127,7 @@ data Sym where
 deriving instance Eq Sym
 deriving instance Ord Sym
 deriving instance Typeable Sym
+deriving instance Generic Sym
 
 instance Show Sym where
     show (SAdd x y) = "(" <> show x <> " + " <> show y <> ")"
