@@ -12,8 +12,10 @@
 
 -----------------------------------------------------------------------------
 module ISA.Example.Sum
-    (demo_sum)
-  where
+  ( demo_sum
+  , sumArrayLowLevel
+  , initContext
+  ) where
 
 import           Data.Int                      (Int32)
 import qualified Data.Map                      as Map
@@ -74,6 +76,27 @@ showContext ctx =
   , showKey ctx (Addr 253)
   , showKey ctx (Addr 255)
   ]
+
+initContext :: Context
+initContext = MkContext { _pathCondition = ((SGt (SAny "x1") 0) &&& (SLt (SAny "x1") 100))
+                                       &&& ((SGt (SAny "x2") 0) &&& (SLt (SAny "x2") 100))
+                                       &&& ((SGt (SAny "x3") 0) &&& (SLt (SAny "x3") 100))
+                      , _bindings = Map.fromList $ [ (IC, SConst 0)
+                                                   , (IR, 0)
+                                                   , (F Condition, SConst (CBool False))
+                                                   , (F Halted, SConst (CBool False))
+                                                   , (F Overflow, SConst (CBool False))
+                                                   , (Reg R0, 0)
+                                                   , (Reg R1, 0)
+                                                   , (Reg R2, 0)
+                                                   , (Addr 0, 3)
+                                                   , (Addr 253, 0)
+                                                   , (Addr 255, 1)
+
+                                                   , (Addr 1, SAny "x1")
+                                                   , (Addr 2, SAny "x2")
+                                                   , (Addr 3, SAny "x3")
+                                                   ] ++ mkProgram sumArrayLowLevel }
 
 demo_sum :: IO ()
 demo_sum = do

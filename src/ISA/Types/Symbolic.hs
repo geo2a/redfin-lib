@@ -28,6 +28,7 @@ import           Debug.Trace
 import           GHC.Generics
 import           Prelude       hiding (not)
 
+import           ISA.Selective
 import           ISA.Types
 
 -----------------------------------------------------------------------------
@@ -40,6 +41,8 @@ data Concrete where
 
 deriving instance Eq Concrete
 deriving instance Ord Concrete
+deriving instance Generic Concrete
+deriving instance Read Concrete
 
 instance Show Concrete where
   show (CInt32 i) = show i

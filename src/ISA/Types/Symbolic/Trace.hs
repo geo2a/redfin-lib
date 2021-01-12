@@ -11,13 +11,18 @@
 --
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic.Trace
-    ( Trace(..), mkTrace, subsetTrace, traceDepth, writeTraceHtmlFile
-    , Path, paths
-    , Node(..), NodeId
+    ( Trace(..), mkTrace, subsetTrace, traceDepth, htmlTrace, writeTraceHtmlFile
+    , Path, paths, constrainTrace
+    , Node(..), NodeId, lookup
     ) where
 
+import           Data.Maybe                 (catMaybes, listToMaybe)
+import           Data.Text                  (Text)
 import qualified Data.Tree                  as Tree
 import qualified Data.Tree.View             as TreeView
+import           Prelude                    hiding (lookup)
+
+import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Context
 
 type NodeId = Int
@@ -37,7 +42,7 @@ instance Show (Node s) where
 
 -- | Symbolic execution trace
 newtype Trace s = Trace {unTrace :: Tree.Tree (Node s)}
-    deriving Functor
+    deriving (Show, Functor)
 
 instance Foldable Trace where
     foldMap f (Trace tree) = foldMap (f . nodeBody) tree
@@ -62,6 +67,10 @@ writeTraceHtmlFile shower path trace = writeFile path (htmlTrace shower trace)
 mkTrace :: Node Context -> [Trace Context] -> Trace Context
 mkTrace node children = Trace $ Tree.Node node (map unTrace children)
 
+constrainTrace :: (Text, Context -> Sym) -> Trace Context -> Trace Context
+constrainTrace (name, expr) =
+  fmap (\ctx -> ctx {_constraints = (name, expr ctx):_constraints ctx})
+
 -- -- | Impose a path constraint on every state in the trace.
 -- --   Useful for checking whole program properties, e.g. the absence of overflow
 -- constraint :: Label -> (State -> Sym Bool) -> Trace State -> Trace State
@@ -81,3 +90,8 @@ paths :: Tree.Tree a -> [Path a]
 paths = \case
     (Tree.Node payload []) -> [[payload]]
     (Tree.Node payload xs) -> concat [map (payload:) (paths t) | t <- xs]
+
+lookup :: NodeId -> Trace a -> Maybe a
+lookup n (Trace t) =
+  Tree.foldTree (\x xs -> if nodeId x == n then Just (nodeBody x)
+                          else listToMaybe (catMaybes xs)) t

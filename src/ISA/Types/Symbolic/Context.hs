@@ -4,6 +4,7 @@ module ISA.Types.Symbolic.Context
   (Context(..), getBinding, showKey, showIR) where
 
 import qualified Data.Map.Strict              as Map
+import           Data.Text                    (Text)
 import           GHC.Generics
 
 import           ISA.Types
@@ -16,8 +17,9 @@ import           ISA.Types.Symbolic
 --     reachable
 data Context = MkContext { _bindings      :: Map.Map Key Sym
                          , _pathCondition :: Sym
+                         , _constraints   :: [(Text, Sym)]
                          }
-  deriving (Generic)
+  deriving (Eq, Generic)
 
 getBinding :: Key -> Context -> Maybe Sym
 getBinding key ctx = Map.lookup key (_bindings ctx)

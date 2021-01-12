@@ -13,7 +13,9 @@
 -----------------------------------------------------------------------------
 
 module ISA.Backend.IO
-    ( bootRuntimeIO) where
+    ( bootRuntimeIO
+    , simulateIO
+    ) where
 
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Trans.Reader
@@ -24,7 +26,6 @@ import qualified Data.Map                   as Map
 import           FS
 import           Prelude                    hiding (Read, init, readIO)
 
-import           ISA.Semantics
 import           ISA.Types
 
 -- | Simulator environment
@@ -35,7 +36,7 @@ data Env a = MkEnv
 -- | Initialise state of the runtime
 bootRuntimeIO :: [(Key, a)] -> IO (Env a)
 bootRuntimeIO init =
-  pure . MkEnv =<< newIORef (Map.fromList init)
+  MkEnv <$> newIORef (Map.fromList init)
 
 readIO :: Key -> ReaderT (Env a) IO a
 readIO key = do
@@ -56,16 +57,8 @@ writeIO key producer = do
   liftIO $ putStrLn $ "Write: (" <> show key <> ", " <> show value <> ")"
   pure value
 
-simulateIO :: Env (Data Int32) -> FS Key Selective Value (Data Int32) -> IO (Data Int32)
+simulateIO :: Env (Data Int32)
+           -> FS Key Selective Value (Data Int32)
+           -> IO (Data Int32)
 simulateIO env comp = do
   runReaderT (comp readIO writeIO) env
-
--- example :: IO ()
--- example = do
---   env  <-
---     bootRuntimeIO [ (IC, 0)
---                   , (F Condition, 0)
---                   , (Reg R0, -1)
---                   , (Addr 0, 1)]
---   result <- simulateIO env (add R0 0)
---   print result

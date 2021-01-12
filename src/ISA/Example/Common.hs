@@ -1,13 +1,16 @@
 module ISA.Example.Common where
 
+import           Control.Monad.State.Strict
 import           Data.Bifunctor             (first)
 import qualified Data.Map.Strict            as Map
-import           Data.SBV
+import           Data.SBV                   (SMTConfig (..), Timing (..), z3)
+import           Data.Text                  (Text)
 
 import           ISA.Assembly
 import           ISA.Types
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Context
+import           ISA.Types.Symbolic.Trace
 
 defaultRegisters :: [(Register, Sym)]
 defaultRegisters = [ (R0, 0)
@@ -33,6 +36,7 @@ boot :: Script
      -> Context
 boot src regs memory flags =
   MkContext { _pathCondition = SConst (CBool True)
+            , _constraints = []
             , _bindings =
                 Map.fromList $ mkProgram src
                             ++ map (first Reg) regs
@@ -40,6 +44,20 @@ boot src regs memory flags =
                             ++ map (first F) flags
                             ++ [(IC, SConst 0), (IR, 0)]
             }
+
+newtype Symbolic a = MkSymbolic { runSymbolic :: State (Trace Context) a }
+  deriving (Functor, Applicative, Monad, MonadState (Trace Context))
+
+forall :: Text -> Symbolic Sym
+forall = pure . SAny
+
+-- | Generate free variables with the given names
+symbolics :: [Text] -> Symbolic [Sym]
+symbolics names = pure $ map SAny names
+
+-- | Conjunct a symbolic constraint to the current path condition
+constrain :: (Text, Context -> Sym) -> Symbolic ()
+constrain constr = modify (constrainTrace constr)
 
 prover :: SMTConfig
 prover = z3 { verbose = True

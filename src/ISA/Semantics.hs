@@ -1,8 +1,4 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE GADTs           #-}
-
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
-
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Semantics

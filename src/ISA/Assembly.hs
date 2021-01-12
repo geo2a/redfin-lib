@@ -11,14 +11,12 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 module ISA.Assembly where
 
 import           Control.Monad.State
 import           Data.Int                     (Int32)
 import qualified Data.Map.Strict              as Map
 import qualified Data.Text                    as Text
-import           Debug.Trace                  (trace)
 
 import           ISA.Types
 import           ISA.Types.Instruction
@@ -45,7 +43,8 @@ goto name = do
            -- error $ "ISA.Assembly.goto: no such label " <> show name-- jmpi 0
          Just there -> do
              let offset  =
-                   ((fromIntegral there :: Int32) - (fromIntegral here :: Int32) - 1)
+                   (fromIntegral there :: Int32) -
+                   (fromIntegral here :: Int32) - 1
              jmpi (fromIntegral offset)
 
 -- | Go to a label
@@ -57,7 +56,8 @@ goto_ct name = do
          Nothing -> jmpi 0
          Just there -> do
              let offset  =
-                   ((fromIntegral there :: Int32) - (fromIntegral here :: Int32) - 1)
+                   (fromIntegral there :: Int32) -
+                   (fromIntegral here :: Int32) - 1
              jmpi_ct (fromIntegral offset)
 
 goto_cf :: Label -> Script
@@ -68,7 +68,8 @@ goto_cf name = do
          Nothing -> jmpi 0
          Just there -> do
              let offset  =
-                   ((fromIntegral there :: Int32) - (fromIntegral here :: Int32) - 1)
+                   (fromIntegral there :: Int32) -
+                   (fromIntegral here :: Int32) - 1
              jmpi_cf (fromIntegral offset)
 
 type Labels = Map.Map Label Address

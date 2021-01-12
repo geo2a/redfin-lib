@@ -22,7 +22,6 @@ source-repository head
 library
   default-language: Haskell2010
   exposed-modules:
-      ISA,
       FS,
       ISA.Assembly,
       ISA.Selective,
@@ -73,11 +72,18 @@ library
                     , ConstraintKinds
                     , StandaloneDeriving
                     , OverloadedStrings
+                    , DeriveFunctor
+                    , DeriveGeneric
+                    , DerivingVia
+                    , GADTs
+                    , GeneralizedNewtypeDeriving
+
   GHC-options:      -Wall
                     -fno-warn-name-shadowing
                     -Wcompat
                     -Wincomplete-record-updates
                     -Wredundant-constraints
+                    -threaded -rtsopts -with-rtsopts=-N
 
 test-suite tests
   GHC-options:     -Wall

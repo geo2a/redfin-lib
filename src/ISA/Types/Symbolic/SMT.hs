@@ -170,7 +170,7 @@ solve expr = solveWithFuel expr defaultFuel
 -- | Solve the path condition of a context
 solveContext :: Context -> (Context, Solution)
 solveContext ctx = (ctx, solve $
-                     (_pathCondition ctx) &&& (fromJust (getBinding (F Overflow) ctx)))
+                     (_pathCondition ctx) &&& conjoin (map snd $ _constraints ctx))
 
 solvePath :: Path Context -> (Context -> Sym) -> Path Solution
 solvePath path consider = map (solve . consider) path

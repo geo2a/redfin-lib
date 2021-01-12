@@ -6,18 +6,18 @@
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 --
--- Module desription
+-- Compute data dependencies of programs
 --
 -----------------------------------------------------------------------------
 
 module ISA.Backend.Dependencies
-  (dependencies
+  ( dependencies
   , programDataGraph
   , drawGraph) where
 
-import           Algebra.Graph            hiding (graph)
+import           Algebra.Graph
 import           Algebra.Graph.Export.Dot
-import           Control.Arrow            (first, second)
+import           Control.Arrow            (second)
 import           Data.Either              (partitionEithers)
 import           Data.Maybe               (fromJust)
 import qualified Data.Set                 as Set
@@ -41,8 +41,6 @@ dependencies task =
     partitionEithers . getOver $
     task trackingRead trackingWrite
 
-type KeyLabel = String
-
 type InstructionLabel = String
 
 -- | Compute static data flow graph of an instruction. In case of supplying a
@@ -57,7 +55,7 @@ instructionGraph (addr, instr) = do
     let instrInfo = instructionLabel
     pure $ overlay (star (Right instrInfo) (map Left outs))
                    (transpose $ star (Right instrInfo) (map Left ins))
-    where instructionLabel = (show addr <> "|" <> show instr)
+    where instructionLabel = show addr <> "|" <> show instr
 
 -- | Serialise data flow graph as a .dot string
 drawGraph :: Graph (Either Key InstructionLabel) -> String

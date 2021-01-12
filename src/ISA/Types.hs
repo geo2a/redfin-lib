@@ -1,8 +1,3 @@
-{-# LANGUAGE DeriveFunctor              #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingVia                #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Types
@@ -11,7 +6,7 @@
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 --
--- Types describing ISA ISA
+-- Types describing the ISA
 --
 -----------------------------------------------------------------------------
 
@@ -21,25 +16,28 @@ module ISA.Types
       Register (..)
       -- ** memory location
     , Address (..)
-    -- * a typeclass representing things that could be converted to a memory location
+      -- ** a typeclass representing things that could be converted to a memory location
     , Addressable(..)
       -- ** flag
     , Flag (..)
-      -- immediate argument
+      -- ** immediate argument
     , Imm (..)
-    -- instruction code
+      -- ** instruction code
     , InstructionCode (..)
-    -- packaged data
+    -- * Data representation, equality types and keys
+    -- ** packaged data
     , Data (..)
-    -- equality check that may fail
-    , Prop(..), TryEq (..), TryOrd(..)
-    -- * Abstraction over possible locations in the ISA
+    -- ** equality and order checks that may fail
+    , TryEq (..), TryOrd(..)
+    -- ** Abstraction over possible locations in the ISA
     , Key(..), keyTag
 
-    -- * Classes abstracting values that ISA model can operate with
+    -- * Classes abstracting values that the ISA model can operate with
     -- ** Booleans
     , Boolean (..)
     , Value
+
+    -- * bitvector-to-binary expansion/compression
     , blastLE, fromBitsLE, fromBitsLEInt8, fromBitsLEInt32
     , fromBitsLEWord8, fromBitsLEWord16, pad
     ) where
@@ -95,6 +93,7 @@ newtype InstructionCode = InstructionCode Word16
 instance Arbitrary InstructionCode where
   arbitrary = genericArbitrary uniform
 
+-- | Packaging data in a newtype allows to redefine typeclass instances
 newtype Data a = MkData a
   deriving (Functor, Eq, Ord, Num, Enum, Real, Integral
            , Typeable, Bounded, Bits, FiniteBits, Generic)
@@ -105,6 +104,7 @@ instance Arbitrary a => Arbitrary (Data a) where
 
 -----------------------------------------------------------------------------
 
+-- | Abstraction over possible locations in the ISA
 data Key where
   Reg :: Register -> Key
   -- ^ data register
@@ -121,6 +121,7 @@ data Key where
 
 deriving instance Eq Key
 deriving instance Ord Key
+deriving instance Generic Key
 
 keyTag :: Key -> String
 keyTag = \case
@@ -161,20 +162,16 @@ instance Boolean (Data Int8) where
   true = MkData 1
   not  (MkData x) = if x == 0 then 1 else 0
 
-  x ||| y = if (toBool x ||| toBool y) then 1 else 0
-  x &&& y = if (toBool x &&& toBool y) then 1 else 0
+  x ||| y = if toBool x ||| toBool y then 1 else 0
+  x &&& y = if toBool x &&& toBool y then 1 else 0
 
 instance Boolean (Data Int32) where
   toBool (MkData x) = x /= 0
   true = MkData 1
   not  (MkData x) = if x == 0 then 1 else 0
 
-  x ||| y = if (toBool x ||| toBool y) then 1 else 0
-  x &&& y = if (toBool x &&& toBool y) then 1 else 0
-
--- data Prop a = Trivial Bool
---             | Nontrivial a
---             deriving (Show, Typeable)
+  x ||| y = if toBool x ||| toBool y then 1 else 0
+  x &&& y = if toBool x &&& toBool y then 1 else 0
 
 instance Boolean a => Boolean (Prop a) where
   true = Trivial True
@@ -252,7 +249,7 @@ type Value a =
 fromBitsLE :: (FiniteBits a, Num a) => [Bool] -> a
 fromBitsLE = go 0 0
   where go acc _  []    = acc
-        go acc i (x:xs) = go (if x then (setBit acc i) else acc) (i+1) xs
+        go acc i (x:xs) = go (if x then setBit acc i else acc) (i+1) xs
 
 fromBitsLEInt32 :: [Bool] -> Int32
 fromBitsLEInt32 xs | length xs == 32 = fromBitsLE xs
