@@ -15,16 +15,16 @@
 module ISA.Example.Add  where
 
 import           Control.Monad.State.Strict
-import           Data.Int                      (Int32)
-import qualified Data.Map                      as Map
-import           Data.Maybe                    (fromJust)
-import qualified Data.Tree                     as Tree
+import           Data.Int                           (Int32)
+import qualified Data.Map                           as Map
+import           Data.Maybe                         (fromJust)
+import qualified Data.Tree                          as Tree
 
 import           ISA.Assembly
 -- import           ISA.Backend.Dependencies
-import           ISA.Backend.Symbolic.List
+import           ISA.Backend.Symbolic.QueryList
 -- import           ISA.Semantics
-import           ISA.Backend.Symbolic.List.Run
+import           ISA.Backend.Symbolic.List.QueryRun
 import           ISA.Example.Common
 import           ISA.Types
 import           ISA.Types.Instruction
@@ -97,25 +97,29 @@ theorem = do
   x <- forall "x"
   y <- forall "y"
 
-  constrain ("x == 3", const (SEq x 3))
+  constrain ("x == 3", const (SEq x 2))
   constrain ("y == 5", const (SEq y 5))
   constrain ("No overflow", \ctx -> SNot (fromJust (getBinding (F Overflow) ctx)))
 
 
-  let mem = mkMemory [(0, x), (1, y)]
+  let mem = mkMemory [(0, x), (1, y), (3, 0)]
       initialState = boot addLowLevel defaultRegisters mem defaultFlags
 
-  let tr = runModel 100 initialState
+  tr <- liftIO $ runModel 10 initialState
       -- tr' = constrainTrace
 
   pure tr
 
 demo_add :: IO ()
 demo_add = do
-  let tr = runState (runSymbolic theorem) (mkTrace (Node 0 (MkContext Map.empty true [])) [])
-      tr' = fmap solveContext (fst tr)
-  let z = Tree.foldTree (\(Node c s) xs -> s : concat xs) (unTrace tr')
-  print z
+  let mem = mkMemory [(0, 0), (1, 0), (3, 0)]
+      initialState = boot addLowLevel defaultRegisters mem defaultFlags
+  tr <- runStateT (runSymbolic theorem) (mkTrace (Node 0 (initialState)) [])
+  let z = fmap (\(Node _ ctx) -> showContext ctx) (unTrace (fst tr))
+  mapM putStrLn z
+  -- let tr' = fmap solveContext (fst tr)
+  -- let z = Tree.foldTree (\(Node c s) xs -> s : concat xs) (unTrace tr')
+  -- print z
   pure ()
 
 -- demo_add :: IO ()

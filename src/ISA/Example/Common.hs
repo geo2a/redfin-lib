@@ -45,8 +45,8 @@ boot src regs memory flags =
                             ++ [(IC, SConst 0), (IR, 0)]
             }
 
-newtype Symbolic a = MkSymbolic { runSymbolic :: State (Trace Context) a }
-  deriving (Functor, Applicative, Monad, MonadState (Trace Context))
+newtype Symbolic a = MkSymbolic { runSymbolic :: StateT (Trace Context) IO a }
+  deriving (Functor, Applicative, Monad, MonadState (Trace Context), MonadIO)
 
 forall :: Text -> Symbolic Sym
 forall = pure . SAny
