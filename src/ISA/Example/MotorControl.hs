@@ -15,30 +15,33 @@
 module ISA.Example.MotorControl
     () where
 
-import           Control.Monad                 (filterM)
+import           Control.Monad                      (filterM)
+import           Control.Monad.IO.Class             (liftIO)
 import           Control.Selective
-import           Data.Foldable                 (sequenceA_)
+import           Data.Foldable                      (sequenceA_)
 import           Data.Int
-import           Data.Maybe                    (fromJust)
-import           Prelude                       hiding (div, mod)
+import           Data.Maybe                         (fromJust)
+import           Prelude                            hiding (div, mod)
 import           System.CPUTime
-import           System.IO.Unsafe              (unsafePerformIO)
-import           Text.Pretty.Simple            (pPrint)
+import           System.IO.Unsafe                   (unsafePerformIO)
+import           Text.Pretty.Simple                 (pPrint)
 import           Text.Printf
 -- import qualified Data.Tree as Tree
-import qualified Data.Map.Strict               as Map
-import qualified Data.SBV                      as SBV
+import qualified Data.Map.Strict                    as Map
+import qualified Data.SBV                           as SBV
 
 import           ISA.Assembly
 import           ISA.Backend.Dependencies
-import           ISA.Backend.Symbolic.List
-import           ISA.Backend.Symbolic.List.Run
+import           ISA.Backend.Symbolic.List.QueryRun
+import           ISA.Backend.Symbolic.QueryList
+import           ISA.Example.Common
 import           ISA.Semantics
 import           ISA.Types
 import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
 import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.Context
 import           ISA.Types.Symbolic.Trace
 
 
@@ -225,33 +228,43 @@ showContext ctx =
   , showKey ctx (Addr 4)
   ]
 
+theorem :: Symbolic (Trace Context)
+theorem = do
+  a_max <- forall "a_max"
+  v_max <- forall "v_max"
+  dist <- forall "dist"
+  s <- forall "s"
+  v <- forall "v"
+
+
+  constrain ("0 < a_max < 10", const $ (SGt a_max 0) &&& (SLt a_max 100))
+  constrain ("0 < v_max < 100", const $ (SGt v_max 0) &&& (SLt v_max 100))
+  constrain ("0 < dist < 1000", const $ (SGt dist 0) &&& (SLt dist 100))
+  constrain ("0 < s < 100", const $ (SGt s 0) &&& (SLt s 100))
+  constrain ("0 < v < v_max", const $ (SGt v 0) &&& (SLt v v_max))
+
+  let mem = mkMemory [(0, a_max), (1, v_max), (2, dist), (3, s), (4, v)]
+  initialState <- boot mc_loop defaultRegisters mem defaultFlags
+
+  liftIO (runModel 1000 initialState)
+
 demo :: IO ()
 demo = do
-  let ctx = MkContext { _pathCondition = SConst (CBool True)
-                      , _bindings = Map.fromList $ [ (IC, SConst 0)
-                                                   , (IR, 0)
-                                                   , (F Condition, SConst (CBool False))
-                                                   , (F Halted, SConst (CBool False))
-                                                   , (Reg R0, 0)
-                                                   , (Reg R1, 0)
-                                                   , (Reg R2, 0)
+  tr <- runSymbolic theorem
+  solved <- solveTrace (fst tr)
+  -- let cs = fmap (\(Node _ s ctx) -> showContext ctx) (unTrace (fst tr))
+  let z = fmap (\(Node _ s ctx) -> show s <> showContext ctx) (unTrace solved)
+  mapM putStrLn z
 
-                                                   , (Addr 0, SAny "a_max")
-                                                   , (Addr 1, SAny "v_max")
-                                                   , (Addr 2, SAny "dist")
-                                                   , (Addr 3, SAny "s")
-                                                   , (Addr 4, SAny "v")
-                                                   ] ++ mkProgram mc_loop
-                      }
-  let dataGraph =
-        fromJust $ programDataGraph (assemble mc_loop)
-  writeFile "/home/geo2a/Desktop/traces/graph_motor.dot" (drawGraph dataGraph)
+  -- let dataGraph =
+  --       fromJust $ programDataGraph (assemble mc_loop)
+  -- writeFile "/home/geo2a/Desktop/traces/graph_motor.dot" (drawGraph dataGraph)
 
-  putStrLn ""
-  let t = runModel 50 ctx
-      tracePath = "/home/geo2a/Desktop/traces/trace_motor.html"
-  writeTraceHtmlFile showContext tracePath t
-  putStrLn $ "Wrote trace into file " <> tracePath
+  -- putStrLn ""
+  -- let t = runModel 50 ctx
+  --     tracePath = "/home/geo2a/Desktop/traces/trace_motor.html"
+  -- writeTraceHtmlFile showContext tracePath t
+  -- putStrLn $ "Wrote trace into file " <> tracePath
 
   -- debugConsole 10 ctx
   pure ()

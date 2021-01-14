@@ -46,6 +46,7 @@ addLowLevel = do
 showContext :: Context -> String
 showContext ctx =
   unlines [ "Path constraint: " <> show (_pathCondition ctx)
+          , "Conditions: " <> unlines (map show (_constraints ctx))
   , showKey ctx IC
   , showKey ctx IR
   , showKey ctx (F Condition)
@@ -56,23 +57,23 @@ showContext ctx =
   , showKey ctx (Addr 1)
   ]
 
--- initCtx :: Context
--- initCtx =
---   MkContext { _pathCondition = true
---               -- ((SGt (SAny "x") 0) &&& (SLt (SAny "x") 100))
---               --              &&& ((SGt (SAny "y") 0) &&& (SLt (SAny "y") 100))
---             , _bindings = Map.fromList $ [ (IC, SConst 0)
---                                          , (IR, 0)
---                                          , (F Condition, SConst (CBool False))
---                                          , (F Halted, SConst (CBool False))
---                                          , (F Overflow, SConst (CBool False))
---                                          , (Reg R0, 0)
---                                          , (Addr 0, SAny "x")
---                                          , (Addr 1, SAny "y")
---                                          -- , (Addr 0, maxBound)
---                                          -- , (Addr 1, 1)
---                                          ] ++ mkProgram addLowLevel
---             }
+initCtx :: Context
+initCtx =
+  MkContext { _pathCondition = true
+              -- ((SGt (SAny "x") 0) &&& (SLt (SAny "x") 100))
+              --              &&& ((SGt (SAny "y") 0) &&& (SLt (SAny "y") 100))
+            , _bindings = Map.fromList $ [ (IC, SConst 0)
+                                         , (IR, 0)
+                                         , (F Condition, SConst (CBool False))
+                                         , (F Halted, SConst (CBool False))
+                                         , (F Overflow, SConst (CBool False))
+                                         , (Reg R0, 0)
+                                         , (Addr 0, SAny "x")
+                                         , (Addr 1, SAny "y")
+                                         -- , (Addr 0, maxBound)
+                                         -- , (Addr 1, 1)
+                                         ] ++ mkProgram addLowLevel
+            }
 
 -- symexecTrace :: Int -> Trace Context
 -- symexecTrace steps = runModel steps initCtx
@@ -96,30 +97,26 @@ theorem :: Symbolic (Trace Context)
 theorem = do
   x <- forall "x"
   y <- forall "y"
-
-  constrain ("x == 3", const (SEq x 2))
+  constrain ("x == 3", const (SEq x 3))
   constrain ("y == 5", const (SEq y 5))
-  constrain ("No overflow", \ctx -> SNot (fromJust (getBinding (F Overflow) ctx)))
-
-
-  let mem = mkMemory [(0, x), (1, y), (3, 0)]
-      initialState = boot addLowLevel defaultRegisters mem defaultFlags
+  -- constrain ("x == y", const (SEq x y))
+  -- constrain ("No overflow", \ctx -> SNot (fromJust (getBinding (F Overflow) ctx)))
+  let mem = mkMemory [(0, x), (1, y)]
+  initialState <- boot addLowLevel defaultRegisters mem defaultFlags
 
   tr <- liftIO $ runModel 10 initialState
       -- tr' = constrainTrace
-
   pure tr
 
 demo_add :: IO ()
 demo_add = do
-  let mem = mkMemory [(0, 0), (1, 0), (3, 0)]
-      initialState = boot addLowLevel defaultRegisters mem defaultFlags
-  tr <- runStateT (runSymbolic theorem) (mkTrace (Node 0 (initialState)) [])
-  let z = fmap (\(Node _ ctx) -> showContext ctx) (unTrace (fst tr))
+  tr <- runSymbolic theorem
+  solved <- solveTrace (fst tr)
+  -- let cs = fmap (\(Node _ s ctx) -> showContext ctx) (unTrace (fst tr))
+  let z = fmap (\(Node _ s ctx) -> show s <> showContext ctx) (unTrace solved)
   mapM putStrLn z
   -- let tr' = fmap solveContext (fst tr)
   -- let z = Tree.foldTree (\(Node c s) xs -> s : concat xs) (unTrace tr')
-  -- print z
   pure ()
 
 -- demo_add :: IO ()

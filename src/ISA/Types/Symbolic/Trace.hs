@@ -12,52 +12,56 @@
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic.Trace
     ( Trace(..), mkTrace, subsetTrace, traceDepth, htmlTrace, writeTraceHtmlFile
-    , Path, paths, constrainTrace
+    , Path, paths, constrainTrace, solveTrace
     , Node(..), NodeId, lookup
     ) where
 
 import           Data.Maybe                 (catMaybes, listToMaybe)
 import           Data.Text                  (Text)
+import           Data.Traversable           (forM)
 import qualified Data.Tree                  as Tree
 import qualified Data.Tree.View             as TreeView
 import           Prelude                    hiding (lookup)
 
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Context
+import           ISA.Types.Symbolic.SMT
 
 type NodeId = Int
 
-data Node s = Node { nodeId   :: NodeId
-                   , nodeBody :: s
+data Node s = Node { _nodeId   :: NodeId
+                   , _status   :: Maybe Solution
+                   , _nodeBody :: s
                    } deriving Functor
 
 instance Eq (Node s) where
-    (Node x _) == (Node y _) = x == y
+  x == y = _nodeId x == _nodeId y
 
 instance Ord (Node s) where
-    (Node x _) <= (Node y _) = x <= y
+  x <= y = _nodeId x <= _nodeId y
 
 instance Show (Node s) where
-    show (Node nId _) = show nId
+  show node = show (_nodeId node)
 
 -- | Symbolic execution trace
 newtype Trace s = Trace {unTrace :: Tree.Tree (Node s)}
-    deriving (Show, Functor)
+  deriving (Show, Functor)
 
 instance Foldable Trace where
-    foldMap f (Trace tree) = foldMap (f . nodeBody) tree
+  foldMap f (Trace tree) = foldMap (f . _nodeBody) tree
 
 instance Traversable Trace where
-    traverse f (Trace tree) = Trace <$> traverse (\(Node n s) -> Node n <$> f s) tree
+  traverse f (Trace tree) =
+    Trace <$> traverse (\(Node n s b) -> Node n s <$> f b) tree
 
 -- | Render a trace as an HTML string
 htmlTrace :: (Context -> String) -> Trace Context -> String
 htmlTrace shower (Trace tree) =
   TreeView.htmlTree Nothing $
     fmap (\node -> TreeView.NodeInfo
-                   TreeView.InitiallyExpanded (show (nodeId node) <> " | " <>
-                                               showIR (nodeBody node))
-                                               (shower (nodeBody node)))
+                   TreeView.InitiallyExpanded (show (_nodeId node) <> " | " <>
+                                               showIR (_nodeBody node))
+                                               (shower (_nodeBody node)))
          tree
 
 -- | Render a trace as HTML and write the result into a file
@@ -71,17 +75,12 @@ constrainTrace :: (Text, Context -> Sym) -> Trace Context -> Trace Context
 constrainTrace (name, expr) =
   fmap (\ctx -> ctx {_constraints = (name, expr ctx):_constraints ctx})
 
--- -- | Impose a path constraint on every state in the trace.
--- --   Useful for checking whole program properties, e.g. the absence of overflow
--- constraint :: Label -> (State -> Sym Bool) -> Trace State -> Trace State
--- constraint label constr = fmap (\s -> appendConstraints [(label, constr s)] s)
-
 traceDepth :: Trace s -> Int
 traceDepth = length . Tree.flatten . unTrace
 
 subsetTrace :: (s -> Bool) -> Trace s -> [Node s]
 subsetTrace property (Trace tree) =
-    foldMap (\s -> if property (nodeBody s) then [s] else []) tree
+    foldMap (\s -> if property (_nodeBody s) then [s] else []) tree
 
 type Path s = [s]
 
@@ -93,5 +92,10 @@ paths = \case
 
 lookup :: NodeId -> Trace a -> Maybe a
 lookup n (Trace t) =
-  Tree.foldTree (\x xs -> if nodeId x == n then Just (nodeBody x)
+  Tree.foldTree (\x xs -> if _nodeId x == n then Just (_nodeBody x)
                           else listToMaybe (catMaybes xs)) t
+
+solveTrace :: Trace Context -> IO (Trace Context)
+solveTrace (Trace tr) = Trace <$> (forM tr $ \node -> do
+  (_, s) <- solveContext (_nodeBody node)
+  pure $ node { _status = Just s })

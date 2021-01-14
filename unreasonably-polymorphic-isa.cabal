@@ -37,11 +37,12 @@ library
       ISA.Types.Symbolic.SMT,
       ISA.Types.Symbolic.Trace
 
-      ISA.Backend.Symbolic.List,
-      ISA.Backend.Symbolic.List.Run,
+      ISA.Backend.Symbolic.QueryList,
+      ISA.Backend.Symbolic.List.QueryRun,
       ISA.Backend.IO,
       ISA.Backend.Dependencies,
 
+      ISA.Example.Common,
       ISA.Example.Add,
       ISA.Example.Sum,
       ISA.Example.MotorControl

@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Symbolic.SMT
@@ -14,7 +15,7 @@ module ISA.Types.Symbolic.SMT
     ( -- get the list of free variables in a symbolic expression
       gatherFree
       -- check if the expression is satisfiable
-    , Solution (..), isSat, solve, solveWithFuel, solveContext, solvePath
+    , Solution (..), isSat, solve, solveWithFuel, solveContext
       -- helper functions
     , conjoin
     ) where
@@ -25,13 +26,13 @@ import qualified Data.SBV.Dynamic           as SBV
 import qualified Data.Set                   as Set
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
+import           Data.Traversable
 import           Prelude                    hiding (not)
 import           System.IO.Unsafe           (unsafePerformIO)
 
 import           ISA.Types
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Context
-import           ISA.Types.Symbolic.Trace
 
 -- | Walk the constraint gathering up the free variables.
 gatherFree :: Sym -> Set.Set Sym
@@ -138,39 +139,39 @@ solver = SBV.z3 { SBV.verbose = True
 -----------------------------------------------------------------------------
 data Solution = Unsat
               -- ^ the path constraint is unsatisfiable, i.e. False
-              | Sat Sym
+              | Sat Sym (Maybe SBV.SatResult)
               -- ^ the path constraint is a satisfiable symbolic boolean
   deriving Show
 
 isSat :: Solution -> Bool
 isSat = \case Unsat -> False
-              Sat _ -> True
+              Sat _ _ -> True
 
 -- | Check satisfiability of a boolean symbolic expression:
 --   * first, try to perform constant folding (via a Haskell function) for 'fuel' steps
---   * if the value is indeed symbolic, call the SMT solver via unsafePerformIO
-solveWithFuel :: Sym -> Int -> Solution
+--   * if the value is indeed symbolic, call the SMT solver
+solveWithFuel :: Sym -> Int -> IO Solution
 solveWithFuel expr fuel =
   case getValue (simplify (Just fuel) expr) of
-    Just (CBool val) -> if val then Sat (SConst (CBool True)) else Unsat
+    Just (CBool val) -> pure $ if val then Sat (SConst (CBool True)) Nothing else Unsat
     Just (CWord w) -> error $ "Sym.solveWithFuel: non-boolean literal " <> show w
     Just (CInt32 i) -> error $ "Sym.solveWithFuel: non-boolean literal " <> show i
-    Nothing ->
-      let (SBV.SatResult result) = unsafePerformIO (sat expr)
-      in case result of
-           SBV.Unsatisfiable _ _ -> Unsat
-           SBV.Satisfiable _ _   -> Sat (expr)
-           _                     -> error "Sym.solveWithFuel: fatal error!"
+    Nothing -> do
+      sbv@(SBV.SatResult result) <- sat expr
+      pure $ case result of
+               SBV.Unsatisfiable _ _ -> Unsat
+               SBV.Satisfiable _ _   -> Sat expr (Just sbv)
+               _                     -> error "Sym.solveWithFuel: fatal error!"
 
 -- | A variant of 'solveWithFuel' which uses a default fuel value
-solve :: Sym -> Solution
+solve :: Sym -> IO Solution
 solve expr = solveWithFuel expr defaultFuel
   where defaultFuel = 100
 
 -- | Solve the path condition of a context
-solveContext :: Context -> (Context, Solution)
-solveContext ctx = (ctx, solve $
-                     (_pathCondition ctx) &&& conjoin (map snd $ _constraints ctx))
+solveContext :: Context -> IO (Context, Solution)
+solveContext ctx = (ctx,) <$>
+  solve ((_pathCondition ctx) &&& conjoin (map snd $ _constraints ctx))
 
-solvePath :: Path Context -> (Context -> Sym) -> Path Solution
-solvePath path consider = map (solve . consider) path
+-- solvePath :: Path Context -> (Context -> Sym) -> Path Solution
+-- solvePath path consider = map (solve . consider) path

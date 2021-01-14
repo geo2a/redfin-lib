@@ -33,20 +33,25 @@ boot :: Script
      -> [(Register, Sym)]
      -> [(Address,  Sym)]
      -> [(Flag, Sym)]
-     -> Context
-boot src regs memory flags =
-  MkContext { _pathCondition = SConst (CBool True)
-            , _constraints = []
-            , _bindings =
-                Map.fromList $ mkProgram src
-                            ++ map (first Reg) regs
-                            ++ map (first Addr) memory
-                            ++ map (first F) flags
-                            ++ [(IC, SConst 0), (IR, 0)]
-            }
+     -> Symbolic Context
+boot src regs memory flags = do
+  cs <- _constraints <$> get
+  pure $ MkContext { _pathCondition = SConst (CBool True)
+                   , _constraints = cs
+                   , _bindings =
+                       Map.fromList $ mkProgram src
+                                   ++ map (first Reg) regs
+                                   ++ map (first Addr) memory
+                                   ++ map (first F) flags
+                                   ++ [(IC, SConst 0), (IR, 0)]
+                   }
 
-newtype Symbolic a = MkSymbolic { runSymbolic :: StateT (Trace Context) IO a }
-  deriving (Functor, Applicative, Monad, MonadState (Trace Context), MonadIO)
+newtype Symbolic a = MkSymbolic { getSymbolic :: StateT Context IO a }
+  deriving (Functor, Applicative, Monad, MonadState Context, MonadIO)
+
+runSymbolic :: Symbolic a -> IO (a, Context)
+runSymbolic theorem =
+  runStateT (getSymbolic theorem) (MkContext Map.empty (SConst (CBool True)) [])
 
 forall :: Text -> Symbolic Sym
 forall = pure . SAny
@@ -57,7 +62,7 @@ symbolics names = pure $ map SAny names
 
 -- | Conjunct a symbolic constraint to the current path condition
 constrain :: (Text, Context -> Sym) -> Symbolic ()
-constrain constr = modify (constrainTrace constr)
+constrain (name, expr) = modify (\ctx -> ctx {_constraints = (name, expr ctx):_constraints ctx})
 
 prover :: SMTConfig
 prover = z3 { verbose = True
