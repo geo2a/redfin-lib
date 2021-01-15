@@ -12,7 +12,7 @@
 -- demonstrate integer overflow detection and functional verification
 
 -----------------------------------------------------------------------------
-module ISA.Example.Add  where
+module ISA.Example.Add (addLowLevel, initCtx, run, solve)  where
 
 import           Control.Monad.State.Strict
 import           Data.Int                           (Int32)
@@ -46,7 +46,7 @@ addLowLevel = do
 showContext :: Context -> String
 showContext ctx =
   unlines [ "Path constraint: " <> show (_pathCondition ctx)
-          , "Conditions: " <> unlines (map show (_constraints ctx))
+          , "Conditions: \n" <> unlines (map show (_constraints ctx))
   , showKey ctx IC
   , showKey ctx IR
   , showKey ctx (F Condition)
@@ -55,11 +55,14 @@ showContext ctx =
   , showKey ctx (Reg R0)
   , showKey ctx (Addr 0)
   , showKey ctx (Addr 1)
-  ]
+  ] ++
+  show (_solution ctx)
+  ++ "\n==================="
 
 initCtx :: Context
 initCtx =
   MkContext { _pathCondition = true
+            , _constraints = []
               -- ((SGt (SAny "x") 0) &&& (SLt (SAny "x") 100))
               --              &&& ((SGt (SAny "y") 0) &&& (SLt (SAny "y") 100))
             , _bindings = Map.fromList $ [ (IC, SConst 0)
@@ -73,7 +76,14 @@ initCtx =
                                          -- , (Addr 0, maxBound)
                                          -- , (Addr 1, 1)
                                          ] ++ mkProgram addLowLevel
+            , _solution = Nothing
             }
+
+run :: Int -> Context -> IO (Trace Context)
+run steps ctx = runModel steps ctx
+
+solve :: Trace Context -> IO (Trace Context)
+solve = solveTrace
 
 -- symexecTrace :: Int -> Trace Context
 -- symexecTrace steps = runModel steps initCtx
@@ -113,7 +123,7 @@ demo_add = do
   tr <- runSymbolic theorem
   solved <- solveTrace (fst tr)
   -- let cs = fmap (\(Node _ s ctx) -> showContext ctx) (unTrace (fst tr))
-  let z = fmap (\(Node _ s ctx) -> show s <> showContext ctx) (unTrace solved)
+  let z = fmap (\(Node _ ctx) -> showContext ctx) (unTrace solved)
   mapM putStrLn z
   -- let tr' = fmap solveContext (fst tr)
   -- let z = Tree.foldTree (\(Node c s) xs -> s : concat xs) (unTrace tr')

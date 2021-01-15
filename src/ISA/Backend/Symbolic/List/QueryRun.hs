@@ -86,14 +86,14 @@ runModelM steps s = do
     let halted = case Map.lookup (F Halted) (_bindings s) of
           Just b  -> b
           Nothing -> error "Engine.runModel: uninitialised flag Halted!"
-    if | steps <= 0 -> pure (mkTrace (Node n Nothing s) [])
+    if | steps <= 0 -> pure (mkTrace (Node n s) [])
        | otherwise  ->
          case halted of
-           SConst (CBool True) -> pure (mkTrace (Node n Nothing s) [])
+           SConst (CBool True) -> pure (mkTrace (Node n s) [])
            _ -> do
              newStates <- liftIO $ step s
              children <- traverse (runModelM (steps - 1)) newStates
-             pure $ mkTrace (Node n Nothing s) children
+             pure $ mkTrace (Node n s) children
 
 runModel :: Int -> Context -> IO (Trace Context)
 runModel steps s = evalStateT (runModelM steps s) 0

@@ -101,7 +101,9 @@ initContext = MkContext { _pathCondition = SConst (CBool True)
                                                    , (Addr 1, SAny "x1")
                                                    , (Addr 2, SAny "x2")
                                                    , (Addr 3, SAny "x3")
-                                                   ] ++ mkProgram sumArrayLowLevel }
+                                                   ] ++ mkProgram sumArrayLowLevel
+                      , _solution = Nothing
+                      }
 
 
 theorem :: Symbolic (Trace Context)
@@ -145,7 +147,7 @@ demo_sum = do
   tr <- runSymbolic theorem
   solved <- solveTrace (fst tr)
   -- let cs = fmap (\(Node _ s ctx) -> showContext ctx) (unTrace (fst tr))
-  let z = fmap (\(Node _ s ctx) -> show s <> showContext ctx) (unTrace solved)
+  let z = fmap (\(Node _ ctx) -> showContext ctx) (unTrace solved)
   mapM putStrLn z
 
 

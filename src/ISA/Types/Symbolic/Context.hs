@@ -1,9 +1,11 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module ISA.Types.Symbolic.Context
-  (Context(..), getBinding, showKey, showIR) where
+  (Context(..), getBinding, showKey, showIR, isReachable) where
 
 import qualified Data.Map.Strict              as Map
+import qualified Data.SBV                     as SBV (SMTResult (..),
+                                                      SatResult (..))
 import           Data.Text                    (Text)
 import           GHC.Generics
 
@@ -18,8 +20,18 @@ import           ISA.Types.Symbolic
 data Context = MkContext { _bindings      :: Map.Map Key Sym
                          , _pathCondition :: Sym
                          , _constraints   :: [(Text, Sym)]
+                         , _solution      :: Maybe SBV.SatResult
                          }
-  deriving (Eq, Generic)
+  deriving (Generic)
+
+instance Eq Context where
+  x == y = _bindings x == _bindings y
+
+isReachable :: Context -> Bool
+isReachable ctx = case (_solution ctx) of
+  Nothing                                    -> True
+  Just (SBV.SatResult (SBV.Satisfiable _ _)) -> True
+  _                                          -> False
 
 getBinding :: Key -> Context -> Maybe Sym
 getBinding key ctx = Map.lookup key (_bindings ctx)

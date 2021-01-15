@@ -51,7 +51,7 @@ newtype Symbolic a = MkSymbolic { getSymbolic :: StateT Context IO a }
 
 runSymbolic :: Symbolic a -> IO (a, Context)
 runSymbolic theorem =
-  runStateT (getSymbolic theorem) (MkContext Map.empty (SConst (CBool True)) [])
+  runStateT (getSymbolic theorem) (MkContext Map.empty (SConst (CBool True)) [] Nothing)
 
 forall :: Text -> Symbolic Sym
 forall = pure . SAny

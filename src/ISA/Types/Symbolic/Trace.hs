@@ -30,7 +30,6 @@ import           ISA.Types.Symbolic.SMT
 type NodeId = Int
 
 data Node s = Node { _nodeId   :: NodeId
-                   , _status   :: Maybe Solution
                    , _nodeBody :: s
                    } deriving Functor
 
@@ -52,7 +51,7 @@ instance Foldable Trace where
 
 instance Traversable Trace where
   traverse f (Trace tree) =
-    Trace <$> traverse (\(Node n s b) -> Node n s <$> f b) tree
+    Trace <$> traverse (\(Node n b) -> Node n <$> f b) tree
 
 -- | Render a trace as an HTML string
 htmlTrace :: (Context -> String) -> Trace Context -> String
@@ -97,5 +96,5 @@ lookup n (Trace t) =
 
 solveTrace :: Trace Context -> IO (Trace Context)
 solveTrace (Trace tr) = Trace <$> (forM tr $ \node -> do
-  (_, s) <- solveContext (_nodeBody node)
-  pure $ node { _status = Just s })
+  ctx <- solveContext (_nodeBody node)
+  pure $ node { _nodeBody = ctx })
