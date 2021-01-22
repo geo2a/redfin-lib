@@ -138,15 +138,15 @@ instance Show Sym where
     show (SMul x y) = "(" <> show x <> " * " <> show y <> ")"
     show (SDiv x y) = "(" <> show x <> " / " <> show y <> ")"
     show (SMod x y) = "(" <> show x <> " % " <> show y <> ")"
-    show (SAbs x  ) = "|" <> show x <> "|"
+    show (SAbs x  ) = "abs " <> show x
     show (SConst x) = show x
-    show (SAnd x y) = "(" <> show x <> " & " <> show y <> ")"
-    show (SOr  x y) = "(" <> show x <> " | " <> show y <> ")"
+    show (SAnd x y) = "(" <> show x <> " && " <> show y <> ")"
+    show (SOr  x y) = "(" <> show x <> " || " <> show y <> ")"
     show (SAny n  ) = Text.unpack n
     show (SEq  x y) = "(" <> show x <> " == " <> show y <> ")"
     show (SGt  x y) = "(" <> show x <> " > " <> show y <> ")"
     show (SLt  x y) = "(" <> show x <> " < " <> show y <> ")"
-    show (SNot b )  = "¬" <> show b
+    show (SNot b )  = "not " <> show b
 
 instance Num Sym where
   x + y = SAdd x y

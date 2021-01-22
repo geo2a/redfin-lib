@@ -155,3 +155,4 @@ jmpi_cf simm = instr (Instruction $ JumpCf simm)
 -- not rX = write 0b111000 (register rX)
 abs rX = instr (Instruction $ Abs rX)
 halt   = instr (Instruction $ Halt)
+--------------------------------------------------------------------------------

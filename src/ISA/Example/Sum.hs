@@ -81,29 +81,30 @@ showContext ctx =
   ]
 
 initContext :: Context
-initContext = MkContext { _pathCondition = SConst (CBool True)
-                        , _constraints = [ ("", ((SGt (SAny "x1") 0) &&& (SLt (SAny "x1") 100)))
-                                         , ("", ((SGt (SAny "x2") 0) &&& (SLt (SAny "x2") 100)))
-                                         , ("", ((SGt (SAny "x3") 0) &&& (SLt (SAny "x3") 100)))
-                                         ]
-                      , _bindings = Map.fromList $ [ (IC, SConst 0)
-                                                   , (IR, 0)
-                                                   , (F Condition, SConst (CBool False))
-                                                   , (F Halted, SConst (CBool False))
-                                                   , (F Overflow, SConst (CBool False))
-                                                   , (Reg R0, 0)
-                                                   , (Reg R1, 0)
-                                                   , (Reg R2, 0)
-                                                   , (Addr 0, 3)
-                                                   , (Addr 253, 0)
-                                                   , (Addr 255, 1)
-
-                                                   , (Addr 1, SAny "x1")
-                                                   , (Addr 2, SAny "x2")
-                                                   , (Addr 3, SAny "x3")
-                                                   ] ++ mkProgram sumArrayLowLevel
-                      , _solution = Nothing
-                      }
+initContext = MkContext
+  { _pathCondition = SConst (CBool True)
+  , _constraints =
+    [ ("0 < x1 < 100", ((SGt (SAny "x1") 0) &&& (SLt (SAny "x1") 100)))
+    , ("0 < x2 < 100", ((SGt (SAny "x2") 0) &&& (SLt (SAny "x2") 100)))
+    , ("0 < x3 < 100", ((SGt (SAny "x3") 0) &&& (SLt (SAny "x3") 100)))
+    ]
+  , _bindings = Map.fromList $ [ (IC, SConst 0)
+                               , (IR, 0)
+                               , (F Condition, SConst (CBool False))
+                               , (F Halted, SConst (CBool False))
+                               , (F Overflow, SConst (CBool False))
+                               , (Reg R0, 0)
+                               , (Reg R1, 0)
+                               , (Reg R2, 0)
+                               , (Addr 0, 3)
+                               , (Addr 253, 0)
+                               , (Addr 255, 1)
+                               , (Addr 1, SAny "x1")
+                               , (Addr 2, SAny "x2")
+                               , (Addr 3, SAny "x3")
+                               ] ++ mkProgram sumArrayLowLevel
+  , _solution = Nothing
+  }
 
 
 theorem :: Symbolic (Trace Context)

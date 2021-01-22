@@ -54,7 +54,7 @@ import           ISA.Selective
 
 -- | Data registers
 data Register = R0 | R1 | R2 | R3
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Read, Eq, Ord, Generic)
 
 instance Arbitrary Register where
   arbitrary = genericArbitrary uniform
@@ -62,7 +62,7 @@ instance Arbitrary Register where
 -- | Memory location
 newtype Address = Address Word8
   deriving (Eq, Ord, Num, Real, Enum, Integral, Bounded, Bits, FiniteBits, Generic)
-  deriving Show via Word8
+  deriving (Show, Read) via Word8
 
 instance Arbitrary Address where
   arbitrary = genericArbitrary uniform
@@ -72,7 +72,7 @@ data Flag = Halted
           | Zero
           | Condition
           | Overflow
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Read, Eq, Ord, Generic)
 
 instance Arbitrary Flag where
   arbitrary = genericArbitrary uniform

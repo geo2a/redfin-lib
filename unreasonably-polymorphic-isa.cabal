@@ -35,7 +35,8 @@ library
       ISA.Types.Symbolic,
       ISA.Types.Symbolic.Context,
       ISA.Types.Symbolic.SMT,
-      ISA.Types.Symbolic.Trace
+      ISA.Types.Symbolic.Trace,
+      ISA.Types.Symbolic.Parser
 
       ISA.Backend.Symbolic.QueryList,
       ISA.Backend.Symbolic.List.QueryRun,
@@ -65,7 +66,9 @@ library
       text,
       transformers,
       QuickCheck,
-      tree-view >= 0.5
+      tree-view >= 0.5,
+      megaparsec,
+      parser-combinators
   default-extensions: LambdaCase
                     , FlexibleContexts
                     , FlexibleInstances
