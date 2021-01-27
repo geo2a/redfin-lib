@@ -26,7 +26,7 @@ data Context = MkContext { _bindings      :: Map.Map Key Sym
 
 instance Eq Context where
   x == y = (_bindings x == _bindings y)
-        && (map fst (_constraints x) == map fst (_constraints y))
+        && (_constraints x == _constraints y)
 
 isReachable :: Context -> Bool
 isReachable ctx = case (_solution ctx) of
