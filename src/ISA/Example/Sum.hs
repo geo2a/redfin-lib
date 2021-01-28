@@ -146,9 +146,9 @@ demo_sum = do
   --                                                  ] ++ mkProgram sumArrayLowLevel
   --                     }
   tr <- runSymbolic theorem
-  solved <- solveTrace (fst tr)
+  -- solved <- solveTrace (fst tr)
   -- let cs = fmap (\(Node _ s ctx) -> showContext ctx) (unTrace (fst tr))
-  let z = fmap (\(Node _ ctx) -> showContext ctx) (unTrace solved)
+  let z = fmap (\(Node _ ctx) -> showContext ctx) (unTrace . fst $ tr)
   mapM putStrLn z
 
 

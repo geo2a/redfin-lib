@@ -115,9 +115,9 @@ theorem = do
 demo_add :: IO ()
 demo_add = do
   tr <- runSymbolic theorem
-  solved <- solveTrace (fst tr)
+  -- solved <- solveTrace (fst tr)
   -- let cs = fmap (\(Node _ s ctx) -> showContext ctx) (unTrace (fst tr))
-  let z = fmap (\(Node _ ctx) -> showContext ctx) (unTrace solved)
+  let z = fmap (\(Node _ ctx) -> showContext ctx) (unTrace . fst $ tr)
   mapM putStrLn z
   -- let tr' = fmap solveContext (fst tr)
   -- let z = Tree.foldTree (\(Node c s) xs -> s : concat xs) (unTrace tr')

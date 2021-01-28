@@ -12,7 +12,7 @@
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic.Trace
     ( Trace(..), mkTrace, subsetTrace, traceDepth, htmlTrace, writeTraceHtmlFile
-    , Path, paths, constrainTrace, solveTrace
+    , Path, paths, constrainTrace
     , Node(..), NodeId, lookup
     ) where
 
@@ -94,7 +94,7 @@ lookup n (Trace t) =
   Tree.foldTree (\x xs -> if _nodeId x == n then Just (_nodeBody x)
                           else listToMaybe (catMaybes xs)) t
 
-solveTrace :: Trace Context -> IO (Trace Context)
-solveTrace (Trace tr) = Trace <$> (forM tr $ \node -> do
-  ctx <- solveContext (_nodeBody node)
-  pure $ node { _nodeBody = ctx })
+-- solveTrace :: Trace Context -> IO (Trace Context)
+-- solveTrace (Trace tr) = Trace <$> (forM tr $ \node -> do
+--   ctx <- solveContext (_nodeBody node)
+--   pure $ node { _nodeBody = ctx })
