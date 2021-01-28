@@ -49,7 +49,7 @@ pSConst = SConst <$> pConcrete
 
 pSAny :: Parser Sym
 pSAny = SAny . Text.pack <$> lexeme
-  ((:) <$> letterChar <*> many alphaNumChar <?> "variable")
+  ((:) <$> letterChar <*> many (alphaNumChar <|> char '_') <?> "variable")
 
 pTerm :: Parser Sym
 pTerm = choice

@@ -14,7 +14,7 @@
 module ISA.Example.Sum
   ( demo_sum
   , sumArrayLowLevel
-  , initContext
+  , initCtx
   ) where
 
 import           Control.Monad.IO.Class             (liftIO)
@@ -80,8 +80,8 @@ showContext ctx =
   , showKey ctx (Addr 255)
   ]
 
-initContext :: Context
-initContext = MkContext
+initCtx :: Context
+initCtx = MkContext
   { _pathCondition = SConst (CBool True)
   , _constraints =
     [ ("0 < x1 < 100", ((SGt (SAny "x1") 0) &&& (SLt (SAny "x1") 100)))

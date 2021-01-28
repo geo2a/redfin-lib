@@ -13,7 +13,7 @@
 -----------------------------------------------------------------------------
 
 module ISA.Example.MotorControl
-    () where
+    (mc_loop, initCtx) where
 
 import           Control.Monad                      (filterM)
 import           Control.Monad.IO.Class             (liftIO)
@@ -214,19 +214,34 @@ mc_loop = do
 
     halt
 
-showContext :: Context -> String
-showContext ctx =
-  unlines [ "Path constraint: " <> show (_pathCondition ctx)
-  , showKey ctx IC
-  , showKey ctx IR
-  , showKey ctx (F Condition)
-  , showKey ctx (F Halted)
-  , showKey ctx (Reg R0)
-  , showKey ctx (Reg R1)
-  , showKey ctx (Reg R2)
-  , showKey ctx (Addr 3)
-  , showKey ctx (Addr 4)
-  ]
+initCtx :: Context
+initCtx = MkContext
+  { _pathCondition = SConst (CBool True)
+  , _constraints =
+    [ ("0 < a_max < 10",  (SGt a_max 0) &&& (SLt a_max 100))
+    , ("0 < v_max < 100", (SGt v_max 0) &&& (SLt v_max 100))
+    , ("0 < dist < 1000", (SGt dist 0) &&& (SLt dist 100))
+    , ("0 < s < 100",     (SGt s 0) &&& (SLt s 100))
+    , ("0 < v < v_max",   (SGt v 0) &&& (SLt v v_max))
+    ]
+  , _bindings = Map.fromList $ [ (IC, SConst 0)
+                               , (IR, 0)
+                               , (F Condition, SConst (CBool False))
+                               , (F Halted, SConst (CBool False))
+                               , (F Overflow, SConst (CBool False))
+                               , (Addr 0, SAny "a_max")
+                               , (Addr 1, SAny "v_max")
+                               , (Addr 2, SAny "dist")
+                               , (Addr 3, SAny "s")
+                               , (Addr 4, SAny "v")
+                               ] ++ mkProgram mc_loop
+  , _solution = Nothing
+  }
+  where a_max = SAny "a_max"
+        v_max = SAny "v_max"
+        dist = SAny "dist"
+        s = SAny "s"
+        v = SAny "v"
 
 theorem :: Symbolic (Trace Context)
 theorem = do
@@ -247,6 +262,22 @@ theorem = do
   initialState <- boot mc_loop defaultRegisters mem defaultFlags
 
   liftIO (runModel 1000 initialState)
+
+
+showContext :: Context -> String
+showContext ctx =
+  unlines [ "Path constraint: " <> show (_pathCondition ctx)
+  , showKey ctx IC
+  , showKey ctx IR
+  , showKey ctx (F Condition)
+  , showKey ctx (F Halted)
+  , showKey ctx (Reg R0)
+  , showKey ctx (Reg R1)
+  , showKey ctx (Reg R2)
+  , showKey ctx (Addr 3)
+  , showKey ctx (Addr 4)
+  ]
+
 
 demo :: IO ()
 demo = do

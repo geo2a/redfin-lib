@@ -12,7 +12,7 @@
 -- demonstrate integer overflow detection and functional verification
 
 -----------------------------------------------------------------------------
-module ISA.Example.Add (addLowLevel, initCtx, run, solve)  where
+module ISA.Example.Add (addLowLevel, initCtx)  where
 
 import           Control.Monad.State.Strict
 import           Data.Int                           (Int32)
@@ -78,12 +78,6 @@ initCtx =
                                          ] ++ mkProgram addLowLevel
             , _solution = Nothing
             }
-
-run :: Int -> Context -> IO (Trace Context)
-run steps ctx = runModel steps ctx
-
-solve :: Trace Context -> IO (Trace Context)
-solve = solveTrace
 
 -- symexecTrace :: Int -> Trace Context
 -- symexecTrace steps = runModel steps initCtx
