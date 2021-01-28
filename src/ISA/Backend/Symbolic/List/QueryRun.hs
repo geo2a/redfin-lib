@@ -20,15 +20,18 @@ import           Control.Monad.IO.Class         (MonadIO (..))
 import           Control.Monad.Reader.Class     ()
 import           Control.Monad.State.Class
 import           Control.Monad.State.Strict     (StateT, evalStateT, lift)
+import           Data.Bifunctor                 (first, second)
 import           Data.Functor                   (void)
-import           Data.IORef                     ()
+import           Data.IORef
 import qualified Data.Map.Strict                as Map
 import qualified Data.SBV.Dynamic               as SBV
-import           Data.SBV.Internals             as SBV hiding (NodeId)
+import           Data.SBV.Internals             as SBV hiding (NodeId, solver)
 import qualified Data.SBV.Trans                 as SBV
 import qualified Data.SBV.Trans.Control         as SBV
 import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
+import qualified Data.Text                      as Text
+import           Data.Time.Clock                (NominalDiffTime)
 import           GHC.Stack
 import           Prelude                        hiding (log)
 
@@ -115,8 +118,12 @@ processContext ::
   , SBV.MonadQuery m, SBV.MonadSymbolic m, SolverContext m)
   => Map.Map Text SBV.SInt32 -> Context -> m Context
 processContext vars ctx = SBV.inNewAssertionStack $ do
-  x <- toSMT vars [_pathCondition ctx]
-  SBV.constrain x
+  pc <- toSMT vars [_pathCondition ctx]
+  SBV.constrain pc
+  let names = map fst $ _constraints ctx
+  cs <- mapM (toSMT vars . (:[])) (map snd $ _constraints ctx)
+  -- mapM_ (\(n, c) -> SBV.namedConstraint (Text.unpack n) c) (zip names cs)
+  mapM SBV.constrain cs
   SBV.checkSat >>= \case
     SBV.Unk -> pure $ ctx { _solution = Nothing }
     _ -> SBV.getSMTResult >>= \case
@@ -126,8 +133,15 @@ processContext vars ctx = SBV.inNewAssertionStack $ do
         pure $ ctx { _solution = Just $ SBV.SatResult no }
       _ -> error "not implemented"
 
-runModel :: Int -> Context -> IO (Trace Context)
-runModel steps ctx = SBV.runSMT $ do
-  let freeVars = gatherFree ((_pathCondition ctx) &&& conjoin (map snd $ _constraints ctx))
-  vars <- createSym (Set.toList freeVars)
-  SBV.query (evalStateT (runModelM vars steps ctx) 0)
+runModel :: Int -> Context -> IO (SymExecStats, Trace Context)
+runModel steps ctx = do
+  time <- newIORef 0
+  trace <- SBV.runSMTWith (solver time) $ do
+    let freeVars = gatherFree ((_pathCondition ctx) &&& conjoin (map snd $ _constraints ctx))
+    vars <- createSym (Set.toList freeVars)
+    SBV.query (evalStateT (runModelM vars steps ctx) 0)
+  (,) <$> (MkSymExecStats <$> readIORef time) <*> pure trace
+
+solver :: IORef NominalDiffTime -> SBV.SMTConfig
+solver t = SBV.z3 { SBV.timing = SBV.SaveTiming t
+                  }

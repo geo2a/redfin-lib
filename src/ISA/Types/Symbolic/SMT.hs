@@ -12,8 +12,11 @@
 -----------------------------------------------------------------------------
 
 module ISA.Types.Symbolic.SMT
-    ( -- get the list of free variables in a symbolic expression
-      gatherFree, createSym
+    ( -- statistics after running symbolic execution with solving
+      SymExecStats (..)
+
+      -- get the list of free variables in a symbolic expression
+    , gatherFree, createSym
 
       -- helper functions
     , conjoin
@@ -26,11 +29,15 @@ import qualified Data.SBV.Trans     as SBV
 import qualified Data.Set           as Set
 import           Data.Text          (Text)
 import qualified Data.Text          as Text
+import           Data.Time.Clock    (NominalDiffTime)
 import           Data.Traversable
 import           GHC.Stack
 import           Prelude            hiding (not)
 
 import           ISA.Types.Symbolic
+
+data SymExecStats = MkSymExecStats { _timing :: NominalDiffTime }
+  deriving Show
 
 -- | Walk the constraint gathering up the free variables.
 gatherFree :: Sym -> Set.Set Sym
@@ -106,12 +113,6 @@ conjoinSBV = foldr (\x y -> (SBV..&&) x y) (SBV.sTrue)
 
 conjoin :: [Sym] -> Sym
 conjoin cs = foldr (\x y -> SAnd x y) (SConst (CBool True)) cs
-
-solver :: SBV.SMTConfig
-solver = SBV.z3 { SBV.verbose = True
-                , SBV.redirectVerbose = Just "log.smt2"
-                -- , SBV.printBase = 16
-                }
 
 isSat :: SBV.SatResult -> Bool
 isSat (SBV.SatResult r) = case r of

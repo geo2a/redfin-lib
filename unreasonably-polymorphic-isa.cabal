@@ -50,25 +50,26 @@ library
   hs-source-dirs:
       src
   build-depends:
-      algebraic-graphs,
-      base >=4.7 && <5,
-      constraint,
-      containers,
-      co-log-core,
-      generic-random,
-      generics-sop,
-      haskeline,
-      microlens-platform,
-      mtl,
-      selective,
-      sbv >= 8.6,
-      pretty-simple,
-      text,
-      transformers,
-      QuickCheck,
-      tree-view >= 0.5,
-      megaparsec,
-      parser-combinators
+                QuickCheck,
+                algebraic-graphs,
+                base >=4.7 && <5,
+                co-log-core,
+                constraint,
+                containers,
+                generic-random,
+                generics-sop,
+                haskeline,
+                megaparsec,
+                microlens-platform,
+                mtl,
+                parser-combinators,
+                pretty-simple,
+                sbv >= 8.6,
+                selective,
+                text,
+                time >= 1.8.0.2,
+                transformers,
+                tree-view >= 0.5
   default-extensions: LambdaCase
                     , FlexibleContexts
                     , FlexibleInstances
@@ -100,12 +101,13 @@ test-suite tests
   type:             exitcode-stdio-1.0
 
   build-depends:
-    base            >= 4.7 && < 5,
-    containers,
-    HUnit,
-    QuickCheck,
-    tasty,
-    tasty-hunit,
-    tasty-quickcheck,
-    sbv,
-    unreasonably-polymorphic-isa
+                HUnit,
+                QuickCheck,
+                base            >= 4.7 && < 5,
+                containers,
+                sbv,
+                tasty,
+                tasty-hunit,
+                tasty-quickcheck,
+                time >= 1.8.0.2,
+                unreasonably-polymorphic-isa

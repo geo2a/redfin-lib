@@ -99,18 +99,19 @@ initCtx =
 
 theorem :: Symbolic (Trace Context)
 theorem = do
-  x <- forall "x"
-  y <- forall "y"
-  constrain ("x == 3", const (SEq x 3))
-  constrain ("y == 5", const (SEq y 5))
-  -- constrain ("x == y", const (SEq x y))
-  -- constrain ("No overflow", \ctx -> SNot (fromJust (getBinding (F Overflow) ctx)))
-  let mem = mkMemory [(0, x), (1, y)]
-  initialState <- boot addLowLevel defaultRegisters mem defaultFlags
+  undefined
+  -- x <- forall "x"
+  -- y <- forall "y"
+  -- constrain ("x == 3", const (SEq x 3))
+  -- constrain ("y == 5", const (SEq y 5))
+  -- -- constrain ("x == y", const (SEq x y))
+  -- -- constrain ("No overflow", \ctx -> SNot (fromJust (getBinding (F Overflow) ctx)))
+  -- let mem = mkMemory [(0, x), (1, y)]
+  -- initialState <- boot addLowLevel defaultRegisters mem defaultFlags
 
-  tr <- liftIO $ runModel 10 initialState
-      -- tr' = constrainTrace
-  pure tr
+  -- tr <- liftIO $ runModel 10 initialState
+  --     -- tr' = constrainTrace
+  -- pure tr
 
 demo_add :: IO ()
 demo_add = do

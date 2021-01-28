@@ -245,23 +245,24 @@ initCtx = MkContext
 
 theorem :: Symbolic (Trace Context)
 theorem = do
-  a_max <- forall "a_max"
-  v_max <- forall "v_max"
-  dist <- forall "dist"
-  s <- forall "s"
-  v <- forall "v"
+  undefined
+  -- a_max <- forall "a_max"
+  -- v_max <- forall "v_max"
+  -- dist <- forall "dist"
+  -- s <- forall "s"
+  -- v <- forall "v"
 
 
-  constrain ("0 < a_max < 10", const $ (SGt a_max 0) &&& (SLt a_max 100))
-  constrain ("0 < v_max < 100", const $ (SGt v_max 0) &&& (SLt v_max 100))
-  constrain ("0 < dist < 1000", const $ (SGt dist 0) &&& (SLt dist 100))
-  constrain ("0 < s < 100", const $ (SGt s 0) &&& (SLt s 100))
-  constrain ("0 < v < v_max", const $ (SGt v 0) &&& (SLt v v_max))
+  -- constrain ("0 < a_max < 10", const $ (SGt a_max 0) &&& (SLt a_max 100))
+  -- constrain ("0 < v_max < 100", const $ (SGt v_max 0) &&& (SLt v_max 100))
+  -- constrain ("0 < dist < 1000", const $ (SGt dist 0) &&& (SLt dist 100))
+  -- constrain ("0 < s < 100", const $ (SGt s 0) &&& (SLt s 100))
+  -- constrain ("0 < v < v_max", const $ (SGt v 0) &&& (SLt v v_max))
 
-  let mem = mkMemory [(0, a_max), (1, v_max), (2, dist), (3, s), (4, v)]
-  initialState <- boot mc_loop defaultRegisters mem defaultFlags
+  -- let mem = mkMemory [(0, a_max), (1, v_max), (2, dist), (3, s), (4, v)]
+  -- initialState <- boot mc_loop defaultRegisters mem defaultFlags
 
-  liftIO (runModel 1000 initialState)
+  -- liftIO (runModel 1000 initialState)
 
 
 showContext :: Context -> String

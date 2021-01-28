@@ -109,18 +109,19 @@ initCtx = MkContext
 
 theorem :: Symbolic (Trace Context)
 theorem = do
-  x1 <- forall "x1"
-  x2 <- forall "x2"
-  x3 <- forall "x3"
+  undefined
+  -- x1 <- forall "x1"
+  -- x2 <- forall "x2"
+  -- x3 <- forall "x3"
 
-  constrain ("0 < x1 < 100", const $ (SGt x1 0) &&& (SLt x1 100))
-  constrain ("0 < x2 < 100", const $ (SGt x2 0) &&& (SLt x2 100))
-  constrain ("0 < x3 < 100", const $ (SGt x3 0) &&& (SLt x3 100))
+  -- constrain ("0 < x1 < 100", const $ (SGt x1 0) &&& (SLt x1 100))
+  -- constrain ("0 < x2 < 100", const $ (SGt x2 0) &&& (SLt x2 100))
+  -- constrain ("0 < x3 < 100", const $ (SGt x3 0) &&& (SLt x3 100))
 
-  let mem = mkMemory [(0, 3), (1, x1), (2, x2), (3, x3), (253, 0), (255, 1)]
-  initialState <- boot sumArrayLowLevel defaultRegisters mem defaultFlags
+  -- let mem = mkMemory [(0, 3), (1, x1), (2, x2), (3, x3), (253, 0), (255, 1)]
+  -- initialState <- boot sumArrayLowLevel defaultRegisters mem defaultFlags
 
-  liftIO (runModel 100 initialState)
+  -- liftIO (runModel 100 initialState)
 
 demo_sum :: IO ()
 demo_sum = do
