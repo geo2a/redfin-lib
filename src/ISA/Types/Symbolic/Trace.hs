@@ -16,11 +16,14 @@ module ISA.Types.Symbolic.Trace
     , Node(..), NodeId, lookup
     ) where
 
+import           Data.Aeson                 (FromJSON, ToJSON, defaultOptions,
+                                             genericToEncoding, toEncoding)
 import           Data.Maybe                 (catMaybes, listToMaybe)
 import           Data.Text                  (Text)
 import           Data.Traversable           (forM)
 import qualified Data.Tree                  as Tree
 import qualified Data.Tree.View             as TreeView
+import           GHC.Generics
 import           Prelude                    hiding (lookup)
 
 import           ISA.Types.Symbolic
@@ -31,7 +34,7 @@ type NodeId = Int
 
 data Node s = Node { _nodeId   :: NodeId
                    , _nodeBody :: s
-                   } deriving Functor
+                   } deriving (Functor, Generic)
 
 instance Eq (Node s) where
   x == y = _nodeId x == _nodeId y
@@ -42,9 +45,13 @@ instance Ord (Node s) where
 instance Show (Node s) where
   show node = show (_nodeId node)
 
+instance ToJSON s => ToJSON (Node s) where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON s => FromJSON (Node s) where
+
 -- | Symbolic execution trace
 newtype Trace s = Trace {unTrace :: Tree.Tree (Node s)}
-  deriving (Show, Functor)
+  deriving (Show, Functor, Generic)
 
 instance Foldable Trace where
   foldMap f (Trace tree) = foldMap (f . _nodeBody) tree
@@ -52,6 +59,10 @@ instance Foldable Trace where
 instance Traversable Trace where
   traverse f (Trace tree) =
     Trace <$> traverse (\(Node n b) -> Node n <$> f b) tree
+
+instance ToJSON s => ToJSON (Trace s) where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON s => FromJSON (Trace s) where
 
 -- | Render a trace as an HTML string
 htmlTrace :: (Context -> String) -> Trace Context -> String

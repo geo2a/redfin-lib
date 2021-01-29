@@ -28,6 +28,7 @@ library
       ISA.Semantics,
 
       ISA.Types,
+      ISA.Types.SBV,
       ISA.Types.Instruction,
       ISA.Types.Instruction.Decode,
       ISA.Types.Instruction.Encode,
@@ -51,6 +52,7 @@ library
       src
   build-depends:
                 QuickCheck,
+                aeson >= 1.5.5.1,
                 algebraic-graphs,
                 base >=4.7 && <5,
                 co-log-core,
@@ -103,6 +105,7 @@ test-suite tests
   build-depends:
                 HUnit,
                 QuickCheck,
+                aeson >= 1.5.5.1,
                 base            >= 4.7 && < 5,
                 containers,
                 sbv,

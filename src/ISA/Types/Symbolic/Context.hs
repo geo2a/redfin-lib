@@ -1,16 +1,19 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric  #-}
 
 module ISA.Types.Symbolic.Context
   (Context(..), getBinding, showKey, showIR, isReachable) where
 
+import           Data.Aeson                   (FromJSON, ToJSON, defaultOptions,
+                                               genericToEncoding, toEncoding)
 import qualified Data.Map.Strict              as Map
-import qualified Data.SBV                     as SBV (SMTResult (..),
-                                                      SatResult (..))
+import qualified Data.SBV                     as SBV
 import           Data.Text                    (Text)
 import           GHC.Generics
 
 import           ISA.Types
 import           ISA.Types.Instruction.Decode
+import           ISA.Types.SBV
 import           ISA.Types.Symbolic
 
 -- | A record type for state of the symbolically executed computation
@@ -20,9 +23,13 @@ import           ISA.Types.Symbolic
 data Context = MkContext { _bindings      :: Map.Map Key Sym
                          , _pathCondition :: Sym
                          , _constraints   :: [(Text, Sym)]
-                         , _solution      :: Maybe SBV.SatResult
+                         , _solution      :: Maybe SMTResult
                          }
-  deriving (Generic)
+  deriving Generic
+
+instance ToJSON Context where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON Context where
 
 instance Eq Context where
   x == y = (_bindings x == _bindings y)
@@ -30,9 +37,9 @@ instance Eq Context where
 
 isReachable :: Context -> Bool
 isReachable ctx = case (_solution ctx) of
-  Nothing                                    -> True
-  Just (SBV.SatResult (SBV.Satisfiable _ _)) -> True
-  _                                          -> False
+  Nothing              -> True
+  Just (Satisfiable _) -> True
+  _                    -> False
 
 getBinding :: Key -> Context -> Maybe Sym
 getBinding key ctx = Map.lookup key (_bindings ctx)

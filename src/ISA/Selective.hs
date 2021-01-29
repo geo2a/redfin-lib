@@ -11,7 +11,7 @@
 -----------------------------------------------------------------------------
 
 module ISA.Selective
-    (Prop(..)
+    (Prop(..), elimProp
     , Selective(..), selectM, ifS, whenS
     , S.Over(..)) where
 
@@ -24,6 +24,11 @@ instance Monoid m => Selective (S.Over m) where
 --   or we can't tell
 data Prop a = Trivial Bool
             | Nontrivial a
+            deriving Functor
+
+elimProp :: Monoid a => Prop a -> a
+elimProp = \case Trivial _ -> mempty
+                 Nontrivial x -> x
 
 -- | This flavour of Selective functors dispatches on
 --   an effectful equality check and applies one of the

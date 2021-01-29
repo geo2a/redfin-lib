@@ -49,12 +49,17 @@ import           Data.Word       (Word16, Word8)
 import           Generic.Random
 import           GHC.Generics    (Generic)
 import           Test.QuickCheck (Arbitrary, arbitrary)
+import           Data.Aeson hiding (Value)
 
 import           ISA.Selective
 
 -- | Data registers
 data Register = R0 | R1 | R2 | R3
   deriving (Show, Read, Eq, Ord, Generic)
+
+instance ToJSON Register where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON Register where
 
 instance Arbitrary Register where
   arbitrary = genericArbitrary uniform
@@ -63,6 +68,10 @@ instance Arbitrary Register where
 newtype Address = Address Word8
   deriving (Eq, Ord, Num, Real, Enum, Integral, Bounded, Bits, FiniteBits, Generic)
   deriving (Show, Read) via Word8
+
+instance ToJSON Address where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON Address where
 
 instance Arbitrary Address where
   arbitrary = genericArbitrary uniform
@@ -73,6 +82,10 @@ data Flag = Halted
           | Condition
           | Overflow
   deriving (Show, Read, Eq, Ord, Generic)
+
+instance ToJSON Flag where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON Flag where
 
 instance Arbitrary Flag where
   arbitrary = genericArbitrary uniform
@@ -90,6 +103,10 @@ newtype InstructionCode = InstructionCode Word16
   deriving (Eq, Ord, Num, Bits, FiniteBits, Generic)
   deriving Show via Word16
 
+instance ToJSON InstructionCode where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON InstructionCode where
+
 instance Arbitrary InstructionCode where
   arbitrary = genericArbitrary uniform
 
@@ -98,6 +115,10 @@ newtype Data a = MkData a
   deriving (Functor, Eq, Ord, Num, Enum, Real, Integral
            , Typeable, Bounded, Bits, FiniteBits, Generic)
   deriving Show via a
+
+instance ToJSON a => ToJSON (Data a) where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON a => FromJSON (Data a) where
 
 instance Arbitrary a => Arbitrary (Data a) where
   arbitrary = genericArbitrary uniform
@@ -122,6 +143,13 @@ data Key where
 deriving instance Eq Key
 deriving instance Ord Key
 deriving instance Generic Key
+
+instance ToJSON Key where
+  toEncoding = genericToEncoding defaultOptions
+instance ToJSONKey Key where
+  toJSONKey = genericToJSONKey defaultJSONKeyOptions
+instance FromJSON Key where
+instance FromJSONKey Key where
 
 keyTag :: Key -> String
 keyTag = \case

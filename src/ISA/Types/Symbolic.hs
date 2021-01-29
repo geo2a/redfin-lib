@@ -19,6 +19,8 @@ module ISA.Types.Symbolic
     , getValue, toAddress, toImm, toInstructionCode
     ) where
 
+import           Data.Aeson    (FromJSON, ToJSON, defaultOptions,
+                                genericToEncoding, toEncoding)
 import           Data.Int      (Int32, Int8)
 import           Data.Text     (Text)
 import qualified Data.Text     as Text
@@ -43,6 +45,9 @@ deriving instance Eq Concrete
 deriving instance Ord Concrete
 deriving instance Generic Concrete
 deriving instance Read Concrete
+instance ToJSON Concrete where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON Concrete where
 
 instance Show Concrete where
   show (CInt32 i) = show i
@@ -131,6 +136,9 @@ deriving instance Eq Sym
 deriving instance Ord Sym
 deriving instance Typeable Sym
 deriving instance Generic Sym
+instance ToJSON Sym where
+  toEncoding = genericToEncoding defaultOptions
+instance FromJSON Sym where
 
 instance Show Sym where
     show (SAdd x y) = "(" <> show x <> " + " <> show y <> ")"

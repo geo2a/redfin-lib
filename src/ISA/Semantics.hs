@@ -83,7 +83,8 @@ add reg addr read write =
       result = (+) <$> arg1 <*> arg2
       -- when @result@ is zero we set @Zero@ flag to @true@
   in
-    whenS o (write (F Overflow) (pure true)) *>
+    write (F Overflow) (elimProp <$> o) *>
+    -- select o (const (pure mempty)) (pure id) *>
     write (Reg reg) result
 
 addI :: Register -> Imm a -> FS Key Selective Value a

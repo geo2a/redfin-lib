@@ -29,7 +29,7 @@ import           Data.Kind         (Constraint)
 import           Data.Word         ()
 import           Prelude           hiding (Read, readIO)
 import           Prelude           hiding (Monad, Read, abs, div, mod)
-import GHC.Generics()
+import GHC.Generics
 
 import           ISA.Types
 
