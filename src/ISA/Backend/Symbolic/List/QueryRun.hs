@@ -137,7 +137,7 @@ runModel :: Int -> Context -> IO (SymExecStats, Trace Context)
 runModel steps ctx = do
   time <- newIORef 0
   trace <- SBV.runSMTWith (solver time) $ do
-    let freeVars = gatherFree ((_pathCondition ctx) &&& conjoin (map snd $ _constraints ctx))
+    let freeVars = findFreeVars ctx
     vars <- createSym (Set.toList freeVars)
     SBV.query (evalStateT (runModelM vars steps ctx) 0)
   (,) <$> (MkSymExecStats <$> readIORef time) <*> pure trace

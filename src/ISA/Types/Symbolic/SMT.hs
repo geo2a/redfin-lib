@@ -16,7 +16,10 @@ module ISA.Types.Symbolic.SMT
       SymExecStats (..)
 
       -- get the list of free variables in a symbolic expression
-    , gatherFree, createSym
+    , findFreeVars, gatherFree
+
+    -- declare variables/expressions as symbolic
+    , createSym
 
       -- helper functions
     , conjoin
@@ -24,23 +27,32 @@ module ISA.Types.Symbolic.SMT
     , toSMT
     ) where
 
-import qualified Data.Map.Strict    as Map
-import qualified Data.SBV.Trans     as SBV
-import qualified Data.Set           as Set
-import           Data.Text          (Text)
-import qualified Data.Text          as Text
-import           Data.Time.Clock    (NominalDiffTime)
+import qualified Data.Map.Strict            as Map
+import qualified Data.SBV.Trans             as SBV
+import           Data.Set                   (Set)
+import qualified Data.Set                   as Set
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import           Data.Time.Clock            (NominalDiffTime)
 import           Data.Traversable
 import           GHC.Stack
-import           Prelude            hiding (not)
+import           Prelude                    hiding (not)
 
 import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.Context
 
 data SymExecStats = MkSymExecStats { _timing :: NominalDiffTime }
   deriving Show
 
--- | Walk the constraint gathering up the free variables.
-gatherFree :: Sym -> Set.Set Sym
+-- | Find all free symbolic variables (SAny) in the context
+findFreeVars :: Context -> Set Sym
+findFreeVars ctx =
+  let fromBindings = mconcat . fmap gatherFree . Map.elems $ _bindings ctx
+      fromConstraints = gatherFree . conjoin . map snd $ _constraints ctx
+  in fromBindings <> fromConstraints
+
+-- | Walk through a symbolic expression gathering up the free variables.
+gatherFree :: Sym -> Set Sym
 gatherFree c@(SAny _) = Set.singleton c
 gatherFree (SAdd l r) = gatherFree l <> gatherFree r
 gatherFree (SSub l r) = gatherFree l <> gatherFree r
@@ -105,8 +117,6 @@ symBool vars = \case
   (SOr  l r)         -> (SBV..||) <$> symBool vars l  <*> symBool vars r
   (SNot x  )         -> SBV.sNot  <$> symBool vars x
   _ -> Nothing
-
-
 
 conjoinSBV :: [SBV.SBool] -> SBV.SBool
 conjoinSBV = foldr (\x y -> (SBV..&&) x y) (SBV.sTrue)
