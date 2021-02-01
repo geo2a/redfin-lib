@@ -25,11 +25,7 @@ data Context = MkContext { _bindings      :: Map.Map Key Sym
                          , _constraints   :: [(Text, Sym)]
                          , _solution      :: Maybe SMTResult
                          }
-  deriving Generic
-
-instance ToJSON Context where
-  toEncoding = genericToEncoding defaultOptions
-instance FromJSON Context where
+  deriving (Generic, ToJSON, FromJSON)
 
 instance Eq Context where
   x == y = (_bindings x == _bindings y)

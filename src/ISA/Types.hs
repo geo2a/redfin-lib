@@ -30,7 +30,7 @@ module ISA.Types
     -- ** equality and order checks that may fail
     , TryEq (..), TryOrd(..)
     -- ** Abstraction over possible locations in the ISA
-    , Key(..), keyTag
+    , Key(..), parseKey, keyTag
 
     -- * Classes abstracting values that the ISA model can operate with
     -- ** Booleans
@@ -43,13 +43,20 @@ module ISA.Types
     ) where
 
 import           Data.Bits
+import Data.Bool
+import Control.Monad
+import           Data.Monoid
+import           Data.List (isPrefixOf, isInfixOf)
 import           Data.Int        (Int32, Int8)
+import qualified Data.Text as Text
+import           Text.Read                  (readEither, readMaybe)
 import           Data.Typeable
 import           Data.Word       (Word16, Word8)
 import           Generic.Random
 import           GHC.Generics    (Generic)
 import           Test.QuickCheck (Arbitrary, arbitrary)
 import           Data.Aeson hiding (Value)
+import           Data.Aeson.Types hiding (Value)
 
 import           ISA.Selective
 
@@ -140,6 +147,21 @@ data Key where
   Prog :: Address -> Key
   -- ^ program address
 
+-- | Parse key heuristically: we only need to be able to parse
+--   registers, flags, addresses and IR. If first three options
+--   fail it should be the IR.
+parseKey :: String -> Maybe Key
+parseKey key =
+   getFirst . mconcat . map First $ [ Reg  <$> readMaybe key
+                                    , F    <$> readMaybe key
+                                    , Addr <$> readMaybe key
+                                    , join $ bool Nothing (Just IR) <$>
+                                    (isInfixOf <$> Just "IR" <*> Just key)
+                                    , join $ bool Nothing (Just (Prog 0)) <$>
+                                    (isPrefixOf <$> Just "PROG" <*> Just key)
+                                    , join $ bool Nothing (Just IC) <$>
+                                    (isInfixOf <$> Just "IC" <*> Just key)
+                                    ]
 deriving instance Eq Key
 deriving instance Ord Key
 deriving instance Generic Key
@@ -147,9 +169,16 @@ deriving instance Generic Key
 instance ToJSON Key where
   toEncoding = genericToEncoding defaultOptions
 instance ToJSONKey Key where
-  toJSONKey = genericToJSONKey defaultJSONKeyOptions
+  toJSONKey = toJSONKeyText (Text.pack . show)
 instance FromJSON Key where
+-- instance FromJSONKey Key where
 instance FromJSONKey Key where
+  fromJSONKey = FromJSONKeyTextParser $ \t -> case parseKey (Text.unpack t) of
+    Just k -> pure k
+    Nothing -> fail ("Invalid key: " ++ show t)
+
+-- instance FromJSONKey Key where
+--   fromJSONKey = genericFromJSONKey defaultJSONKeyOptions
 
 keyTag :: Key -> String
 keyTag = \case
@@ -167,7 +196,7 @@ instance Show Key where
         F    flag  -> show flag
         IC         -> "IC"
         IR         -> "IR"
-        Prog addr  -> show addr
+        Prog addr  -> "PROG " <> show addr
 
 class Boolean a where
   toBool  :: a -> Bool
