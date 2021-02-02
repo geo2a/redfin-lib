@@ -37,6 +37,7 @@ library
       ISA.Types.Symbolic.Context,
       ISA.Types.Symbolic.SMT,
       ISA.Types.Symbolic.Trace,
+      ISA.Types.Symbolic.Trace.Property,
       ISA.Types.Symbolic.Parser
 
       ISA.Backend.Symbolic.QueryList,
@@ -58,6 +59,7 @@ library
                 co-log-core,
                 constraint,
                 containers,
+                extra >= 1.7.8,
                 generic-random,
                 generics-sop,
                 haskeline,
@@ -68,6 +70,7 @@ library
                 pretty-simple,
                 sbv >= 8.6,
                 selective,
+                stm >= 2.5.0.0,
                 text,
                 time >= 1.8.0.2,
                 transformers,
@@ -108,7 +111,9 @@ test-suite tests
                 aeson >= 1.5.5.1,
                 base            >= 4.7 && < 5,
                 containers,
+                extra >= 1.7.8,
                 sbv,
+                stm >= 2.5.0.0,
                 tasty,
                 tasty-hunit,
                 tasty-quickcheck,

@@ -146,4 +146,5 @@ runModel steps ctx = do
 
 solver :: IORef NominalDiffTime -> SBV.SMTConfig
 solver t = SBV.z3 { SBV.timing = SBV.SaveTiming t
+                  , SBV.extraArgs = ["parallel.enable=true"]
                   }

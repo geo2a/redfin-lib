@@ -18,6 +18,7 @@ import           Control.Monad.State.Strict
 import           Data.Int                           (Int32)
 import qualified Data.Map                           as Map
 import           Data.Maybe                         (fromJust)
+import qualified Data.Set                           as Set
 import qualified Data.Tree                          as Tree
 
 import           ISA.Assembly
@@ -34,6 +35,7 @@ import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Context
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Symbolic.Trace
+import           ISA.Types.Symbolic.Trace.Property
 
 addLowLevel :: Script
 addLowLevel = do
@@ -115,43 +117,27 @@ theorem = do
 
 demo_add :: IO ()
 demo_add = do
-  tr <- runSymbolic theorem
+  tr <- snd <$> runModel 10 initCtx
+  let x = SAny "x"
+      y = SAny "y"
+      cs = (ConstrainBy . Set.fromList $ [ SGt x 0 &&& SLt x 100000
+                                         -- , SGt y 0 &&& SLt y 100000
+                                         ])
+  -- mapM_ putStr$ fmap (\(Node n ctx) -> showContext ctx) (unTrace tr)
+  let correct = formulate
+        (InLeafs (Reg R0) (\v -> (SEq v (x + y)))) tr
+      noOverflow = formulate
+        (InWhole (F Overflow) id) tr
+      t = noOverflow
+  case t of
+    Left err  -> print err
+    Right thm -> do
+      prove thm cs
   -- solved <- solveTrace (fst tr)
   -- let cs = fmap (\(Node _ s ctx) -> showContext ctx) (unTrace (fst tr))
-  let z = fmap (\(Node _ ctx) -> showContext ctx) (unTrace . fst $ tr)
-  mapM putStrLn z
+  -- let z = fmap (\(Node _ ctx) -> showContext ctx) (unTrace . fst $ tr)
+  -- mapM putStrLn z
   -- let tr' = fmap solveContext (fst tr)
   -- let z = Tree.foldTree (\(Node c s) xs -> s : concat xs) (unTrace tr')
+
   pure ()
-
--- demo_add :: IO ()
--- demo_add = do
---   -- let ctx = MkContext { _pathCondition = SConst (CBool True)
---   -- let program = [(0, Instruction $ Add R0 0)]
---   --     dataGraph =
---   --       fromJust $ programDataGraph (program :: [(Address, Instruction (Data Int32))])
---   -- -- putStrLn "Data dependencies: "
---   -- -- print (dependencies (instructionSemantics (snd . head $ program :: Instruction (Data Int32))))
---   -- putStrLn ""
---   putStrLn "Symbolic execution tree: "
-
---   let t = runModel 1000 initCtx
---       tracePath = "/home/geo2a/Desktop/traces/trace_add.html"
---   writeTraceHtmlFile showContext tracePath t
---   putStrLn $ "Wrote trace into file " <> tracePath
-
---   let ps = map (map nodeBody) $ paths (unTrace t)
---   --     leaves = map (last . map nodeBody) $ paths (unTrace t)
---   --     ps' = map solvePath ps
---   --     overflownPaths = filter id $ map (all isSat) ps'
---   -- print $ ps'
---   -- print overflownPaths
---   -- Ok, it's kinda working, but not really: job for tomorrow is
---   -- to find out a good way to establish preconditions
---   -- if all id ps'' then
---   --   putStrLn "Yes"
---   --   else putStrLn "No"
---   -- print $ map solveContext leaves
-
---   -- debugConsole 10 ctx
---   pure ()

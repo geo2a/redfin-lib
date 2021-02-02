@@ -14,6 +14,7 @@
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic.Trace
     ( Trace(..), mkTrace, subsetTrace, traceDepth, htmlTrace, writeTraceHtmlFile
+    , leafs
     , Path, paths, constrainTrace
     , Node(..), NodeId, lookup
     ) where
@@ -21,8 +22,11 @@ module ISA.Types.Symbolic.Trace
 import           Data.Aeson                 (FromJSON, ToJSON, defaultOptions,
                                              genericToEncoding, toEncoding)
 import           Data.Maybe                 (catMaybes, listToMaybe)
+import           Data.Set                   (Set)
+import qualified Data.Set                   as Set
 import           Data.Text                  (Text)
 import           Data.Traversable           (forM)
+import           Data.Tree                  (Tree)
 import qualified Data.Tree                  as Tree
 import qualified Data.Tree.View             as TreeView
 import           GHC.Generics
@@ -89,6 +93,20 @@ traceDepth = length . Tree.flatten . unTrace
 subsetTrace :: (s -> Bool) -> Trace s -> [Node s]
 subsetTrace property (Trace tree) =
     foldMap (\s -> if property (_nodeBody s) then [s] else []) tree
+
+-- leafs :: Ord s => Trace s -> Set (Node s)
+-- leafs (Trace tree) = go mempty tree
+--   where
+--     go acc tree =
+--           case Tree.subForest tree of
+--             [] -> Set.insert (Tree.rootLabel tree) acc
+--             xs -> mconcat (map (go acc) xs)
+
+leafs :: Trace s -> [Node s]
+leafs (Trace tree) =
+  case Tree.levels tree of
+    [] -> []
+    xs -> last xs
 
 type Path s = [s]
 

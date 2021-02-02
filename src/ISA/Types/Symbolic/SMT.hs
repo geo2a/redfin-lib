@@ -90,7 +90,7 @@ toSMT vars cs = do
   where process [] = []
         process (x:xs) =
           case x of
-            Nothing -> error $ show x
+            Nothing -> process xs
             Just y  -> y:process xs
 
 symInt32 :: (Map.Map Text SBV.SInt32) -> Sym -> Maybe SBV.SInt32

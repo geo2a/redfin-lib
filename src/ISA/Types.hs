@@ -47,6 +47,8 @@ import Data.Bool
 import Control.Monad
 import           Data.Monoid
 import           Data.List (isPrefixOf, isInfixOf)
+import Prelude hiding (not)
+import qualified Prelude
 import           Data.Int        (Int32, Int8)
 import qualified Data.Text as Text
 import           Text.Read                  (readEither, readMaybe)
@@ -201,6 +203,8 @@ instance Show Key where
 class Boolean a where
   toBool  :: a -> Bool
   true    :: a
+  false   :: a
+  false = ISA.Types.not true
   not     :: a -> a
 
   (|||)   :: a -> a -> a
