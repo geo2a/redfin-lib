@@ -1,20 +1,61 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module ISA.Types.Symbolic.Parser (parseSym) where
+module ISA.Types.Symbolic.Parser (parseSym, parseProp) where
 
 import           Control.Monad.Combinators.Expr
-import           Data.Text                      (Text)
-import qualified Data.Text                      as Text
+import           Data.Text                         (Text)
+import qualified Data.Text                         as Text
 import           Data.Void
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer     as L
+import qualified Text.Megaparsec.Char.Lexer        as L
 
+import           ISA.Types
 import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.Trace.Property
 
 parseSym :: String -> Text -> Either Text Sym
 parseSym symName = either (Left . Text.pack . errorBundlePretty) (Right . id)
          . parse pSym symName
+
+parseProp :: String -> Text -> Either Text Property
+parseProp propName =
+  either (Left . Text.pack . errorBundlePretty) (Right . id)
+  . parse pProp propName
+
+pProp :: Parser Property
+pProp = symbol "whole" *>
+        (InWhole <$> pValidity <*> pKey <*> pPredicate)
+        <|>
+        symbol "leafs" *>
+        (InLeafs <$> pValidity <*> pKey <*> pPredicate)
+
+pValidity :: Parser Validity
+pValidity = (symbol "allsat" *> pure AllSat)
+        <|> (symbol "allunsat" *> pure AllUnsat)
+
+pPredicate :: Parser (Sym -> Sym)
+pPredicate = do
+  (SAny var) <- char '\\' *> pSAny
+  symbol "->"
+  property <- pSym
+  pure (\expr -> subst expr var property)
+
+pKey :: Parser Key
+pKey = Reg <$> pReg
+   <|> F   <$> pFlag
+
+pReg :: Parser Register
+pReg = (symbol "R0" *> pure R0)
+   <|> (symbol "R1" *> pure R1)
+   <|> (symbol "R2" *> pure R2)
+   <|> (symbol "R3" *> pure R3)
+   <?> "register"
+
+pFlag :: Parser Flag
+pFlag = (symbol "Halted" *> pure Halted)
+    <|> (symbol "Overflow " *> pure Overflow)
+    <?> "flag"
 
 --------------------------------------------------------------------------------
 type Parser = Parsec Void Text

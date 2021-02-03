@@ -55,10 +55,12 @@ library
                 QuickCheck,
                 aeson >= 1.5.5.1,
                 algebraic-graphs,
+                async >= 2.2.2,
                 base >=4.7 && <5,
                 co-log-core,
                 constraint,
                 containers,
+                deepseq >= 1.4.4.0,
                 extra >= 1.7.8,
                 generic-random,
                 generics-sop,
@@ -74,7 +76,8 @@ library
                 text,
                 time >= 1.8.0.2,
                 transformers,
-                tree-view >= 0.5
+                tree-view >= 0.5,
+                hint
   default-extensions: LambdaCase
                     , FlexibleContexts
                     , FlexibleInstances
@@ -109,8 +112,10 @@ test-suite tests
                 HUnit,
                 QuickCheck,
                 aeson >= 1.5.5.1,
+                async >= 2.2.2,
                 base            >= 4.7 && < 5,
                 containers,
+                deepseq >= 1.4.4.0,
                 extra >= 1.7.8,
                 sbv,
                 stm >= 2.5.0.0,

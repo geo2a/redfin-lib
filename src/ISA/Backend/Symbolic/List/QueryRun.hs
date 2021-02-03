@@ -129,8 +129,9 @@ processContext vars ctx = SBV.inNewAssertionStack $ do
   SBV.checkSat >>= \case
     SBV.Unk -> pure $ ctx { _solution = Nothing }
     _ -> SBV.getSMTResult >>= \case
-      (SBV.Satisfiable _ yes) ->
-        pure $ ctx { _solution = (Just . Satisfiable . MkSMTModel $ SBV.modelAssocs yes) }
+      (SBV.Satisfiable _ yes) -> do
+        values <- traverse SBV.getValue vars
+        pure $ ctx { _solution = (Just . Satisfiable . MkSMTModel $ values) }
       (SBV.Unsatisfiable _ _) ->
         pure $ ctx { _solution = Just $ Unsatisfiable }
       _ -> error "not implemented"

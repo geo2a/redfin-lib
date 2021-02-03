@@ -123,14 +123,4 @@ conjoinSBV = foldr (\x y -> (SBV..&&) x y) (SBV.sTrue)
 
 conjoin :: [Sym] -> Sym
 conjoin cs = foldr (\x y -> SAnd x y) (SConst (CBool True)) cs
-
-isSat :: SBV.SatResult -> Bool
-isSat (SBV.SatResult r) = case r of
-  (SBV.Satisfiable _ _) -> True
-  _                     -> False
-
-isUnsat :: SBV.SatResult -> Bool
-isUnsat (SBV.SatResult r) = case r of
-  (SBV.Unsatisfiable _ _) -> True
-  _                       -> False
 ------------------------ -----------------------------------------------------

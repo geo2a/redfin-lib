@@ -14,7 +14,7 @@
 --
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic
-    ( Concrete(..), Sym (..), simplify, trySolve
+    ( Concrete(..), Sym (..), subst, simplify, trySolve
     -- try to concertise symbolic values
     , getValue, toAddress, toImm, toInstructionCode
     ) where
@@ -242,6 +242,24 @@ instance Addressable (Data Sym) where
 
 
 -----------------------------------------------------------------------------
+-- | Substitute a variable named @name with @expr
+subst :: Sym -> Text -> Sym -> Sym
+subst expr name = \case
+  n@(SAny var) -> if var == name then expr else n
+  n@(SConst _) -> n
+  (SAdd p q) -> SAdd (subst expr name p) (subst expr name q)
+  (SSub p q) -> SSub (subst expr name p) (subst expr name q)
+  (SMul p q) -> SMul (subst expr name p) (subst expr name q)
+  (SDiv p q) -> SDiv (subst expr name p) (subst expr name q)
+  (SMod p q) -> SMod (subst expr name p) (subst expr name q)
+  (SAbs x  ) -> SAbs (subst expr name x)
+  (SAnd p q) -> SAnd (subst expr name p) (subst expr name q)
+  (SOr  p q) -> SOr  (subst expr name p) (subst expr name q)
+  (SNot x  ) -> SNot (subst expr name x)
+  (SEq  p q) -> SEq (subst expr name p) (subst expr name q)
+  (SGt  p q) -> SGt (subst expr name p) (subst expr name q)
+  (SLt  p q) -> SLt (subst expr name p) (subst expr name q)
+
 -- | Try to perform constant folding and get the resulting value. Return 'Nothing' on
 --   encounter of a symbolic variable.
 getValue :: Sym -> Maybe Concrete

@@ -33,6 +33,7 @@ import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Context
+import           ISA.Types.Symbolic.Parser
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Symbolic.Trace
 import           ISA.Types.Symbolic.Trace.Property
@@ -120,19 +121,22 @@ demo_add = do
   tr <- snd <$> runModel 10 initCtx
   let x = SAny "x"
       y = SAny "y"
-      cs = (ConstrainBy . Set.fromList $ [ SGt x 0 &&& SLt x 100000
-                                         -- , SGt y 0 &&& SLt y 100000
-                                         ])
+      cs = (ConstrainBy $ [ SGt x 0 &&& SLt x 100000
+                          , SGt y 0 &&& SLt y 100000
+                          ])
   -- mapM_ putStr$ fmap (\(Node n ctx) -> showContext ctx) (unTrace tr)
-  let correct = formulate
-        (InLeafs (Reg R0) (\v -> (SEq v (x + y)))) tr
-      noOverflow = formulate
-        (InWhole (F Overflow) id) tr
-      t = noOverflow
+  let prop1 = either undefined id $ parseProp "correct" "leafs allsat R0 \\v -> v == x + y"
+      prop2 = either undefined id $
+                parseProp "noOver" "whole allunsat Overflow \\v -> v"
+  let correct = formulate prop1 tr
+      noOverflow = formulate prop2 tr
+        -- (InWhole (AllUnsat) (F Overflow) id) tr
+      t = correct -- noOverflow
   case t of
     Left err  -> print err
     Right thm -> do
-      prove thm cs
+      print thm
+      print =<< prove thm cs
   -- solved <- solveTrace (fst tr)
   -- let cs = fmap (\(Node _ s ctx) -> showContext ctx) (unTrace (fst tr))
   -- let z = fmap (\(Node _ ctx) -> showContext ctx) (unTrace . fst $ tr)
