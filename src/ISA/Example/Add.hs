@@ -124,19 +124,26 @@ demo_add = do
 
 
   -- mapM_ putStr$ fmap (\(Node n ctx) -> showContext ctx) (unTrace tr)
-  let noOverflow =
-        -- formulate (AllG . Atom $
-        --            (\ctx -> maybe undefined id
-        --                   . getBinding (F Overflow) $ ctx)) tra
+  let overflow =
         formulate (EG . Atom $
                    (\ctx -> maybe undefined id
                           . getBinding (F Overflow) $ ctx)) tr
-  -- print (tryFoldConstant (subst 2 "y" (subst 3 "x" noOverflow)))
-  mapM_ (putStrLn . show) =<< prove noOverflow
-                  (ConstrainedBy $ [ (SAny "x" `SGt` 0) &&& (SAny "x" `SLt` 1000)
-                                   , (SAny "y" `SGt` 0) &&& (SAny "y" `SLt` 1000)
-                                   ]
-                  )
+      noOverflow = formulate (AllG . Not . Atom $
+                   (\ctx -> maybe undefined id
+                          . getBinding (F Overflow) $ ctx)) tr
+      correct = formulate (AllF . Atom $
+                (\ctx -> SEq (SAdd (SAny "x") (SAny "y")) . maybe undefined id
+                       . getBinding (Reg R0) $ ctx)) tr
+  let phi = noOverflow
+
+  print (getTheorem phi)
+  ans <- prove phi $
+         ConstrainedBy $ [ (SAny "x" `SGt` 0) &&& (SAny "x" `SLt` 1000)
+                         -- , (SAny "y" `SGt` 0) &&& (SAny "y" `SLt` 1000)
+                         ]
+
+  mapM (putStrLn . show) ans
+  print (check ans phi)
   -- let prop1 = either undefined id $ parseProp "correct" "leafs allsat R0 \\v -> v == x + y"
   --     prop2 = either undefined id $
   --               parseProp "noOver" "whole allunsat Overflow \\v -> v"
@@ -154,6 +161,7 @@ demo_add = do
   -- let z = fmap (\(Node _ ctx) -> showContext ctx) (unTrace . fst $ tr)
   -- mapM putStrLn z
   -- let tr' = fmap solveContext (fst tr)
+
   -- let z = Tree.foldTree (\(Node c s) xs -> s : concat xs) (unTrace tr')
 
   pure ()

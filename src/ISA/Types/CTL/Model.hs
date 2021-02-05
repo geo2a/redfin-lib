@@ -3,17 +3,21 @@
 {-# LANGUAGE TupleSections     #-}
 
 module ISA.Types.CTL.Model
-  ( Theorem(..), SolverTask(..)
-  , formulate, Constraints(..), prove) where
+  ( Theorem(..), SolverTask(..), atomicTasks
+  , formulate, Constraints(..), prove, check) where
 
 -- module ISA.Types.CTL.Model where
 
-import           Control.Concurrent.STM
+import           Control.Concurrent.STM        hiding (check)
 import           Control.Concurrent.STM.TQueue
+import           Control.Monad                 (join)
 import           Control.Monad.IO.Class
 import           Data.Aeson                    (FromJSON, ToJSON)
+import           Data.Bifunctor
+import           Data.List                     (partition)
 import           Data.Map                      (Map)
 import qualified Data.Map                      as Map
+import           Data.Maybe                    (isJust)
 import           Data.Monoid
 import qualified Data.SBV                      as SBV
 import qualified Data.SBV.Control              as SBV
@@ -24,6 +28,7 @@ import qualified Data.Text                     as Text
 import           Data.Traversable
 import           Data.Tree                     (Tree)
 import qualified Data.Tree                     as Tree
+import qualified Debug.Trace                   as Bug
 import           GHC.Generics
 import           Numeric.Natural
 
@@ -102,10 +107,10 @@ showCTL init = \case
 --   show (MkTheorem exprs) = unlines $
 --     map (show . _nodeBody) . Set.toList $ exprs
 
--- -- | Result of @Theorem proving
--- data Proof = Proved Theorem
---            | Falsifiable Theorem (NodeId, SMTResult)
---            deriving (Generic, ToJSON, FromJSON)
+-- | Result of @Theorem proving
+data Proof = Proved Text
+           | Falsifiable Text (Text, SMTResult)
+           deriving (Generic, ToJSON, FromJSON)
 
 -- instance Show Proof where
 --   show = \case
@@ -167,7 +172,7 @@ scheduleImpl env finished results = \case
   where
     scheduleSingle :: (Text, Sym) -> SolverTask (SBV.Query (Maybe Bool))
     scheduleSingle (n, expr) = Atomic . (n,) $
-      groupQuery env finished results (Text.pack (show n), expr)
+      groupQuery env finished results (n, expr)
 
     -- | If the task only has atomic subtasks
     scheduleList :: Op -> [(Text, Sym)] -> SolverTask (SBV.Query (Maybe Bool))
@@ -182,24 +187,34 @@ scheduleImpl env finished results = \case
         Disj -> Compound Disj $ map scheduleSingle atoms
 
 schedule :: TVar (Map Text SBV.SInt32) -> TVar Int -> TQueue (Text, Maybe SMTResult)
-          -> SolverTask Sym -> [(Text, SBV.Query (Maybe Bool))]
+          -> SolverTask Sym -> SolverTask (SBV.Query (Maybe Bool))
 schedule env finished results =
-  atomicTasks . scheduleImpl env finished results
+  scheduleImpl env finished results
 
-prove :: Theorem -> Constraints -> IO [(Text, Maybe SMTResult)]
+check :: Map Text SMTResult -> Theorem -> Maybe Bool
+check answers (MkTheorem task) = checkImpl answers task
+  where
+    checkImpl answers = \case
+      Atomic (name, _)    -> isSat <$> Map.lookup name answers
+      Compound Conj tasks -> all id <$> traverse (checkImpl answers) tasks
+      Compound Disj tasks -> any id <$> traverse (checkImpl answers) tasks
+
+-- prove :: Theorem -> Constraints -> IO (Maybe Bool)
+prove :: Theorem -> Constraints -> IO (Map Text SMTResult)
 prove thm@(MkTheorem task) cs = do
   env <- newTVarIO (Map.empty)
   results <- newTQueueIO
   finishedCount <- newTVarIO 0
-  let qs = schedule env finishedCount results task
+  let qs = atomicTasks $ schedule env finishedCount results task
   _ <- SBV.satConcurrentWithAll SBV.z3 (map snd qs) (prepare env cs thm)
-  atomically $ do
+  answers <- atomically $ do
     finished <- (== size task) <$> readTVar finishedCount
     case finished of
-      True  -> flushTQueue results
+      True  -> Map.fromList <$> flushTQueue results
       False -> retry
   -- let solved = map (second (maybe unknownFatal id)) $ answers
   --     (sats, unsats) = partition (isSat . snd) solved
+  pure $ fmap (maybe Unsatisfiable id) answers
   -- pure $
   --   case validity of
   --     AllSat ->
@@ -211,35 +226,6 @@ prove thm@(MkTheorem task) cs = do
   --         []    -> Proved thm
   --         (x:_) -> Falsifiable thm x
   where unknownFatal = error "Impossible happened: prover said unknown!"
-
--- | Prove a theorem under constraints.
---   Concurrently run several solvers
--- prove :: Theorem -> Constraints -> IO [(NodeId, Maybe SMTResult)]
--- prove thm@(MkTheorem exprs) cs = do
---   env <- newTVarIO (Map.empty)
---   results <- newTQueueIO
---   finishedCount <- newTVarIO 0
---   let qs = fmap (nodeQuery env finishedCount results) exprs
---   _ <- SBV.satConcurrentWithAll SBV.z3 qs (prepare env cs thm)
---   atomically $ do
---     finished <- (== length exprs) <$> readTVar finishedCount
---     case finished of
---       True  -> flushTQueue results
---       False -> retry
---   -- let solved = map (second (maybe unknownFatal id)) $ answers
---   --     (sats, unsats) = partition (isSat . snd) solved
---   -- pure $
---   --   case validity of
---   --     AllSat ->
---   --       case unsats of
---   --         []    -> Proved thm
---   --         (x:_) -> Falsifiable thm x
---   --     AllUnsat ->
---   --       case sats of
---   --         []    -> Proved thm
---   --         (x:_) -> Falsifiable thm x
---   where unknownFatal = error "Impossible happened: prover said unknown!"
-
 
 -- | Prepare the shared proving environment:
 --   * Gather free symbolic variables (@SAny) from the theorem statement
@@ -260,10 +246,11 @@ nodeQuery env finished results (Node n expr) = do
   SBV.constrain =<< toSMT vars [expr]
   SBV.checkSat >>= \case
     SBV.Unk -> do
-      liftIO . atomically $ do
-        writeTQueue results $ (n, Nothing)
-        modifyTVar finished (+1)
-      pure Nothing
+      error "Impossible happened: prover said unknown!"
+      -- liftIO . atomically $ do
+      --   writeTQueue results $ (n, Nothing)
+      --   modifyTVar finished (+1)
+      -- pure Nothing
     _ -> SBV.getSMTResult >>= \case
       (SBV.Satisfiable _ yes) -> do
         values <- traverse SBV.getValue vars

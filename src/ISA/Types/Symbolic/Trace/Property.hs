@@ -34,11 +34,13 @@ import           GHC.Generics
 import           Prelude                    hiding (not)
 
 import           ISA.Types
+import           ISA.Types.CTL
 import           ISA.Types.SBV
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Context
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Symbolic.Trace
+
 
 data Validity = AllSat | AllUnsat
   deriving (Show, Generic, ToJSON, FromJSON)

@@ -24,7 +24,7 @@ instance Monoid m => Selective (S.Over m) where
 --   or we can't tell
 data Prop a = Trivial Bool
             | Nontrivial a
-            deriving Functor
+            deriving (Show, Functor)
 
 elimProp :: Monoid a => Prop a -> a
 elimProp = \case Trivial _ -> mempty

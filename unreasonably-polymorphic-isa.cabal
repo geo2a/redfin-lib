@@ -28,6 +28,8 @@ library
       ISA.Semantics,
 
       ISA.Types,
+      ISA.Types.CTL,
+      ISA.Types.CTL.Model,
       ISA.Types.SBV,
       ISA.Types.Instruction,
       ISA.Types.Instruction.Decode,

@@ -12,11 +12,13 @@
 module ISA.Semantics
     ( instructionSemanticsS
     , instructionSemanticsM
+    , willOverflowPure
     ) where
 
 import           Prelude               hiding (Monad, abs, div, mod)
 import qualified Prelude               (Monad, abs, div, mod)
 
+import           Data.Int
 import           FS
 import           ISA.Selective
 import           ISA.Types
