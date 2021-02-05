@@ -14,13 +14,15 @@
 --
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic
-    ( Concrete(..), Sym (..), subst, simplify, trySolve
+    ( Concrete(..), Sym (..), conjoin, disjoin
+      , subst, simplify, trySolve
     -- try to concertise symbolic values
-    , getValue, toAddress, toImm, toInstructionCode
+    , getValue, tryFoldConstant, tryReduce, toAddress, toImm, toInstructionCode
     ) where
 
 import           Data.Aeson    (FromJSON, ToJSON, defaultOptions,
                                 genericToEncoding, toEncoding)
+import           Data.Foldable
 import           Data.Int      (Int32, Int8)
 import           Data.Text     (Text)
 import qualified Data.Text     as Text
@@ -240,7 +242,11 @@ instance Addressable (Data Sym) where
       Left _     -> Nothing
       Right addr -> Just addr
 
+conjoin :: [Sym] -> Sym
+conjoin cs = foldl' SAnd true cs
 
+disjoin :: [Sym] -> Sym
+disjoin cs = foldl' SOr false cs
 -----------------------------------------------------------------------------
 -- | Substitute a variable named @name with @expr
 subst :: Sym -> Text -> Sym -> Sym

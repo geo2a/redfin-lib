@@ -120,7 +120,4 @@ symBool vars = \case
 
 conjoinSBV :: [SBV.SBool] -> SBV.SBool
 conjoinSBV = foldr (\x y -> (SBV..&&) x y) (SBV.sTrue)
-
-conjoin :: [Sym] -> Sym
-conjoin cs = foldr (\x y -> SAnd x y) (SConst (CBool True)) cs
 ------------------------ -----------------------------------------------------

@@ -28,6 +28,8 @@ import           ISA.Backend.Symbolic.QueryList
 import           ISA.Backend.Symbolic.List.QueryRun
 import           ISA.Example.Common
 import           ISA.Types
+import           ISA.Types.CTL
+import           ISA.Types.CTL.Model
 import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
@@ -36,7 +38,6 @@ import           ISA.Types.Symbolic.Context
 import           ISA.Types.Symbolic.Parser
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Symbolic.Trace
-import           ISA.Types.Symbolic.Trace.Property
 
 addLowLevel :: Script
 addLowLevel = do
@@ -119,24 +120,35 @@ theorem = do
 demo_add :: IO ()
 demo_add = do
   tr <- snd <$> runModel 10 initCtx
-  let x = SAny "x"
-      y = SAny "y"
-      cs = (ConstrainBy $ [ SGt x 0 &&& SLt x 100000
-                          , SGt y 0 &&& SLt y 100000
-                          ])
+
+
+
   -- mapM_ putStr$ fmap (\(Node n ctx) -> showContext ctx) (unTrace tr)
-  let prop1 = either undefined id $ parseProp "correct" "leafs allsat R0 \\v -> v == x + y"
-      prop2 = either undefined id $
-                parseProp "noOver" "whole allunsat Overflow \\v -> v"
-  let correct = formulate prop1 tr
-      noOverflow = formulate prop2 tr
-        -- (InWhole (AllUnsat) (F Overflow) id) tr
-      t = correct -- noOverflow
-  case t of
-    Left err  -> print err
-    Right thm -> do
-      print thm
-      print =<< prove thm cs
+  let noOverflow =
+        -- formulate (AllG . Atom $
+        --            (\ctx -> maybe undefined id
+        --                   . getBinding (F Overflow) $ ctx)) tra
+        formulate (EG . Atom $
+                   (\ctx -> maybe undefined id
+                          . getBinding (F Overflow) $ ctx)) tr
+  -- print (tryFoldConstant (subst 2 "y" (subst 3 "x" noOverflow)))
+  mapM_ (putStrLn . show) =<< prove noOverflow
+                  (ConstrainedBy $ [ (SAny "x" `SGt` 0) &&& (SAny "x" `SLt` 1000)
+                                   , (SAny "y" `SGt` 0) &&& (SAny "y" `SLt` 1000)
+                                   ]
+                  )
+  -- let prop1 = either undefined id $ parseProp "correct" "leafs allsat R0 \\v -> v == x + y"
+  --     prop2 = either undefined id $
+  --               parseProp "noOver" "whole allunsat Overflow \\v -> v"
+  -- let correct = formulate prop1 tr
+  --     noOverflow = formulate prop2 tr
+  --       -- (InWhole (AllUnsat) (F Overflow) id) tr
+  --     t = correct -- noOverflow
+  -- case t of
+  --   Left err  -> print err
+  --   Right thm -> do
+  --     print thm
+  --     print =<< prove thm cs
   -- solved <- solveTrace (fst tr)
   -- let cs = fmap (\(Node _ s ctx) -> showContext ctx) (unTrace (fst tr))
   -- let z = fmap (\(Node _ ctx) -> showContext ctx) (unTrace . fst $ tr)

@@ -2,7 +2,8 @@
 {-# LANGUAGE DeriveGeneric  #-}
 
 module ISA.Types.Symbolic.Context
-  (Context(..), getBinding, showKey, showIR, isReachable) where
+  ( Context(..), emptyCtx
+  , getBinding, showKey, showIR, isReachable) where
 
 import           Data.Aeson                   (FromJSON, ToJSON, defaultOptions,
                                                genericToEncoding, toEncoding)
@@ -26,6 +27,9 @@ data Context = MkContext { _bindings      :: Map.Map Key Sym
                          , _solution      :: Maybe SMTResult
                          }
   deriving (Generic, ToJSON, FromJSON)
+
+emptyCtx :: Context
+emptyCtx = MkContext Map.empty false [] Nothing
 
 instance Eq Context where
   x == y = (_bindings x == _bindings y)

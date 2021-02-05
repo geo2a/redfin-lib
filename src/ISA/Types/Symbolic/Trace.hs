@@ -13,10 +13,12 @@
 --
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic.Trace
-    ( Trace(..), mkTrace, subsetTrace, traceDepth, htmlTrace, writeTraceHtmlFile
-    , leafs
+    ( Trace(..), mkTrace
+    , initial, leafs, nodes
+    , subsetTrace, traceDepth
     , Path, paths, constrainTrace
     , Node(..), NodeId, lookup
+    , htmlTrace, writeTraceHtmlFile
     ) where
 
 import           Data.Aeson                 (FromJSON, ToJSON, defaultOptions,
@@ -53,7 +55,14 @@ instance Show (Node s) where
 
 -- | Symbolic execution trace
 newtype Trace s = Trace {unTrace :: Tree.Tree (Node s)}
-  deriving (Show, Functor, Generic, ToJSON, FromJSON)
+  deriving (Functor, Generic, ToJSON, FromJSON)
+
+-- | The root of a trace
+initial :: Trace s -> Node s
+initial (Trace tree) = Tree.rootLabel tree
+
+instance Show a => Show (Trace a) where
+  show (Trace tree) = Tree.drawTree (fmap (show . _nodeBody) tree)
 
 instance Foldable Trace where
   foldMap f (Trace tree) = foldMap (f . _nodeBody) tree
@@ -94,13 +103,8 @@ subsetTrace :: (s -> Bool) -> Trace s -> [Node s]
 subsetTrace property (Trace tree) =
     foldMap (\s -> if property (_nodeBody s) then [s] else []) tree
 
--- leafs :: Ord s => Trace s -> Set (Node s)
--- leafs (Trace tree) = go mempty tree
---   where
---     go acc tree =
---           case Tree.subForest tree of
---             [] -> Set.insert (Tree.rootLabel tree) acc
---             xs -> mconcat (map (go acc) xs)
+nodes :: Trace s -> [Node s]
+nodes = subsetTrace (const True)
 
 leafs :: Trace s -> [Node s]
 leafs (Trace tree) =
