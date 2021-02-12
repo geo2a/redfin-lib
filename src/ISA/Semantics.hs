@@ -18,23 +18,16 @@ module ISA.Semantics
 import           Prelude               hiding (Monad, abs, div, mod)
 import qualified Prelude               (Monad, abs, div, mod)
 
+import           Control.Selective     hiding (whenS)
 import           Data.Int
 import           FS
-import           ISA.Selective
+import           ISA.Selective         (Prop (..), elimProp)
 import           ISA.Types
 import           ISA.Types.Instruction
+import           ISA.Types.Symbolic
 
 type Monad f = (Selective f, Prelude.Monad f)
 
------------------------------------------------------------------------------
--- -- | A valiant of 'Control.Selective.whenS' which, instead of returning @()@,
--- --   gives back the value of type @a@ on @True@ or @mempty@ on @False@.
--- --   This is essential to avoid redoing work just to make some semantics type-check.
--- whenS' :: (Selective f, Monoid a) => f Bool -> f a -> f a
--- whenS' x y = selector <*? effect
---   where
---     selector = bool (Right mempty) (Left ()) <$> x -- NB: maps True to Left ()
---     effect   = const                         <$> y
 -----------------------------------------------------------------------------
 -----------------------------------------------------------------------------
 --------------- Semantics of instructions -----------------------------------
@@ -140,30 +133,42 @@ abs reg read write =
 -- | Compare the values in the register and memory cell
 cmpEq :: Register -> Address -> FS Key Selective Value a
 cmpEq reg addr = \read write ->
-    whenS ((===) <$> read (Reg reg) <*> read (Addr addr))
-          (write (F Condition) (pure true))
+  write (F Condition) (elimProp <$> ((===) <$> read (Reg reg) <*> read (Addr addr)))
 
 cmpGt :: Register -> Address -> FS Key Selective Value a
 cmpGt reg addr = \read write ->
-  whenS (gt <$> read (Reg reg) <*> read (Addr addr))
-        (write (F Condition) (pure true))
+  write (F Condition) ((>) <$> read (Reg reg) <*> read (Addr addr) *> read (F Condition))
+  -- ifS ((>) <$> read (Reg reg) <*> read (Addr addr))
+  --      (write (F Condition) (pure true))
+  --      (write (F Condition) (pure false))
 
 cmpLt :: Register -> Address -> FS Key Selective Value a
 cmpLt reg addr = \read write ->
-  whenS (lt <$> read (Reg reg) <*> read (Addr addr))
-        (write (F Condition) (pure true))
+  write (F Condition) ((<) <$> read (Reg reg) <*> read (Addr addr) *> read (F Condition))
+  -- ifS ((<) <$> read (Reg reg) <*> read (Addr addr))
+  --     (write (F Condition) (pure true))
+  --     (write (F Condition) (pure false))
+
+e :: Value a => a -> Either a a
+e x = case toBool x of True  -> Left x
+                       False -> Right x
+
 
 -- | Perform jump if flag @Condition@ is set
 jumpCt :: Imm a -> FS Key Selective Value a
 jumpCt (Imm offset) read write =
-  whenS ((===) <$> read (F Condition) <*> pure true)
-        (write IC ((+) <$> pure offset <*> read IC))
+  select (e <$> read (F Condition))
+         (const <$> (write IC ((+) <$> pure offset <*> read IC)))
+  -- ifS ((==) <$> read (F Condition) <*> pure true)
+  --     (write IC ((+) <$> pure offset <*> read IC))
+  --     (write IC ((+) <$> pure 0 <*> read IC))
 
 -- | Perform jump if flag @Condition@ is set
 jumpCf :: Imm a -> FS Key Selective Value a
 jumpCf (Imm offset) read write =
-  whenS ((===) <$> read (F Condition) <*> pure (ISA.Types.not true))
-        (write IC ((+) <$> pure offset <*> read IC))
+  ifS ((==) <$> read (F Condition) <*> pure (ISA.Types.not true))
+      (write IC ((+) <$> pure offset <*> read IC))
+      (write IC ((+) <$> pure 0 <*> read IC))
 
 -- | Perform unconditional jump
 jump :: Imm a -> FS Key Applicative Value a

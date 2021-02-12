@@ -22,7 +22,6 @@ source-repository head
 library
   default-language: Haskell2010
   exposed-modules:
-      FS,
       ISA.Assembly,
       ISA.Selective,
       ISA.Semantics,
@@ -39,18 +38,14 @@ library
       ISA.Types.Symbolic.Context,
       ISA.Types.Symbolic.SMT,
       ISA.Types.Symbolic.Trace,
-      ISA.Types.Symbolic.Trace.Property,
       ISA.Types.Symbolic.Parser
 
       ISA.Backend.Symbolic.QueryList,
       ISA.Backend.Symbolic.List.QueryRun,
-      ISA.Backend.IO,
-      ISA.Backend.Dependencies,
-
-      ISA.Example.Common,
-      ISA.Example.Add,
       ISA.Example.Sum,
       ISA.Example.MotorControl
+  other-modules:
+      FS
   hs-source-dirs:
       src
   build-depends:
@@ -92,6 +87,7 @@ library
                     , DerivingVia
                     , GADTs
                     , GeneralizedNewtypeDeriving
+                    , TupleSections
 
   GHC-options:      -Wall
                     -fno-warn-name-shadowing
@@ -99,7 +95,6 @@ library
                     -Wincomplete-record-updates
                     -Wredundant-constraints
                     -threaded -rtsopts -with-rtsopts=-N
-
 test-suite tests
   GHC-options:     -Wall
                    -Werror=incomplete-replacements
