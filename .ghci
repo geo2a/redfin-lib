@@ -1,0 +1,6 @@
+:unset +s +t
+-- Turn on multi-line input and remove the distracting verbosity.
+:set +m -v0
+:set -Wno-orphans -Wno-unused-matches -Wno-missing-signatures
+:set -Wno-unused-top-binds -Wno-unused-imports -Wno-warn-unused-imports
+:set -Wno-unused-do-bind -Wno-redundant-constraints
