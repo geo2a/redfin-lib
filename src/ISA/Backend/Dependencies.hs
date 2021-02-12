@@ -18,12 +18,12 @@ module ISA.Backend.Dependencies
 import           Algebra.Graph
 import           Algebra.Graph.Export.Dot
 import           Control.Arrow            (second)
+import           Control.Selective
 import           Data.Either              (partitionEithers)
 import           Data.Maybe               (fromJust)
 import qualified Data.Set                 as Set
 
 import           FS
-import           ISA.Selective
 import           ISA.Semantics
 import           ISA.Types
 import           ISA.Types.Instruction

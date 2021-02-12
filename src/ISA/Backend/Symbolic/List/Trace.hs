@@ -3,16 +3,16 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module     : ISA.Types.Symbolic.Trace
+-- Module     : ISA.Types.Symbolic.List.Trace
 -- Copyright  : (c) Georgy Lukyanov 2019
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 --
--- Tree-shaped symbolic execution trace
+-- Rose-tree shaped symbolic execution trace
 --
 -----------------------------------------------------------------------------
-module ISA.Types.Symbolic.Trace
+module ISA.Backend.Symbolic.List.Trace
     ( Trace(..), mkTrace
     , initial, leafs, nodes
     , subsetTrace, traceDepth

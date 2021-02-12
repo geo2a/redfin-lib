@@ -1,44 +1,44 @@
-{-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
-module ISA.Types.CTL.Model
-  ( Theorem(..), SolverTask(..), atomicTasks
-  , formulate, Constraints(..), prove, check) where
+module ISA.Types.CTL.Model where
+-- module ISA.Types.CTL.Model
+--   ( Theorem(..), SolverTask(..), Constraints(..), Proof(..), atomicTasks
+--   , formulate, prove
+--   , showCTL) where
 
--- module ISA.Types.CTL.Model where
 
-import           Control.Concurrent.STM        hiding (check)
+import           Control.Concurrent.STM          hiding (check)
 import           Control.Concurrent.STM.TQueue
-import           Control.Monad                 (join)
+import           Control.Monad                   (join)
 import           Control.Monad.IO.Class
-import           Data.Aeson                    (FromJSON, ToJSON)
+import           Data.Aeson                      (FromJSON, ToJSON)
 import           Data.Bifunctor
-import           Data.List                     (partition)
-import           Data.Map                      (Map)
-import qualified Data.Map                      as Map
-import           Data.Maybe                    (isJust)
+import           Data.List                       (partition)
+import           Data.Map                        (Map)
+import qualified Data.Map                        as Map
+import           Data.Maybe                      (isJust)
 import           Data.Monoid
-import qualified Data.SBV                      as SBV
-import qualified Data.SBV.Control              as SBV
-import qualified Data.SBV.Internals            as SBV
-import qualified Data.Set                      as Set
-import           Data.Text                     (Text)
-import qualified Data.Text                     as Text
+import qualified Data.SBV                        as SBV
+import qualified Data.SBV.Control                as SBV
+import qualified Data.SBV.Internals              as SBV
+import           Data.Set                        (Set)
+import qualified Data.Set                        as Set
+import           Data.Text                       (Text)
+import qualified Data.Text                       as Text
 import           Data.Traversable
-import           Data.Tree                     (Tree)
-import qualified Data.Tree                     as Tree
-import qualified Debug.Trace                   as Bug
+import           Data.Tree                       (Tree)
+import qualified Data.Tree                       as Tree
+import qualified Debug.Trace                     as Bug
 import           GHC.Generics
 import           Numeric.Natural
 
+import           ISA.Backend.Symbolic.List.Trace
 import           ISA.Types
 import           ISA.Types.CTL
 import           ISA.Types.SBV
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Context
 import           ISA.Types.Symbolic.SMT
-import           ISA.Types.Symbolic.Trace
 
 newtype Variable = MkVar Text
   deriving (Show, Generic, ToJSON, FromJSON)
@@ -47,6 +47,7 @@ newtype Variable = MkVar Text
 newtype Theorem = MkTheorem { getTheorem :: (SolverTask Sym) }
   deriving (Generic, ToJSON, FromJSON)
 
+-- | An operation to combine the results of solving: either conjunction or disjunction
 data Op = Conj | Disj
   deriving (Generic, ToJSON, FromJSON)
 
@@ -54,11 +55,11 @@ op :: Op -> ([Sym] -> Sym)
 op = \case Conj -> conjoin
            Disj -> disjoin
 
--- | A task prepared for  solving:
+-- | A task prepared for solving:
 --   * either an atomic symbolic expression coming
 --     from a certain node in the trace
 --   * or a conjunction/disjunction of tasks
-data SolverTask a = Atomic (Text, a)
+data SolverTask a = Atomic (NodeId, a)
                   | Compound Op [SolverTask a]
   deriving (Functor, Generic, ToJSON, FromJSON)
 
@@ -72,15 +73,17 @@ instance Traversable SolverTask where
     Atomic (n , x) -> Atomic . (n,) <$> action x
     Compound op tasks -> Compound op <$> traverse (traverse action) tasks
 
+-- | The amount of atomic tasks in a solver task tree
 size :: SolverTask a -> Int
 size = getSum . foldMap (const (Sum 1))
 
+-- | Depth of solver task tree
 depth :: SolverTask a -> Natural
 depth = \case Atomic _ -> 0
               Compound _ xs -> sum . map depth $ xs
 
 -- | Get a list of atomic solver tasks: useful for gathering free variables
-atomicTasks :: SolverTask a -> [(Text, a)]
+atomicTasks :: SolverTask a -> [(NodeId, a)]
 atomicTasks = go []
   where go acc = \case
           Atomic n -> n : acc
@@ -93,201 +96,172 @@ instance Show a => Show (SolverTask a) where
       Conj -> unlines (map (("∧ " <>) . show) xs)
       Disj -> unlines (map (("∨ " <>) . show) xs)
 
-showCTL :: Context -> CTL (Context -> Sym) -> String
-showCTL init = \case
+showCTL :: CTL (Context -> Sym) -> Context -> String
+showCTL prop c = case prop of
   TT      -> "T"
   FF      -> "⊥"
-  Atom p  -> show (p init)
-  Not p   -> "¬" <> showCTL init p
-  And p q -> showCTL init p <> " ∧ " <> showCTL init q
-  AllG p  -> "AG " <> showCTL init p
-  AllF p  -> "AF" <> showCTL init p
+  Atom p  -> show (p c)
+  Not p   -> "¬" <> showCTL p c
+  And p q -> showCTL p c <> " ∧ " <> showCTL q c
+  AllG p  -> "AG " <> showCTL p c
+  AllF p  -> "AF" <> showCTL p c
 
--- instance Show Theorem where
---   show (MkTheorem exprs) = unlines $
---     map (show . _nodeBody) . Set.toList $ exprs
-
--- | Result of @Theorem proving
-data Proof = Proved Text
-           | Falsifiable Text (Text, SMTResult)
+-- | Result of theorem proving proving
+data Proof = Proved
+           | Falsifiable [(NodeId, SMTResult)]
            deriving (Generic, ToJSON, FromJSON)
 
--- instance Show Proof where
---   show = \case
---     Proved _ -> "Q.E.D"
---     Falsifiable theorem (n, contra) ->
---       "Falsifiable! Counterexample caused by node " <> show n <> ": \n" <> show contra
+instance Show Proof where
+  show = \case
+    Proved -> "Q.E.D"
+    Falsifiable contra ->
+      "Falsifiable! Counterexample caused by nodes " <> (unlines $ map show contra)
 
-formulate :: CTL (Context -> Sym) -> Trace Context -> Theorem
-formulate p t = MkTheorem (formulateImpl p t)
 
-formulateImpl :: CTL (Context -> Sym) -> Trace Context -> SolverTask Sym
-formulateImpl property trace =
-  let initId = _nodeId . initial $ trace
-  in case property of
-     TT      -> Atomic $ (Text.pack . show $ initId , true)
-     FF      -> Atomic $ (Text.pack . show $ initId , false)
-     Atom p  -> Atomic $ (Text.pack . show $ initId , (p (_nodeBody $ initial trace)))
-     Not p   -> SNot <$> formulateImpl p trace
-     And p q -> Compound Conj [formulateImpl p trace, formulateImpl q trace]
-     AllG p   -> Compound Conj . map (\node -> formulateImpl p (mkTrace node []))
-               . nodes $ trace
-     EG p -> Compound Disj . map (\node -> formulateImpl p (mkTrace node []))
-             . nodes $ trace
-     AllF p -> allFImpl p (unTrace trace)
-  where
-    allFImpl :: CTL (Context -> Sym)
-             -> Tree (Node Context) -> SolverTask Sym
-    allFImpl p (Tree.Node x xs) =
-      Compound Disj [ formulateImpl p (mkTrace x [])
-                    , Compound Conj (map (allFImpl p) xs)
-                    ]
-
+-- | A list of symbolic expressions to serve as constraints for the state space
 newtype Constraints = ConstrainedBy [Sym]
   deriving (Show, Generic, ToJSON, FromJSON)
 
--- | Wrapper over tree nodes existing only because of its Eq instance, which
---   compares the symbolic expressions inside nodes and is used in to assemble
---   Sets of nodes while keeping their original ids.
-newtype UNode a = MkUNode { _unwrapUNode :: Node a }
-
-instance Eq a => Eq (UNode a) where
-  MkUNode (Node _ x) == MkUNode (Node _ y) = x == y
-
-instance Ord a => Ord (UNode a) where
-  MkUNode (Node _ x) <= MkUNode (Node _ y) = x <= y
-
 --------------------------------------------------------------------------------
+data Schedule a = Literal a
+                | Conjunct [Schedule a]
+                | Disjunct [Schedule a]
+                deriving (Show, Functor)
 
--- | Schedule node problems for solving by translating them into SBV queries,
---   but keeping the combining operation that will need to be allied afterwards
-scheduleImpl :: TVar (Map Text SBV.SInt32) -> TVar Int -> TQueue (Text, Maybe SMTResult)
-          -> SolverTask Sym -> SolverTask (SBV.Query (Maybe Bool))
-scheduleImpl env finished results = \case
-  Atomic task       -> scheduleSingle task
-  task@(Compound op tasks) ->
-    case depth task of
-      1 -> scheduleList op (concatMap atomicTasks tasks)
-      _ -> Compound op (fmap (scheduleImpl env finished results) tasks)
+flatten :: Schedule a -> [a]
+flatten = go []
   where
-    scheduleSingle :: (Text, Sym) -> SolverTask (SBV.Query (Maybe Bool))
-    scheduleSingle (n, expr) = Atomic . (n,) $
-      groupQuery env finished results (n, expr)
+    go acc = \case
+      Literal x -> x : acc
+      Conjunct xs -> concatMap flatten xs
+      Disjunct xs -> concatMap flatten xs
 
-    -- | If the task only has atomic subtasks
-    scheduleList :: Op -> [(Text, Sym)] -> SolverTask (SBV.Query (Maybe Bool))
-    scheduleList op atoms =
-      case op of
-        -- we schedule a conjunction of atoms as a single query
-        Conj ->
-          let name = "{ " <> mconcat (map fst atoms)  <> " }"
-              expr = conjoin . map snd $ atoms
-          in Atomic (name, groupQuery env finished results (name, expr))
-        -- whereas a disjunction is scheduled as multiple: one query per disjunct
-        Disj -> Compound Disj $ map scheduleSingle atoms
+-- instance Show a => Show (Schedule a) where
+--   show = \case
+--     Literal l -> show l
+--     Conjunct xs -> "(" <> (concatMap (\x -> show x <> " ∧ ") xs) <> ")"
+--       -- unlines (map (("∧ " <>) . show) xs)
+--     Disjunct xs -> "(" <> (concatMap (\x -> show x <> " ∨ ") xs) <> ")"
 
-schedule :: TVar (Map Text SBV.SInt32) -> TVar Int -> TQueue (Text, Maybe SMTResult)
-          -> SolverTask Sym -> SolverTask (SBV.Query (Maybe Bool))
-schedule env finished results =
-  scheduleImpl env finished results
+deMorgan :: Schedule (NodeId, Sym) -> Schedule (NodeId, Sym)
+deMorgan = \case
+  Literal (n, v) -> Literal (n, SNot v)
+  Conjunct xs -> Disjunct (map deMorgan xs)
+  Disjunct xs -> Conjunct (map deMorgan xs)
 
-check :: Map Text SMTResult -> Theorem -> Maybe Bool
-check answers (MkTheorem task) = checkImpl answers task
+
+-- | Interpret a CTL formula as a collection of Sym's, preparing it for solving
+formulate :: CTL (Context -> Sym) -> Trace Context -> Schedule (NodeId, Sym)
+formulate property trace =
+  let initId = _nodeId . initial $ trace
+  in case property of
+       TT      -> Literal (initId , true)
+       FF      -> Literal (initId , false)
+       Atom p  -> Literal (initId , (p (_nodeBody $ initial trace)))
+       Not p   -> deMorgan (formulate p trace)
+       -- Not p   -> second SNot <$> (formulate p trace)
+       And p q -> Conjunct [formulate p trace, formulate q trace]
+       AllG p   -> Conjunct . map (\node -> formulate p (mkTrace node []))
+                   . nodes $ trace
+       EG p -> Disjunct . map (\node -> formulate p (mkTrace node []))
+             . nodes $ trace
+       AllF p -> formulate (Not (EG (Not p))) trace
+       -- AllF p -> allFImpl p (unTrace trace)
+  -- where
+  --   allFImpl :: CTL (Context -> Sym)
+  --            -> Tree (Node Context) -> Schedule (NodeId, Sym)
+  --   allFImpl p (Tree.Node x xs) =
+  --     case xs of
+  --       [] -> formulate p (mkTrace x [])
+  --       -- (y:[]) -> Disjunct [ formulate p (mkTrace x []), map (allFImpl p) y]
+  --       (ys) -> Disjunct [ formulate p (mkTrace x [])
+  --                        , Conjunct (map (allFImpl p) ys)
+  --                        ]
+
+postprocess :: Schedule (NodeId, SMTResult) -> [(NodeId, SMTResult)]
+postprocess schedule =
+  let sats = postprocessImpl [] schedule
+  in case schedule of
+       Literal _  -> sats
+       Conjunct _ -> if all (isSat . snd) sats then sats else []
+       Disjunct _ -> if any (isSat . snd) sats then sats else []
+
+postprocessImpl :: [(NodeId, SMTResult)] -> Schedule (NodeId, SMTResult) -> [(NodeId, SMTResult)]
+postprocessImpl acc = \case
+  Literal x -> if (isSat . snd) x then x : acc else acc
+  Conjunct xs ->
+    let results = concatMap (postprocessImpl acc) xs
+    in case all (isSat . snd) results of
+         True  -> acc
+         False -> []
+  Disjunct xs ->
+    let results = concatMap (postprocessImpl acc) xs
+    in case any (isSat . snd) results of
+         True  -> acc
+         False -> []
+
+consume :: Schedule (NodeId, TMVar SMTResult) -> STM (Schedule (NodeId, SMTResult))
+consume schedule = case schedule of
+  Literal (nid, var) -> Literal . (nid,) <$> takeTMVar var
+  Conjunct xs        -> Conjunct <$> mapM consume xs
+  Disjunct xs        -> Disjunct <$> mapM consume xs
+
+produce :: TVar (Map Text SBV.SInt32)
+        -> Schedule (NodeId, Sym) -> IO ([SBV.Query ()], Schedule (NodeId, TMVar SMTResult))
+produce vars schedule =
+  (\r -> (flatten (fmap (\(_, q, _) -> q) r), fmap (\(n, _, v) -> (n, v)) r)) <$> go schedule
   where
-    checkImpl answers = \case
-      Atomic (name, _)    -> isSat <$> Map.lookup name answers
-      Compound Conj tasks -> all id <$> traverse (checkImpl answers) tasks
-      Compound Disj tasks -> any id <$> traverse (checkImpl answers) tasks
+    go schedule =
+      case schedule of
+        Literal (nid, sym) -> do
+          resultBox <- newEmptyTMVarIO
+          let query = nodeQuery vars resultBox sym
+          pure (Literal (nid, query, resultBox))
+        Conjunct xs        -> Conjunct <$> mapM go xs
+        Disjunct xs        -> Disjunct <$> mapM go xs
 
--- prove :: Theorem -> Constraints -> IO (Maybe Bool)
-prove :: Theorem -> Constraints -> IO (Map Text SMTResult)
-prove thm@(MkTheorem task) cs = do
-  env <- newTVarIO (Map.empty)
-  results <- newTQueueIO
-  finishedCount <- newTVarIO 0
-  let qs = atomicTasks $ schedule env finishedCount results task
-  _ <- SBV.satConcurrentWithAll SBV.z3 (map snd qs) (prepare env cs thm)
-  answers <- atomically $ do
-    finished <- (== size task) <$> readTVar finishedCount
-    case finished of
-      True  -> Map.fromList <$> flushTQueue results
-      False -> retry
-  -- let solved = map (second (maybe unknownFatal id)) $ answers
-  --     (sats, unsats) = partition (isSat . snd) solved
-  pure $ fmap (maybe Unsatisfiable id) answers
-  -- pure $
-  --   case validity of
-  --     AllSat ->
-  --       case unsats of
-  --         []    -> Proved thm
-  --         (x:_) -> Falsifiable thm x
-  --     AllUnsat ->
-  --       case sats of
-  --         []    -> Proved thm
-  --         (x:_) -> Falsifiable thm x
-  where unknownFatal = error "Impossible happened: prover said unknown!"
-
--- | Prepare the shared proving environment:
---   * Gather free symbolic variables (@SAny) from the theorem statement
---   * Add constrains to the environment
-prepare :: TVar (Map Text SBV.SInt32) -> Constraints -> Theorem -> SBV.Symbolic ()
-prepare env (ConstrainedBy cs) (MkTheorem tasks) = do
-  vars <- createSym $
-    Set.toList $ gatherFree (conjoin . map snd $ atomicTasks tasks)
+-- | Prepare the shared proving environment by communicating free variables to SBV
+prepare :: TVar (Map Text SBV.SInt32) -> Set Sym -> Constraints -> SBV.Symbolic ()
+prepare env freeVars (ConstrainedBy cs) = do
+  vars <- createSym $ Set.toList freeVars
   liftIO . atomically $ writeTVar env vars
   pre <- toSMT vars cs
   SBV.constrain pre
 
--- | An SMT-problem constructed from a single trace node
-nodeQuery :: TVar (Map Text SBV.SInt32) -> TVar Int -> TQueue (NodeId, Maybe SMTResult)
-          -> Node Sym -> SBV.Query (Maybe Bool)
-nodeQuery env finished results (Node n expr) = do
+-- | Check if a property is satisfiable on the given trace under the given constraints
+--   Return an empty list if all nodes are unsats and the satisfiable nodes otherwise
+sat :: CTL (Context -> Sym) -> Trace Context -> Constraints -> IO [(NodeId, SMTResult)]
+sat prop trace cs = do
+  let schedule = formulate prop trace
+      freeVars = gatherFree . conjoin . map snd . flatten $ schedule
+  env <- newTVarIO mempty
+  (qs, sch) <- produce env schedule
+  _ <- SBV.satConcurrentWithAll SBV.z3 qs (prepare env freeVars cs)
+  solutions <- atomically (consume sch)
+  pure (postprocess solutions)
+
+-- | An SMT-problem constructed from a node
+nodeQuery :: TVar (Map Text SBV.SInt32) -> TMVar SMTResult -> Sym -> SBV.Query ()
+nodeQuery env resultBox expr = do
   vars <- liftIO $ readTVarIO env
   SBV.constrain =<< toSMT vars [expr]
   SBV.checkSat >>= \case
-    SBV.Unk -> do
+    SBV.Unk ->
       error "Impossible happened: prover said unknown!"
-      -- liftIO . atomically $ do
-      --   writeTQueue results $ (n, Nothing)
-      --   modifyTVar finished (+1)
-      -- pure Nothing
-    _ -> SBV.getSMTResult >>= \case
-      (SBV.Satisfiable _ yes) -> do
-        values <- traverse SBV.getValue vars
-        liftIO . atomically $ do
-          writeTQueue results $ (n, Just . Satisfiable . MkSMTModel $ values)
-          modifyTVar finished (+1)
-        pure $ Just True
-      (SBV.Unsatisfiable _ _) -> do
-        liftIO . atomically $ do
-          writeTQueue results $ (n, Just Unsatisfiable)
-          modifyTVar finished (+1)
-        pure $ Just False
-      _ -> error "not implemented"
-
-
--- | An SMT-problem constructed from a group of nodes
-groupQuery :: TVar (Map Text SBV.SInt32) -> TVar Int -> TQueue (Text, Maybe SMTResult)
-          -> (Text, Sym) -> SBV.Query (Maybe Bool)
-groupQuery env finished results (n, expr) = do
-  vars <- liftIO $ readTVarIO env
-  SBV.constrain =<< toSMT vars [expr]
-  SBV.checkSat >>= \case
-    SBV.Unk -> do
-      liftIO . atomically $ do
-        writeTQueue results $ (n, Nothing)
-        modifyTVar finished (+1)
-      pure Nothing
     _ -> SBV.getSMTResult >>= \case
       (SBV.Satisfiable _ _) -> do
         values <- traverse SBV.getValue vars
         liftIO . atomically $ do
-          writeTQueue results $ (n, Just . Satisfiable . MkSMTModel $ values)
-          modifyTVar finished (+1)
-        pure $ Just True
+          putTMVar resultBox $ Satisfiable . MkSMTModel $ values
       (SBV.Unsatisfiable _ _) -> do
         liftIO . atomically $ do
-          writeTQueue results $ (n, Just Unsatisfiable)
-          modifyTVar finished (+1)
-        pure $ Just False
+          putTMVar resultBox $ Unsatisfiable
       _ -> error "not implemented"
+
+-- | Prove a CTL property on a trace
+--   A property is valid if its negation is unsatisfiable, i.e.
+prove :: CTL (Context -> Sym) -> Trace Context -> Constraints ->IO Proof
+prove property trace precondition =
+  sat (Not property) trace precondition >>= \case
+    [] -> pure Proved
+    contra -> pure $ Falsifiable contra

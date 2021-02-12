@@ -1,50 +1,47 @@
-{-# LANGUAGE DeriveFunctor         #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE MultiWayIf            #-}
+{-# LANGUAGE MultiWayIf #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Backend.Symbolic.List.Run
--- Copyright  : (c) Georgy Lukyanov 2019
+-- Copyright  : (c) Georgy Lukyanov 2020-2021
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 --
--- Run the symbolic execution ith multiple worlds semantics
---
+-- Symbolic simulation backend using Data.Tree from containers
 -----------------------------------------------------------------------------
 
-module ISA.Backend.Symbolic.List.QueryRun
+module ISA.Backend.Symbolic.List.Run
                                            where
 
-import           Control.Monad.IO.Class         (MonadIO (..))
-import           Control.Monad.Reader.Class     ()
+import           Control.Monad.IO.Class          (MonadIO (..))
+import           Control.Monad.Reader.Class      ()
 import           Control.Monad.State.Class
-import           Control.Monad.State.Strict     (StateT, evalStateT, lift)
-import           Data.Bifunctor                 (first, second)
-import           Data.Functor                   (void)
+import           Control.Monad.State.Strict      (StateT, evalStateT, lift)
+import           Data.Bifunctor                  (first, second)
+import           Data.Functor                    (void)
 import           Data.IORef
-import qualified Data.Map.Strict                as Map
-import qualified Data.SBV                       as SBV (SMTResult (..))
-import qualified Data.SBV.Dynamic               as SBV
-import qualified Data.SBV.Internals             as SBV
-import qualified Data.SBV.Trans                 as SBV
-import qualified Data.SBV.Trans.Control         as SBV
-import qualified Data.Set                       as Set
-import           Data.Text                      (Text)
-import qualified Data.Text                      as Text
-import           Data.Time.Clock                (NominalDiffTime)
+import qualified Data.Map.Strict                 as Map
+import qualified Data.SBV                        as SBV (SMTResult (..))
+import qualified Data.SBV.Dynamic                as SBV
+import qualified Data.SBV.Internals              as SBV
+import qualified Data.SBV.Trans                  as SBV
+import qualified Data.SBV.Trans.Control          as SBV
+import qualified Data.Set                        as Set
+import           Data.Text                       (Text)
+import qualified Data.Text                       as Text
+import           Data.Time.Clock                 (NominalDiffTime)
 import           GHC.Stack
-import           Prelude                        hiding (log)
+import           Prelude                         hiding (log)
 
-import           ISA.Backend.Symbolic.QueryList
-import           ISA.Semantics
+import           ISA.Backend.Symbolic.List
+import           ISA.Backend.Symbolic.List.Trace
+import           ISA.SemanticsProp
 import           ISA.Types
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.SBV
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Context
 import           ISA.Types.Symbolic.SMT
-import           ISA.Types.Symbolic.Trace
 
 -- | Fetching an instruction is a Monadic operation. It is possible
 --   (and natural) to implement in terms of @FS Key Monad Value@, but
@@ -111,7 +108,6 @@ runModelM vars steps s = do
              children <- liftIO $ step s
              solvedChildren <- lift $ mapM (processContext vars) children
              mkTrace (Node n s) <$> traverse (runModelM vars (steps - 1)) solvedChildren
-  where fuel = 100
 
 -- | Process a context, solving the constraints and putting the solution
 --   into it
@@ -122,9 +118,7 @@ processContext ::
 processContext vars ctx = SBV.inNewAssertionStack $ do
   pc <- toSMT vars [_pathCondition ctx]
   SBV.constrain pc
-  let names = map fst $ _constraints ctx
   cs <- mapM (toSMT vars . (:[])) (map snd $ _constraints ctx)
-  -- mapM_ (\(n, c) -> SBV.namedConstraint (Text.unpack n) c) (zip names cs)
   mapM SBV.constrain cs
   SBV.checkSat >>= \case
     SBV.Unk -> pure $ ctx { _solution = Nothing }

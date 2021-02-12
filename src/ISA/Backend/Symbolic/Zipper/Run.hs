@@ -9,28 +9,20 @@
 -- Symbolic simulation over a zipper-focused binary tree
 -----------------------------------------------------------------------------
 
-module ISA.Backend.Symbolic.ZipperEngine.Run (runModel) where
+module ISA.Backend.Symbolic.Zipper.Run (runModel) where
 
 import           Control.Concurrent.STM
-import           Control.Monad.IO.Class            (MonadIO (..))
+import           Control.Monad.IO.Class       (MonadIO (..))
 import           Control.Monad.Reader
-import           Control.Monad.Reader.Class        ()
+import           Control.Monad.Reader.Class   ()
 import           Control.Monad.State.Class
-import           Data.Functor                      (void)
-import           Data.IntMap.Strict                (IntMap)
-import qualified Data.IntMap.Strict                as IntMap
-import qualified Data.Map.Strict                   as Map
-import qualified Data.SBV.Trans                    as SBV
-import qualified Data.SBV.Trans.Control            as SBV
-import qualified Data.Set                          as Set
-import           Data.Text                         (Text)
-import qualified Data.Text                         as Text
-import           Data.Time.Clock                   (NominalDiffTime)
-import           GHC.Stack
-import           Prelude                           hiding (log)
+import           Data.Functor                 (void)
+import qualified Data.SBV.Trans               as SBV
+import qualified Data.SBV.Trans.Control       as SBV
+import qualified Data.Set                     as Set
+import           Prelude                      hiding (log)
 
-import qualified ISA.Assembly                      as A
-import           ISA.Backend.Symbolic.ZipperEngine
+import           ISA.Backend.Symbolic.Zipper
 import           ISA.Semantics
 import           ISA.Types
 import           ISA.Types.Instruction.Decode
@@ -38,8 +30,8 @@ import           ISA.Types.SBV
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Context
 import           ISA.Types.Symbolic.SMT
-import           ISA.Types.Tree                    hiding (down, left, right,
-                                                    top, up)
+import           ISA.Types.Tree               hiding (down, left, right, top,
+                                               up)
 
 -- | Fetching an instruction is a Monadic operation. It is possible
 --   (and natural) to implement in terms of @FS Key Monad Value@, but
@@ -79,11 +71,11 @@ step = do
     Just i -> void $ instructionSemanticsM (symbolise i) readKey writeKey
   env <- ask
   -- observe if the instruction semantics triggered a fork
-  (trace, choice) <- liftIO . atomically $ do
-    r <- (,) <$> readTMVar (_trace env) <*> readTMVar (_choice env)
+  choice <- liftIO . atomically $ do
+    c <- takeTMVar (_choice env)
     -- clear the choice variable
-    void $ swapTMVar (_choice env) Nothing
-    pure r
+    putTMVar (_choice env) Nothing
+    pure c
   case choice of
     -- if no choice was encountered return a single child state
     Nothing           -> do
@@ -93,13 +85,13 @@ step = do
                    else pure Nothing
     -- if there is a choice: check reachability and return reachable children
     Just (ctx1, ctx2) -> do
-      r1@(b1, ctx1') <- liftIO . SBV.runSMT $ reach ctx1
-      r2@(b2, ctx2') <- liftIO . SBV.runSMT $ reach ctx2
+      r1 <- liftIO . SBV.runSMT $ reach ctx1
+      r2 <- liftIO . SBV.runSMT $ reach ctx2
       case (r1, r2) of
         -- both children are reachable
         ((True, ctx1'), (True, ctx2')) -> pure . Just $ Two ctx1' ctx2'
-        ((False, _)   , (True, ctx2))  -> pure . Just $ One ctx2'
-        ((True, ctx1) , (False, _))    -> pure . Just $ One ctx1'
+        ((False, _)   , (True, ctx2')) -> pure . Just $ One ctx2'
+        ((True, ctx1') , (False, _))   -> pure . Just $ One ctx1'
         ((False, _)   , (False, _))    -> pure Nothing
   where
     -- | Check satisfiability of a Context's path condition under its constraints
@@ -113,7 +105,7 @@ step = do
         SBV.checkSat >>= \case
             SBV.Unk -> pure $ (False, ctx { _solution = Nothing })
             _ -> SBV.getSMTResult >>= \case
-              (SBV.Satisfiable _ yes) -> do
+              (SBV.Satisfiable _ _) -> do
                 values <- traverse SBV.getValue vars
                 pure $ (True, ctx { _solution = (Just . Satisfiable . MkSMTModel $ values) })
               (SBV.Unsatisfiable _ _) ->
@@ -126,8 +118,6 @@ runModel steps init = execEngine (runModelImpl steps) init
 
 runModelImpl :: Int -> Engine ()
 runModelImpl steps = do
-  env <- ask
-  trace <- liftIO . atomically . readTMVar $ (_trace env)
   ctx <- getFocused
   case (||) <$> pure (steps <= 0)
             <*> (toBool <$> getBinding (F Halted) ctx) of

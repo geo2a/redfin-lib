@@ -1,12 +1,16 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 -- | Simplified datatypes from SBV and missing instances
 module ISA.Types.SBV where
 
+import           Control.Selective
 import           Data.Aeson         (FromJSON, ToJSON, defaultOptions,
                                      genericToEncoding, toEncoding)
 import           Data.Int           (Int32)
 import           Data.Map           (Map)
 import qualified Data.Map           as Map
 import qualified Data.SBV           as SBV
+import qualified Data.SBV.Control   as SBV
 import qualified Data.SBV.Internals as SBV
 import           Data.Text          (Text)
 import           GHC.Generics
@@ -72,3 +76,4 @@ deriving instance Generic SBV.CV
 instance ToJSON SBV.CV where
     toEncoding = genericToEncoding defaultOptions
 instance FromJSON SBV.CV
+--------------------------------------------------------------------------------

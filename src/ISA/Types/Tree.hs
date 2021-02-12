@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module ISA.Types.Tree
   ( Tree(..), insert1, insert2, draw
   , Cxt(..), Loc(..), locKey
@@ -90,21 +91,12 @@ shift from tt = execState (unT tt) from
 travelVerbose :: Loc key a -> Travel (Loc key a) b -> (b, Loc key a)
 travelVerbose start tt = runState (unT tt) start
 
-
--- subst :: (Eq key, Enum key) => Tree key a -> key -> Tree key a -> Tree key a
--- subst term k expr = travel (Loc expr top) $ do
---   (Loc tree cxt) <- get
---   case rootKey tree == rootKey term of
---     True  -> put (Loc term cxt) *> top
---     False -> undefined
---   undefined
-
 top :: Travel (Loc key a) ()
 top = do
-  l@(Loc tree cxt) <- get
+  l@(Loc _ cxt) <- get
   case cxt of
-    Top   -> put l
-    other -> up *> top
+    Top -> put l
+    _   -> up *> top
 
 left :: Travel (Loc key a) ()
 left = do

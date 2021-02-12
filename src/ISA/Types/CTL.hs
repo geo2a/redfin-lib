@@ -7,7 +7,7 @@ module ISA.Types.CTL
 import           Data.Aeson   (FromJSON, ToJSON)
 import           GHC.Generics
 
--- | (RestrictedComputational Tree Logic formulae
+-- | (Restricted) Computational Tree Logic formulae
 --   https://functionallens.wordpress.com/2008/05/07/ctl-model-checking-in-haskell-a-classic-algorithm-explained-as-memoization/
 data CTL p = TT | FF
            | Atom p

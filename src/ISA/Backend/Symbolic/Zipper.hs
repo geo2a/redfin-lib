@@ -1,6 +1,5 @@
-{-# LANGUAGE KindSignatures        #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Backend.Symbolic.QueryList
@@ -11,7 +10,7 @@
 --
 -- Symbolic simulation over a zipper-focused binary tree
 -----------------------------------------------------------------------------
-module ISA.Backend.Symbolic.ZipperEngine
+module ISA.Backend.Symbolic.Zipper
   ( -- * symbolic simulation engine
     Engine, execEngine
   , EngineState(..), effectOnContext
@@ -94,7 +93,6 @@ instance Selective Engine where
 -- | The select implementation for Engine
 selectEngine :: Engine (Either a b) -> Engine (a -> b) -> Engine b
 selectEngine choice onLeft = do
-  env <- ask
   c <- choice
   ctx <- getFocused
   let cond = fromJust $ getBinding (F Condition) ctx
@@ -108,7 +106,6 @@ selectEngine choice onLeft = do
 -- | Fill _choice with two new children nodes
 makeChoice :: Context -> Context -> Engine ()
 makeChoice ctx1 ctx2 = do
-  focus <- get
   env <- ask
   void . liftIO . atomically $ do
     swapTMVar (_choice env) (Just (ctx1, ctx2))
@@ -217,26 +214,26 @@ growTrace (Just choice) = do
     putTMVar (_trace env)
       trace { _layout = fst $ updateLayout father focus withKeys
             , _focus = snd $ updateLayout father focus withKeys
-            , _states = updateStates father (_states trace) withKeys
+            , _states = updateStates (_states trace) withKeys
             }
     putTMVar (_statesCount env) (updateStatesCount size choice)
   where
     updateLayout :: Int -> Loc Int () -> OneTwo (Int, Context) -> (Tree Int (), Loc Int ())
     updateLayout father to = \case
-      One (k, ctx) ->
+      One (k, _) ->
         let subtree = Tree.putTree (Trunk father (Leaf k ()))
         in ( Tree.travel to (subtree *> Tree.top *> Tree.getTree)
            , Tree.shift to subtree
            )
-      Two (k1, ctx1) (k2, ctx2) ->
+      Two (k1, _) (k2, _) ->
         let subtree = Tree.putTree (Branch father (Leaf k1 ())
                                                   (Leaf k2 ()))
         in ( Tree.travel to (subtree *> Tree.top *> Tree.getTree)
            , Tree.shift to subtree
            )
 
-    updateStates :: Int -> IntMap Context -> OneTwo (Int, Context) -> IntMap Context
-    updateStates father states = \case
+    updateStates :: IntMap Context -> OneTwo (Int, Context) -> IntMap Context
+    updateStates states = \case
       One (k, ctx) -> IntMap.insert k ctx states
       Two (k1, ctx1) (k2, ctx2) -> IntMap.insert k2 ctx2
                                    (IntMap.insert k1 ctx1 states)

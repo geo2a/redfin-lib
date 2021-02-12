@@ -26,25 +26,31 @@ library
       ISA.Selective,
       ISA.Semantics,
 
+
       ISA.Types,
       ISA.Types.CTL,
       ISA.Types.CTL.Model,
       ISA.Types.SBV,
+      ISA.Types.Tree,
       ISA.Types.Instruction,
       ISA.Types.Instruction.Decode,
       ISA.Types.Instruction.Encode,
       ISA.Types.Instruction.Opcodes,
       ISA.Types.Symbolic,
+      ISA.Backend.Dependencies,
+      ISA.Backend.Symbolic.Zipper,
+      ISA.Backend.Symbolic.Zipper.Run,
       ISA.Types.Symbolic.Context,
       ISA.Types.Symbolic.SMT,
-      ISA.Types.Symbolic.Trace,
       ISA.Types.Symbolic.Parser
-
-      ISA.Backend.Symbolic.QueryList,
-      ISA.Backend.Symbolic.List.QueryRun,
       ISA.Example.Sum,
       ISA.Example.MotorControl
   other-modules:
+      ISA.Backend.Symbolic.List,
+      ISA.Backend.Symbolic.List.Trace,
+      ISA.Backend.Symbolic.List.Run,
+      ISA.Example.Common,
+      ISA.SemanticsProp,
       FS
   hs-source-dirs:
       src
@@ -86,7 +92,6 @@ library
                     , DeriveGeneric
                     , DerivingVia
                     , GADTs
-                    , GeneralizedNewtypeDeriving
                     , TupleSections
 
   GHC-options:      -Wall
@@ -94,7 +99,6 @@ library
                     -Wcompat
                     -Wincomplete-record-updates
                     -Wredundant-constraints
-                    -threaded -rtsopts -with-rtsopts=-N
 test-suite tests
   GHC-options:     -Wall
                    -Werror=incomplete-replacements

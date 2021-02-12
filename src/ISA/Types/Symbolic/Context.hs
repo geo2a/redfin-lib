@@ -29,7 +29,7 @@ data Context = MkContext { _bindings      :: Map.Map Key Sym
   deriving (Generic, ToJSON, FromJSON)
 
 emptyCtx :: Context
-emptyCtx = MkContext Map.empty false [] Nothing
+emptyCtx = MkContext Map.empty true [] Nothing
 
 instance Eq Context where
   x == y = (_bindings x == _bindings y)

@@ -1,3 +1,4 @@
+{-# Language GeneralizedNewtypeDeriving #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Types

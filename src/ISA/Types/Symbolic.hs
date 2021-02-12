@@ -30,6 +30,7 @@ import           Data.Typeable
 import           Data.Word     (Word16)
 import           Debug.Trace
 import           GHC.Generics
+import           GHC.Stack
 import           Prelude       hiding (not)
 
 import           ISA.Selective
@@ -200,13 +201,13 @@ instance Monoid (Data Sym) where
 instance Boolean Sym where
   true = SConst (CBool True)
   -- | Converting symbolic expressions to boolean always returns True
-  -- toBool _ = True
+  toBool _ = True
   -- toBool _ = error "Hi from Sym.toBool"
-  toBool x = case getValue x of
-               Nothing        -> error $ "symbolic value" <> show x
-               Just (CBool b) -> trace (show b) b
-               Just x -> error $ "ISA.Symbolic.Sym.toBool: non-boolean concrete value "
-                              <> show x
+  -- toBool x = case getValue x of
+  --              Nothing        -> error $ "symbolic value" <> show x
+  --              Just (CBool b) -> trace (show b) b
+  --              Just x -> error $ "ISA.Symbolic.Sym.toBool: non-boolean concrete value "
+  --                             <> show x
   not x = SNot x
 
   x ||| y = SOr x y
@@ -346,7 +347,7 @@ simplify steps =
 -- | Try to convert a symbolic value into a memory/program address,
 --   possibly doing constant folding.
 --   Return @Left@ in cases of symbolic value, concrete boolean and non-Word16 value
-toAddress :: Sym -> Either Sym Address
+toAddress :: HasCallStack => Sym -> Either Sym Address
 toAddress sym =
   case getValue (simplify Nothing sym) of
     Just (CWord _)  -> error "ISA.Types.Symbolic.toAddress: not implemented for CWord"

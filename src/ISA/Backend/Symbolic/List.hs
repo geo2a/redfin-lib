@@ -1,44 +1,27 @@
-{-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
 -----------------------------------------------------------------------------
 -- |
--- Module     : ISA.Backend.Symbolic.QueryList
--- Copyright  : (c) Georgy Lukyanov 2021
+-- Module     : ISA.Backend.Symbolic.List
+-- Copyright  : (c) Georgy Lukyanov 2020-2021
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 --
--- Pure tree trace-based symbolic execution backend
+-- Symbolic simulation backend using Data.Tree from containers
 -----------------------------------------------------------------------------
-module ISA.Backend.Symbolic.QueryList where
-    -- ( -- * symbolic execution state
-    --   Context(..), showKey
-    --   -- * symbolic execution engine
-    -- , Engine (..)
-    --   -- instances of read/write callbacks for Engine
-    -- , readKey, writeKey
-    -- ) where
+module ISA.Backend.Symbolic.List
+    ( -- * symbolic execution state
+      Context(..), showKey
+      -- * symbolic execution engine
+    , Engine (..)
+      -- * instances of read/write callbacks for Engine
+    , readKey, writeKey
+    ) where
 
 import           Control.Monad.Reader
 import           Control.Monad.State.Class
--- import           Control.Selective
-import           Data.Bifunctor             (first)
 import qualified Data.Map.Strict            as Map
 import           Prelude                    hiding (log, not, read, readIO)
-import           Unsafe.Coerce
-
-import           Control.Monad.Cont
-import           ISA.Selective
-import           ISA.Types
-import           ISA.Types.Symbolic
-
-import           ISA.Types.Symbolic.Context
-
-import           Control.Monad.Reader
-import           Control.Monad.State.Class
--- import           Control.Selective
-import qualified Data.Map.Strict            as Map
 import           Prelude                    hiding (log, not, read, readIO)
 import           Unsafe.Coerce
 
@@ -54,11 +37,7 @@ import           ISA.Types.Symbolic.Context
 --
 --   A fun note: isn't this a monadic parser? How can we explore a connection between
 --   symbolic execution and parsing and turn it into a functional pearl for ICFP...
-data Engine a = Engine
-    { runEngine :: Context -> IO [(a, Context)] }
-
--- fmapSingle :: (a -> b) -> (Context -> IO (a, Context)) -> (Context -> IO (b, Context))
--- fmapSingle
+data Engine a = Engine { runEngine :: Context -> IO [(a, Context)] }
 
 -- | The 'Functor' instance for @Engine@
 instance Functor Engine where
@@ -98,40 +77,29 @@ instance Selective Engine where
     concat <$> forM xs (\(cond, ctx) ->
                           decide (unsafeCoerce cond, ctx)
                                  (unsafeCoerce boolElim) (unsafeCoerce dataElim))
-    -- (cond, s) <- runEngine condition s0
-    -- case (trySolve . unsafeCoerce $ cond) of
-    --   Trivial True  -> runEngine (boolElim True) s
-    --   Trivial False -> runEngine (boolElim False) s
-    --   Nontrivial symbolic ->
-    --     let onTrue  = s { _pathCondition = SAnd symbolic (_pathCondition s) }
-    --         onFalse = s { _pathCondition = SAnd (SNot symbolic) (_pathCondition s) }
-    --     in runEngine (boolElim True *> (($ (unsafeCoerce symbolic)) <$> dataElim)) onTrue
-    --        ++
-    --        runEngine (boolElim False *> pure (unsafeCoerce symbolic)) onFalse
-    --        -- [((unsafeCoerce symbolic) :: b, onFalse)]
 
--- -- | A 'Monad' instance for 'Engine' is a combination of state and list monads:
--- --   * 'return' embeds the value paired with the current state into a list
--- --   * '>>=' exploits the list monad to run 'f' on every result of 'computation' and
--- --     join the resulting lists of results.
+-- | A 'Monad' instance for 'Engine' is a combination of state and list monads:
+--   * 'return' embeds the value paired with the current state into a list
+--   * '>>=' exploits the list monad to run 'f' on every result of 'computation' and
+--     join the resulting lists of results.
 instance Prelude.Monad Engine where
-    -- return a       = Engine $ \s -> [(a, s)]
-    Engine computation >>= f = Engine $ \s -> do
-      xs <- computation s
-      ys <- forM xs $ \(x, s') -> runEngine (f x) s'
-      pure $ concat ys
+  return       = pure
+  Engine computation >>= f = Engine $ \s -> do
+    xs <- computation s
+    ys <- forM xs $ \(x, s') -> runEngine (f x) s'
+    pure $ concat ys
 
 instance (MonadState Context) Engine where
-    get   = Engine $ \s -> pure [(s, s)]
-    put s = Engine $ \_ -> pure [((), s)]
+  get   = Engine $ \s -> pure [(s, s)]
+  put s = Engine $ \_ -> pure [((), s)]
 
 readKey :: Key -> Engine (Data Sym)
 readKey key = do
-    ctx <- get
-    let x = case Map.lookup key (_bindings ctx) of
-              Just v -> v
-              Nothing -> error $ "Engine.readKey: uninitialised key " <> show key
-    pure (MkData x)
+  ctx <- get
+  let x = case Map.lookup key (_bindings ctx) of
+            Just v -> v
+            Nothing -> error $ "Engine.readKey: uninitialised key " <> show key
+  pure (MkData x)
 
 writeKey :: Key -> Engine (Data Sym) -> Engine (Data Sym)
 writeKey key computation = do
