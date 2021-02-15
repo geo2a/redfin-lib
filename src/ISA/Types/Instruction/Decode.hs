@@ -1,5 +1,7 @@
-{-# LANGUAGE GADTs      #-}
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiWayIf            #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE TypeApplications      #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Types.Instruction.Decode
@@ -31,25 +33,25 @@ import           ISA.Types.Symbolic
 symbolise :: Instruction (Data Int32) -> Instruction (Data Sym)
 symbolise (Instruction i) =
   case i of
-    Halt              -> mkI $ Halt
-    Load   reg1 addr1 -> mkI $ Load   reg1 addr1
-    Add    reg1 addr1 -> mkI $ Add    reg1 addr1
-    AddI   reg1 imm   -> mkI $ AddI   reg1 ((fmap (SConst . CInt32)) <$> imm)
-    Sub    reg1 addr1 -> mkI $ Sub    reg1 addr1
-    SubI   reg1 imm   -> mkI $ SubI   reg1 ((fmap (SConst . CInt32)) <$> imm)
-    Mul    reg1 addr1 -> mkI $ Mul    reg1 addr1
-    Div    reg1 addr1 -> mkI $ Div    reg1 addr1
-    Mod    reg1 addr1 -> mkI $ Mod    reg1 addr1
-    Store  reg1 addr1 -> mkI $ Store  reg1 addr1
-    Set    reg1 imm1  -> mkI $ Set    reg1 ((fmap (SConst . CInt32)) <$> imm1)
-    Abs    reg1       -> mkI $ Abs    reg1
-    Jump   offset1    -> mkI $ Jump   ((fmap (SConst . CInt32)) <$> offset1)
-    JumpCt offset1    -> mkI $ JumpCt ((fmap (SConst . CInt32)) <$> offset1)
-    JumpCf offset1    -> mkI $ JumpCf ((fmap (SConst . CInt32)) <$> offset1)
-    LoadMI reg1 addr1 -> mkI $ LoadMI reg1 addr1
-    CmpEq  reg1 addr1 -> mkI $ CmpEq  reg1 addr1
-    CmpGt  reg1 addr1 -> mkI $ CmpGt  reg1 addr1
-    CmpLt  reg1 addr1 -> mkI $ CmpLt  reg1 addr1
+    Halt              -> mkI $ Halt @Value
+    Load   reg1 addr1 -> mkI $ Load @Value   reg1 addr1
+    Add    reg1 addr1 -> mkI $ Add @Value    reg1 addr1
+    AddI   reg1 imm   -> mkI $ AddI @Value   reg1 ((fmap (SConst . CInt32)) <$> imm)
+    Sub    reg1 addr1 -> mkI $ Sub @Value    reg1 addr1
+    SubI   reg1 imm   -> mkI $ SubI @Value   reg1 ((fmap (SConst . CInt32)) <$> imm)
+    Mul    reg1 addr1 -> mkI $ Mul @Value    reg1 addr1
+    Div    reg1 addr1 -> mkI $ Div @Value    reg1 addr1
+    Mod    reg1 addr1 -> mkI $ Mod @Value    reg1 addr1
+    Store  reg1 addr1 -> mkI $ Store @Value  reg1 addr1
+    Set    reg1 imm1  -> mkI $ Set @Value    reg1 ((fmap (SConst . CInt32)) <$> imm1)
+    Abs    reg1       -> mkI $ Abs @Value    reg1
+    Jump   offset1    -> mkI $ Jump @Value   ((fmap (SConst . CInt32)) <$> offset1)
+    JumpCt offset1    -> mkI $ JumpCt @Value ((fmap (SConst . CInt32)) <$> offset1)
+    JumpCf offset1    -> mkI $ JumpCf @Value ((fmap (SConst . CInt32)) <$> offset1)
+    LoadMI reg1 addr1 -> mkI $ LoadMI @Value reg1 addr1
+    CmpEq  reg1 addr1 -> mkI $ CmpEq @Value  reg1 addr1
+    CmpGt  reg1 addr1 -> mkI $ CmpGt @Value  reg1 addr1
+    CmpLt  reg1 addr1 -> mkI $ CmpLt @Value  reg1 addr1
 
 -- | Try to decode the instruction represented by a concrete symbolic instruction code
 toInstruction :: Sym -> Either Sym (Instruction (Data Int32))
@@ -59,65 +61,65 @@ toInstruction sym = case sym of
                            Nothing -> Left sym
   _                   -> Left sym
 
-decode :: InstructionCode -> Maybe (Instruction (Data Int32))
+decode :: Value a => InstructionCode -> Maybe (Instruction a)
 decode (InstructionCode code) =
     let expandedCode = blastLE code
         opcode = decodeOpcode expandedCode
     in case tag opcode of
-      Just TagHalt   -> Just $ Instruction Halt
+      Just TagHalt   -> Just $ Instruction (Halt @Value)
       Just TagLoad   -> Just $ Instruction $
-              Load (decodeRegister . extractRegister $ expandedCode)
+              Load @Value (decodeRegister . extractRegister $ expandedCode)
                    (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagSet    -> Just $ Instruction $
-              Set (decodeRegister . extractRegister $ expandedCode)
-                  (Imm . MkData . fromIntegral . fromBitsLEInt8 $ extractSImm8 expandedCode)
+              Set @Value (decodeRegister . extractRegister $ expandedCode)
+                  (Imm . fromIntegral . fromBitsLEInt8 $ extractSImm8 expandedCode)
       Just TagStore  -> Just $ Instruction $
-              Store (decodeRegister . extractRegister $ expandedCode)
+              Store @Value (decodeRegister . extractRegister $ expandedCode)
                    (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagAdd    -> Just $ Instruction $
-              Add (decodeRegister . extractRegister $ expandedCode)
+              Add @Value (decodeRegister . extractRegister $ expandedCode)
                    (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagAddI   -> Just $ Instruction $
-              AddI (decodeRegister . extractRegister $ expandedCode)
-             (Imm . MkData . fromIntegral . fromBitsLEInt8 $ extractSImm8 expandedCode)
+              AddI @Value (decodeRegister . extractRegister $ expandedCode)
+             (Imm . fromIntegral . fromBitsLEInt8 $ extractSImm8 expandedCode)
       Just TagSub    -> Just $ Instruction $
-              Sub (decodeRegister . extractRegister $ expandedCode)
+              Sub @Value (decodeRegister . extractRegister $ expandedCode)
                   (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagSubI   -> Just $ Instruction $
-              SubI (decodeRegister . extractRegister $ expandedCode)
-             (Imm . MkData . fromIntegral . fromBitsLEInt8 $ extractSImm8 expandedCode)
+              SubI @Value (decodeRegister . extractRegister $ expandedCode)
+             (Imm . fromIntegral . fromBitsLEInt8 $ extractSImm8 expandedCode)
       Just TagMul    -> Just $ Instruction $
-              Mul (decodeRegister . extractRegister $ expandedCode)
+              Mul @Value (decodeRegister . extractRegister $ expandedCode)
                    (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagDiv    -> Just $ Instruction $
-              Div (decodeRegister . extractRegister $ expandedCode)
+              Div @Value (decodeRegister . extractRegister $ expandedCode)
                    (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagMod    -> Just $ Instruction $
-              Mod (decodeRegister . extractRegister $ expandedCode)
+              Mod @Value (decodeRegister . extractRegister $ expandedCode)
                    (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagAbs    -> Just $ Instruction $
-              Abs (decodeRegister . extractRegister $ expandedCode)
+              Abs @Value (decodeRegister . extractRegister $ expandedCode)
       Just TagJump   -> Just $ Instruction $
-              Jump (Imm . MkData . fromIntegral . fromBitsLEInt8
+              Jump @Value (Imm . fromIntegral . fromBitsLEInt8
                     $ extractSImm8Jump expandedCode)
       Just TagLoadMI -> Just $ Instruction $
-              LoadMI (decodeRegister . extractRegister $ expandedCode)
+              LoadMI @Value (decodeRegister . extractRegister $ expandedCode)
                    (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagCmpEq  -> Just $ Instruction $
-              CmpEq (decodeRegister . extractRegister $ expandedCode)
+              CmpEq @Value (decodeRegister . extractRegister $ expandedCode)
                    (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagCmpGt  -> Just $ Instruction $
-              CmpGt (decodeRegister . extractRegister $ expandedCode)
+              CmpGt @Value (decodeRegister . extractRegister $ expandedCode)
                    (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagCmpLt  -> Just $ Instruction $
-              CmpLt (decodeRegister . extractRegister $ expandedCode)
+              CmpLt @Value (decodeRegister . extractRegister $ expandedCode)
                    (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagJumpCt -> Just $ Instruction $
-              JumpCt
-             (Imm . MkData . fromIntegral . fromBitsLEInt8 $ extractSImm8Jump expandedCode)
+              JumpCt @Value
+             (Imm . fromIntegral . fromBitsLEInt8 $ extractSImm8Jump expandedCode)
       Just TagJumpCf -> Just $ Instruction $
-              JumpCf
-             (Imm . MkData . fromIntegral . fromBitsLEInt8 $ extractSImm8Jump expandedCode)
+              JumpCf @Value
+             (Imm . fromIntegral . fromBitsLEInt8 $ extractSImm8Jump expandedCode)
       Nothing -> Nothing
 
 decodeRegister :: [Bool] -> Register

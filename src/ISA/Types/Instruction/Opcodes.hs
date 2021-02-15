@@ -86,7 +86,7 @@ enumOpcodes width =
   map MkOpcode $ replicateM width [False, True]
 
 -- | Calculate the opcode of an instruction
-opcode :: Instruction a -> Opcode
+opcode :: Show a => Instruction a -> Opcode
 opcode i =
   case lookup (toTag i) (zip [minBound..maxBound] (enumOpcodes opcode_width)) of
     Just c -> c

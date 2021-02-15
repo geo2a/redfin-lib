@@ -1,4 +1,5 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs            #-}
+{-# LANGUAGE TypeApplications #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Types.Instruction.Encode
@@ -11,9 +12,8 @@
 --
 -----------------------------------------------------------------------------
 
-module ISA.Types.Instruction.Encode
-    (encode
-    , concretiseInstr) where
+module ISA.Types.Instruction.Encode (encode) where
+
 
 import           Data.Int                      (Int32, Int8)
 
@@ -30,27 +30,27 @@ concretiseImm (Imm (MkData i)) =
     Left sym -> error $ "Instruction.encode: symbolic immediate argument"
                 <> show sym
 
-concretiseInstr :: Instruction (Data Sym) -> Instruction (Data Int8)
-concretiseInstr = \case
-    Instruction Halt -> Instruction  Halt
-    Instruction (Load     r addr) -> Instruction (Load r addr)
-    Instruction (LoadMI   r addr) -> Instruction (LoadMI r addr)
-    Instruction (Set      r imm) ->  Instruction (Set r (concretiseImm imm))
-    Instruction (Store    r addr) -> Instruction (Store r addr)
-    Instruction (Add      r addr) -> Instruction (Add r addr)
-    Instruction (AddI     r imm)  -> Instruction (AddI r (concretiseImm imm))
-    Instruction (Jump     imm   ) -> Instruction (Jump (concretiseImm imm))
-    Instruction (CmpEq      r addr) -> Instruction (CmpEq r addr)
-    Instruction (CmpLt      r addr) -> Instruction (CmpLt r addr)
-    Instruction (CmpGt      r addr) -> Instruction (CmpGt r addr)
-    Instruction (JumpCt imm)   -> Instruction (JumpCt (concretiseImm imm))
-    Instruction (JumpCf imm)   -> Instruction (JumpCf (concretiseImm imm))
-    Instruction (Sub      r addr) -> Instruction (Sub r addr)
-    Instruction (SubI     r imm)  -> Instruction (SubI r (concretiseImm imm))
-    Instruction (Mul      r addr) -> Instruction (Mul r addr)
-    Instruction (Div      r addr) -> Instruction (Div r addr)
-    Instruction (Mod      r addr) -> Instruction (Mod r addr)
-    Instruction (Abs      r)      -> Instruction (Abs r)
+-- concretiseInstr :: Instruction (Data Sym) -> Instruction (Data Int8)
+-- concretiseInstr = \case
+--     Instruction Halt -> Instruction  Halt
+--     Instruction (Load     r addr) -> Instruction (Load r addr)
+--     Instruction (LoadMI   r addr) -> Instruction (LoadMI r addr)
+--     Instruction (Set      r imm) ->  Instruction (Set r (concretiseImm imm))
+--     Instruction (Store    r addr) -> Instruction (Store r addr)
+--     Instruction (Add      r addr) -> Instruction (Add r addr)
+--     Instruction (AddI     r imm)  -> Instruction (AddI r (concretiseImm imm))
+--     Instruction (Jump     imm   ) -> Instruction (Jump (concretiseImm imm))
+--     Instruction (CmpEq      r addr) -> Instruction (CmpEq r addr)
+--     Instruction (CmpLt      r addr) -> Instruction (CmpLt r addr)
+--     Instruction (CmpGt      r addr) -> Instruction (CmpGt r addr)
+--     Instruction (JumpCt imm)   -> Instruction (JumpCt (concretiseImm imm))
+--     Instruction (JumpCf imm)   -> Instruction (JumpCf (concretiseImm imm))
+--     Instruction (Sub      r addr) -> Instruction (Sub r addr)
+--     Instruction (SubI     r imm)  -> Instruction (SubI r (concretiseImm imm))
+--     Instruction (Mul      r addr) -> Instruction (Mul r addr)
+--     Instruction (Div      r addr) -> Instruction (Div r addr)
+--     Instruction (Mod      r addr) -> Instruction (Mod r addr)
+--     Instruction (Abs      r)      -> Instruction (Abs @ @(Data Int8) r)
 
 encode :: Instruction (Data Int32) -> InstructionCode
 encode i = InstructionCode . fromBitsLEWord16 $ case i of

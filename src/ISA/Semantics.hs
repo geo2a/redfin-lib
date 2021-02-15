@@ -34,15 +34,15 @@ type Monad f = (Selective f, Prelude.Monad f)
 -----------------------------------------------------------------------------
 
 -- | Halt the execution.
-halt :: FS Key Applicative Value a
+halt :: FS Key Applicative '[Boolean] a
 halt _ write = write (F Halted) (pure true)
 
 -- | Load a value from a memory cell to a register
-load :: Register -> Address -> FS Key Functor Value a
+load :: Register -> Address -> FS Key Functor '[] a
 load reg addr read write = write (Reg reg) (read (Addr addr))
 
 -- | Load a value referenced by another  value in a memory cell to a register
-loadMI :: Addressable a => Register -> Address -> FS Key Monad Value a
+loadMI :: Register -> Address -> FS Key Monad '[Addressable, Show] a
 loadMI reg pointer read write =
   read (Addr pointer) >>= \x ->
     case toMemoryAddress x of
@@ -51,17 +51,17 @@ loadMI reg pointer read write =
       Just addr -> write (Reg reg) (read (Addr addr))
 
 -- | Write an immediate argument to a register
-set :: Register -> Imm a -> FS Key Applicative Value a
+set :: Register -> Imm a -> FS Key Applicative '[] a
 set reg (Imm imm) _ write =
   write (Reg reg) (pure imm)
 
 -- | Store a value from a register to a memory cell
-store :: Register -> Address -> FS Key Functor Value a
+store :: Register -> Address -> FS Key Functor '[] a
 store reg addr read write =
   write (Addr addr) (read (Reg reg))
 
 -- | A pure check for integer overflow during addition.
-willOverflowPure :: Value a => a -> a -> Prop a
+willOverflowPure :: (Num a, Bounded a, Boolean a, TryOrd a) => a -> a -> Prop a
 willOverflowPure x y =
     let o1 = gt y 0
         o2 = gt x((-) maxBound y)
@@ -70,7 +70,7 @@ willOverflowPure x y =
     in  (|||) ((&&&) o1 o2)
               ((&&&) o3 o4)
 
-add :: Register -> Address -> FS Key Selective Value a
+add :: Register -> Address -> FS Key Selective '[Monoid, Num, Bounded, Boolean, TryOrd] a
 add reg addr read write =
   let arg1 = read (Reg reg)
       arg2 = read (Addr addr)
@@ -82,96 +82,91 @@ add reg addr read write =
     -- select o (const (pure mempty)) (pure id) *>
     write (Reg reg) result
 
-addI :: Register -> Imm a -> FS Key Selective Value a
+addI :: Register -> Imm a -> FS Key Selective '[Num] a
 addI reg (Imm imm) read write =
   let arg1 = read (Reg reg)
       arg2 = pure imm
       result = (+) <$> arg1 <*> arg2
   in write (Reg reg) result
 
-sub :: Register -> Address -> FS Key Selective Value a
+sub :: Register -> Address -> FS Key Selective '[Num] a
 sub reg addr read write =
   let arg1 = read (Reg reg)
       arg2 = read (Addr addr)
       result = (-) <$> arg1 <*> arg2
   in write (Reg reg) result
 
-subI :: Register -> Imm a -> FS Key Selective Value a
+subI :: Register -> Imm a -> FS Key Selective '[Num] a
 subI reg (Imm imm) read write =
   let arg1 = read (Reg reg)
       arg2 = pure imm
       result = (-) <$> arg1 <*> arg2
   in write (Reg reg) result
 
-mul :: Register -> Address -> FS Key Selective Value a
+mul :: Register -> Address -> FS Key Selective '[Num] a
 mul reg addr read write =
   let arg1 = read (Reg reg)
       arg2 = read (Addr addr)
       result = (*) <$> arg1 <*> arg2
   in write (Reg reg) result
 
-div :: Register -> Address -> FS Key Selective Value a
+div :: Register -> Address -> FS Key Selective '[Integral] a
 div reg addr read write =
   let arg1 = read (Reg reg)
       arg2 = read (Addr addr)
       result = (Prelude.div) <$> arg1 <*> arg2
   in write (Reg reg) result
 
-mod :: Register -> Address -> FS Key Selective Value a
+mod :: Register -> Address -> FS Key Selective '[Integral] a
 mod reg addr read write =
   let arg1 = read (Reg reg)
       arg2 = read (Addr addr)
       result = (Prelude.mod) <$> arg1 <*> arg2
   in write (Reg reg) result
 
-abs :: Register ->  FS Key Functor Value a
+abs :: Register ->  FS Key Functor '[Num] a
 abs reg read write =
   let arg = read (Reg reg)
       result = (Prelude.abs) <$> arg
   in write (Reg reg) result
 
 -- | Compare the values in the register and memory cell
-cmpEq :: Register -> Address -> FS Key Selective Value a
+cmpEq :: Register -> Address -> FS Key Selective '[Boolean, TryEq, Monoid] a
 cmpEq reg addr = \read write ->
   write (F Condition) (elimProp <$> ((===) <$> read (Reg reg) <*> read (Addr addr)))
 
-cmpGt :: Register -> Address -> FS Key Selective Value a
+cmpGt :: Register -> Address -> FS Key Selective '[Boolean, TryOrd, Monoid] a
 cmpGt reg addr = \read write ->
-  write (F Condition) ((>) <$> read (Reg reg) <*> read (Addr addr) *> read (F Condition))
+  write (F Condition) (elimProp <$> (gt <$> read (Reg reg) <*> read (Addr addr)))
   -- ifS ((>) <$> read (Reg reg) <*> read (Addr addr))
   --      (write (F Condition) (pure true))
   --      (write (F Condition) (pure false))
 
-cmpLt :: Register -> Address -> FS Key Selective Value a
+cmpLt :: Register -> Address -> FS Key Selective '[Boolean, TryOrd, Monoid] a
 cmpLt reg addr = \read write ->
   write (F Condition) (elimProp <$> (lt <$> read (Reg reg) <*> read (Addr addr)))
   -- ifS ((<) <$> read (Reg reg) <*> read (Addr addr))
   --     (write (F Condition) (pure true))
   --     (write (F Condition) (pure false))
 
-e :: Value a => a -> Either a a
+e :: Boolean a => a -> Either a a
 e x = case toBool x of True  -> Left x
                        False -> Right x
 
-
 -- | Perform jump if flag @Condition@ is set
-jumpCt :: Imm a -> FS Key Selective Value a
+jumpCt :: Imm a -> FS Key Selective '[Boolean, Num] a
 jumpCt (Imm offset) read write =
   select (e <$> read (F Condition))
          (const <$> (write IC ((+) <$> pure offset <*> read IC)))
-  -- ifS ((==) <$> read (F Condition) <*> pure true)
-  --     (write IC ((+) <$> pure offset <*> read IC))
-  --     (write IC ((+) <$> pure 0 <*> read IC))
 
 -- | Perform jump if flag @Condition@ is set
-jumpCf :: Imm a -> FS Key Selective Value a
+jumpCf :: Imm a -> FS Key Selective '[Boolean, Num] a
 jumpCf (Imm offset) read write =
-  ifS ((==) <$> read (F Condition) <*> pure (ISA.Types.not true))
-      (write IC ((+) <$> pure offset <*> read IC))
-      (write IC ((+) <$> pure 0 <*> read IC))
+  select (e . ISA.Types.not <$> read (F Condition))
+         (const <$> (write IC ((+) <$> pure offset <*> read IC)))
 
 -- | Perform unconditional jump
-jump :: Imm a -> FS Key Applicative Value a
+jump :: Imm a -> FS Key Applicative '[Num] a
 jump (Imm offset) read write =
   write IC ((+) <$> pure offset <*> read IC)
 
@@ -182,7 +177,8 @@ jump (Imm offset) read write =
 -- fetchInstruction read write =
 --       read IC >>= \ic -> write IR (read (Prog ic))
 
-instructionSemanticsS :: Instruction a -> FS Key Selective Value a
+instructionSemanticsS :: Instruction a
+                      -> FS Key Selective '[Monoid, Integral, Bounded, Boolean, TryEq, TryOrd] a
 instructionSemanticsS (Instruction i) r w = case i of
     Halt           -> halt r w
     Load reg addr  -> load reg addr r w
@@ -208,8 +204,8 @@ instructionSemanticsS (Instruction i) r w = case i of
     JumpCt simm8   -> jumpCt simm8 r w
     JumpCf simm8   -> jumpCf simm8 r w
 
-instructionSemanticsM ::
-  (Addressable a) => Instruction a -> FS Key Monad Value a
+instructionSemanticsM :: Instruction a
+                      -> FS Key Monad '[Show, Addressable, Monoid, Integral, Bounded, Boolean, TryEq, TryOrd] a
 instructionSemanticsM (Instruction i) r w = case i of
   LoadMI reg addr -> loadMI reg addr r w
   _               -> instructionSemanticsS (Instruction i) r w

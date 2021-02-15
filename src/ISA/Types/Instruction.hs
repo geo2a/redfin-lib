@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds            #-}
+{-# LANGUAGE TypeApplications            #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
@@ -20,6 +21,7 @@
 module ISA.Types.Instruction
     ( Instruction(..), mkI
     , InstructionImpl(..), instrEq
+    , Unconstrained
     )
   where
 
@@ -46,33 +48,33 @@ import           ISA.Types
 class Unconstrained (a :: * -> *)
 instance Unconstrained a
 
-data InstructionImpl (c :: (* -> *) -> Constraint) a where
-  Halt     :: InstructionImpl Applicative a
-  Load     :: Register -> Address -> InstructionImpl Functor a
-  Set      :: Value a => Register -> Imm a         -> InstructionImpl Functor a
-  Store    :: Register -> Address -> InstructionImpl Functor a
-  Add      :: Register -> Address -> InstructionImpl Applicative a
-  AddI     :: Value a => Register -> Imm a -> InstructionImpl Applicative a
-  Sub      :: Register -> Address -> InstructionImpl Applicative a
-  SubI     :: Value a => Register -> Imm a -> InstructionImpl Applicative a
-  Mul      :: Register -> Address -> InstructionImpl Applicative a
-  Div      :: Register -> Address -> InstructionImpl Applicative a
-  Mod      :: Register -> Address -> InstructionImpl Applicative a
-  Abs      :: Register                  -> InstructionImpl Applicative a
-  Jump     :: Value a => Imm a                    -> InstructionImpl Applicative a
-  LoadMI   :: Register -> Address -> InstructionImpl Prelude.Monad a
+data InstructionImpl (control :: (* -> *) -> Constraint) (value :: * -> Constraint) a where
+  Halt     :: InstructionImpl Applicative value a
+  Load     :: Register -> Address -> InstructionImpl Functor value a
+  Set      :: value a => Register -> Imm a         -> InstructionImpl Functor value a
+  Store    :: Register -> Address -> InstructionImpl Functor value a
+  Add      :: Register -> Address -> InstructionImpl Applicative value a
+  AddI     :: value a => Register -> Imm a -> InstructionImpl Applicative value a
+  Sub      :: Register -> Address -> InstructionImpl Applicative value a
+  SubI     :: value a => Register -> Imm a -> InstructionImpl Applicative value a
+  Mul      :: Register -> Address -> InstructionImpl Applicative value a
+  Div      :: Register -> Address -> InstructionImpl Applicative value a
+  Mod      :: Register -> Address -> InstructionImpl Applicative value a
+  Abs      :: Register                  -> InstructionImpl Applicative value a
+  Jump     :: value a => Imm a                    -> InstructionImpl Applicative value a
+  LoadMI   :: Register -> Address -> InstructionImpl Prelude.Monad value a
 
-  CmpEq    :: Register  -> Address -> InstructionImpl Selective a
-  CmpGt    :: Register  -> Address -> InstructionImpl Selective a
-  CmpLt    :: Register  -> Address -> InstructionImpl Selective a
+  CmpEq    :: Register  -> Address -> InstructionImpl Selective value a
+  CmpGt    :: Register  -> Address -> InstructionImpl Selective value a
+  CmpLt    :: Register  -> Address -> InstructionImpl Selective value a
 
-  JumpCt   :: Value a => Imm a -> InstructionImpl Selective a
-  JumpCf   :: Value a => Imm a -> InstructionImpl Selective a
+  JumpCt   :: value a => Imm a -> InstructionImpl Selective value a
+  JumpCf   :: value a => Imm a -> InstructionImpl Selective value a
 
-deriving instance Eq a => Eq (InstructionImpl c a)
+deriving instance Eq a => Eq (InstructionImpl c v a)
 -- deriving instance Ord (InstructionImpl c)
 
-instance Show (InstructionImpl c a) where
+instance Show a => Show (InstructionImpl control value a) where
   show = \case
     Halt               -> "Halt"
     Load     reg addr  -> "Load "     ++ show reg ++ " " ++ show addr
@@ -95,12 +97,12 @@ instance Show (InstructionImpl c a) where
     CmpGt    reg addr  -> "CmpGt " ++ show reg ++ " " ++ show addr
     CmpLt    reg addr  -> "CmpLt " ++ show reg ++ " " ++ show addr
 
-data Instruction a = forall c. Instruction (InstructionImpl c a)
+data Instruction a = forall c v. v a => Instruction (InstructionImpl c v a)
 
 instance Eq a => Eq (Instruction a) where
   (Instruction i) == (Instruction j) = i `instrEq` j
 
-instrEq :: Eq a => InstructionImpl c1 a -> InstructionImpl c2 a -> Bool
+instrEq :: Eq a => InstructionImpl c1 v1 a -> InstructionImpl c2 v2 a -> Bool
 instrEq i j = case (i, j) of
   (Halt, Halt) -> True
   (Load   reg1 addr1, Load   reg2 addr2) -> reg1 == reg2 && addr1 == addr2
@@ -123,11 +125,13 @@ instrEq i j = case (i, j) of
   (CmpLt  reg1 addr1, CmpLt  reg2 addr2) -> reg1 == reg2 && addr1 == addr2
   (_,_) -> False
 
-mkI :: forall c a. InstructionImpl c a -> Instruction a
+mkI :: forall c v a. v a => InstructionImpl c v a -> Instruction a
 mkI = Instruction
 
-instance Show (Instruction a) where
+instance Show a => Show (Instruction a) where
   show (Instruction i) = show i
+
+
 
 -- -- | Programs are stored in program memory.
 -- type InstructionAddress = Value

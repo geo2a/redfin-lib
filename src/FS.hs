@@ -1,6 +1,13 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE KindSignatures  #-}
-{-# LANGUAGE RankNTypes      #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE PolyKinds             #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module     : FS
@@ -11,15 +18,27 @@
 --
 -- Fine-grained state
 -----------------------------------------------------------------------------
-module FS (FS) where
+module FS  where
 
-import           Data.Constraint (Constraint)
+import           Data.Constraint
+
+-- | Trivial class with no restrictions -- any type of kind * has an instance
+class Any a where
+instance Any a where
+
+-- | Constrain the type 'a' by a list of constraints
+type family CS (cs :: [* -> Constraint]) (a :: *) :: Constraint where
+  CS cs a = CSGo cs (Any a) a
+
+type family CSGo (cs :: [* -> Constraint]) (acc :: Constraint) a :: Constraint where
+  CSGo '[] acc _ = acc
+  CSGo (x ': xs) acc a = CSGo xs (x a, acc) a
 
 type FS (key :: *)
         (control :: (* -> *) -> Constraint)
-        (value :: * -> Constraint)
+        (value :: [* -> Constraint])
         (a :: *) =
-  forall f . (control f, value a)
+  forall f . (control f, CS value a)
           => (key -> f a)
           -> (key -> f a -> f a)
           -> f a

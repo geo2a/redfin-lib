@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Assembly
@@ -118,41 +119,41 @@ label name = do
     put $ s {labels = Map.insert name ic $ labels s}
 
 -- Instruction mnemonics
-add   rX dmemaddr = instr (Instruction $ Add    rX dmemaddr)
-add_i rX imm      = instr (Instruction $ AddI   rX imm)
-sub   rX dmemaddr = instr (Instruction $ Sub    rX dmemaddr)
-sub_i rX imm      = instr (Instruction $ SubI   rX imm)
-mul   rX dmemaddr = instr (Instruction $ Mul    rX dmemaddr)
-div   rX dmemaddr = instr (Instruction $ Div    rX dmemaddr)
-mod   rX dmemaddr = instr (Instruction $ Mod    rX dmemaddr)
-ld    rX dmemaddr = instr (Instruction $ Load   rX dmemaddr)
-st    rX dmemaddr = instr (Instruction $ Store  rX dmemaddr)
-ldmi  rX dmemaddr = instr (Instruction $ LoadMI rX dmemaddr)
--- stmi  rX dmemaddr = instr (Instruction StoreMI $ rX dmemaddr)
-cmpeq rX dmemaddr = instr (Instruction $ CmpEq rX dmemaddr)
-cmplt rX dmemaddr = instr (Instruction $ CmpLt rX dmemaddr)
-cmpgt rX dmemaddr = instr (Instruction $ CmpGt rX dmemaddr)
--- sl    rX dmemaddr = instr (Instruction $ rX dmemaddr)
--- sr    rX dmemaddr = instr (Instruction $ rX dmemaddr)
--- sra   rX dmemaddr = instr (Instruction $ rX dmemaddr)
+add   rX dmemaddr = instr (Instruction $ Add @Value    rX dmemaddr)
+add_i rX imm      = instr (Instruction $ AddI @Value   rX imm)
+sub   rX dmemaddr = instr (Instruction $ Sub @Value    rX dmemaddr)
+sub_i rX imm      = instr (Instruction $ SubI @Value   rX imm)
+mul   rX dmemaddr = instr (Instruction $ Mul @Value    rX dmemaddr)
+div   rX dmemaddr = instr (Instruction $ Div @Value    rX dmemaddr)
+mod   rX dmemaddr = instr (Instruction $ Mod @Value    rX dmemaddr)
+ld    rX dmemaddr = instr (Instruction $ Load @Value   rX dmemaddr)
+st    rX dmemaddr = instr (Instruction $ Store @Value  rX dmemaddr)
+ldmi  rX dmemaddr = instr (Instruction $ LoadMI @Value rX dmemaddr)
+-- stmi  rX dmemaddr = instr (Instruction StoreMI $ rX @Value dmemaddr)
+cmpeq rX dmemaddr = instr (Instruction $ CmpEq @Value rX dmemaddr)
+cmplt rX dmemaddr = instr (Instruction $ CmpLt @Value rX dmemaddr)
+cmpgt rX dmemaddr = instr (Instruction $ CmpGt @Value rX dmemaddr)
+-- sl    rX dmemaddr = instr (Instruction $ rX @Value dmemaddr)
+-- sr    rX dmemaddr = instr (Instruction $ rX @Value dmemaddr)
+-- sra   rX dmemaddr = instr (Instruction $ rX @Value dmemaddr)
 
 -- add_si rX simm = write 0b100000 (register rX .|. simm8 simm)
 -- sub_si rX simm = write 0b100001 (register rX .|. simm8 simm)
 -- mul_si rX simm = write 0b100010 (register rX .|. simm8 simm)
 -- div_si rX simm = write 0b100011 (register rX .|. simm8 simm)
-ld_i  rX simm = instr (Instruction $ Set rX simm)
+ld_i  rX simm = instr (Instruction $ Set @Value rX simm)
 
 -- sl_i   rX uimm = write 0b101100 (register rX .|. uimm8 uimm)
 -- sr_i   rX uimm = write 0b101101 (register rX .|. uimm8 uimm)
 -- sra_i  rX uimm = write 0b101110 (register rX .|. uimm8 uimm)
 -- ld_i   rX uimm = write 0b101111 (register rX .|. uimm8 uimm)
 
-jmpi    simm = instr (Instruction $ Jump     simm)
-jmpi_ct simm = instr (Instruction $ JumpCt simm)
-jmpi_cf simm = instr (Instruction $ JumpCf simm)
+jmpi    simm = instr (Instruction $ Jump @Value     simm)
+jmpi_ct simm = instr (Instruction $ JumpCt @Value simm)
+jmpi_cf simm = instr (Instruction $ JumpCf @Value simm)
 -- wait    uimm = write 0b110011 (uimm10 uimm)
 
 -- not rX = write 0b111000 (register rX)
-abs rX = instr (Instruction $ Abs rX)
-halt   = instr (Instruction $ Halt)
+abs rX = instr (Instruction $ Abs @Value rX)
+halt   = instr (Instruction $ Halt @Value)
 --------------------------------------------------------------------------------
