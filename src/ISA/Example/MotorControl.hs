@@ -29,8 +29,8 @@ import qualified Data.Map.Strict              as Map
 import qualified Data.SBV                     as SBV
 
 import           ISA.Assembly
-import           ISA.Backend.CFG
 import           ISA.Backend.Dependencies
+import           ISA.Backend.Graph.BasicBlock
 -- import           ISA.Backend.Symbolic.List
 -- import           ISA.Backend.Symbolic.List.Run
 -- import           ISA.Backend.Symbolic.List.Trace
@@ -42,6 +42,7 @@ import qualified ISA.Types.Context            as ISA.Types
 import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
+import           ISA.Types.Prop
 import           ISA.Types.Symbolic
 
 

@@ -20,6 +20,7 @@ import           Data.Text          (Text)
 import           GHC.Generics
 
 import           ISA.Types
+import           ISA.Types.Prop
 import           ISA.Types.SBV
 import           ISA.Types.Symbolic
 

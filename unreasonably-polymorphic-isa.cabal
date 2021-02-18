@@ -23,11 +23,11 @@ library
   default-language: Haskell2010
   exposed-modules:
       ISA.Assembly,
-      ISA.Selective,
       ISA.Semantics,
 
       ISA.Types,
       ISA.Types.CTL,
+      ISA.Types.Prop,
       ISA.Types.CTL.Model,
       ISA.Types.SBV,
       ISA.Types.Tree,
@@ -38,6 +38,8 @@ library
       ISA.Types.Instruction.Opcodes,
       ISA.Types.Symbolic,
       ISA.Backend.Dependencies,
+      ISA.Backend.Graph,
+      ISA.Backend.Graph.BasicBlock,
       ISA.Backend.Symbolic.Zipper,
       ISA.Backend.Symbolic.Zipper.Run,
       ISA.Types.Symbolic.SMT,

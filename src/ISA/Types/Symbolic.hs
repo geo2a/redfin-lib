@@ -20,21 +20,21 @@ module ISA.Types.Symbolic
     , getValue, tryFoldConstant, tryReduce, toAddress, toImm, toInstructionCode
     ) where
 
-import           Data.Aeson    (FromJSON, ToJSON, defaultOptions,
-                                genericToEncoding, toEncoding)
+import           Data.Aeson     (FromJSON, ToJSON, defaultOptions,
+                                 genericToEncoding, toEncoding)
 import           Data.Foldable
-import           Data.Int      (Int32, Int8)
-import           Data.Text     (Text)
-import qualified Data.Text     as Text
+import           Data.Int       (Int32, Int8)
+import           Data.Text      (Text)
+import qualified Data.Text      as Text
 import           Data.Typeable
-import           Data.Word     (Word16)
+import           Data.Word      (Word16)
 import           Debug.Trace
 import           GHC.Generics
 import           GHC.Stack
-import           Prelude       hiding (not)
+import           Prelude        hiding (not)
 
-import           ISA.Selective
 import           ISA.Types
+import           ISA.Types.Prop
 
 -----------------------------------------------------------------------------
 
@@ -106,6 +106,8 @@ instance Boolean Concrete where
   toBool (CBool b) = b
   toBool x         = error $ "Concrete.Boolean.toBool: non-boolean argument " <> show x
   true = CBool True
+
+  fromBool b = (CBool b)
 
   not (CBool b) = CBool (not b)
   not x         = error $ "Concrete.Boolean.not: non-boolean argument " <> show x
@@ -202,6 +204,7 @@ instance Boolean Sym where
   true = SConst (CBool True)
   -- | Converting symbolic expressions to boolean always returns True
   toBool _ = True
+  fromBool b = SConst (CBool b)
   -- toBool _ = error "Hi from Sym.toBool"
   -- toBool x = case getValue x of
   --              Nothing        -> error $ "symbolic value" <> show x
@@ -218,6 +221,7 @@ instance Boolean (Data Sym) where
   toBool (MkData x) =
     -- trace (show x) True
     toBool x
+  fromBool b = MkData (fromBool b)
   not (MkData x) = MkData (SNot x)
 
   (MkData x) ||| (MkData y) = MkData (SOr x y)

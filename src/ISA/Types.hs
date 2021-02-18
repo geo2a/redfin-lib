@@ -30,14 +30,10 @@ module ISA.Types
     -- * Data representation, equality types and keys
     -- ** packaged data
     , Data (..)
-    -- ** equality and order checks that may fail
-    , TryEq (..), TryOrd(..)
     -- ** Abstraction over possible locations in the ISA
     , Key(..), parseKey, keyTag
 
     -- * Classes abstracting values that the ISA model can operate with
-    -- ** Booleans
-    , Boolean (..)
     , Value, ToValue(..)
 
     -- * bitvector-to-binary expansion/compression
@@ -63,7 +59,7 @@ import qualified Prelude
 import           Test.QuickCheck  (Arbitrary, arbitrary)
 import           Text.Read        (readMaybe)
 
-import           ISA.Selective
+import           ISA.Types.Prop
 
 -- | Data registers
 data Register = R0 | R1 | R2 | R3
@@ -203,26 +199,9 @@ instance Show Key where
         IR        -> "IR"
         Prog addr -> "PROG " <> show addr
 
-class Boolean a where
-  toBool  :: a -> Bool
-  true    :: a
-  false   :: a
-  false = ISA.Types.not true
-  not     :: a -> a
-
-  (|||)   :: a -> a -> a
-  (&&&)   :: a -> a -> a
-
-instance Boolean Bool where
-  true = True
-  not = Prelude.not
-  toBool = id
-
-  x ||| y = x || y
-  x &&& y = x && y
-
 instance Boolean (Data Int8) where
   toBool (MkData x) = x /= 0
+  fromBool b = if b then 1 else 0
   true = MkData 1
   not  (MkData x) = if x == 0 then 1 else 0
 
@@ -231,49 +210,18 @@ instance Boolean (Data Int8) where
 
 instance Boolean (Data Int32) where
   toBool (MkData x) = x /= 0
+  fromBool b = if b then 1 else 0
   true = MkData 1
   not  (MkData x) = if x == 0 then 1 else 0
 
   x ||| y = if toBool x ||| toBool y then 1 else 0
   x &&& y = if toBool x &&& toBool y then 1 else 0
 
-instance Boolean a => Boolean (Prop a) where
-  true = Trivial True
-  not  = error "Prop.Boolean.not: not is undefined"
-  toBool t = case t of
-    Trivial b    -> b
-    Nontrivial _ -> True
-  x ||| y =
-    case (x, y) of
-      (Trivial a, Trivial b)       -> Trivial (a || b)
-      (Trivial a , Nontrivial b)   -> if a then Trivial True else Nontrivial b
-      (Nontrivial a, Trivial b)    -> if b then Trivial True else Nontrivial a
-      (Nontrivial a, Nontrivial b) -> Nontrivial (a ||| b)
-  x &&& y =
-    case (x, y) of
-      (Trivial a, Trivial b)       -> Trivial (a && b)
-      (Trivial a , Nontrivial b)   -> if a then Nontrivial b else Trivial False
-      (Nontrivial a, Trivial b)    -> if b then Nontrivial a else Trivial False
-      (Nontrivial a, Nontrivial b) -> Nontrivial (a &&& b)
-    -- error "Prop.Boolean.|||: undefined"
-  -- (&&&) = error "Prop.Boolean.&&&: undefined"
-
--- | This class abstracts an equality check with possible failure, i.e. in the
---   case when the values are symbolic. In case of concrete types with an 'Eq'
---   instance '(===)' will always return @Trivial@.
-class TryEq a where
-  (===) :: a -> a -> Prop a
-
 instance TryEq (Data Int8) where
   (MkData x) === (MkData y) = Trivial (x == y)
 
 instance TryEq (Data Int32) where
   (MkData x) === (MkData y) = Trivial (x == y)
-
--- | Similar for TryEq, but for strict order
-class TryEq a => TryOrd a where
-  lt :: a -> a -> Prop a
-  gt :: a -> a -> Prop a
 
 class Addressable a where
   toMemoryAddress :: a -> Maybe Address
@@ -282,7 +230,7 @@ class Addressable a where
 instance Addressable (Data Word16) where
   toMemoryAddress x | x >= fromIntegral (maxBound :: Address) = Nothing
                     | otherwise =
-                      Just . Address . fromBitsLEWord8 . extractMemoryAddress . blastLE $ x
+                      Just . Address . fromBitsLEWord8 . take 8 . blastLE $ x
   fromMemoryAddress x = MkData (fromIntegral x)
 
 instance Addressable (Data Address) where
@@ -293,7 +241,7 @@ instance Addressable (Data Int32) where
   toMemoryAddress x | x < 0 = Nothing
                     | x >= fromIntegral (maxBound :: Address) = Nothing
                     | otherwise =
-                      Just . Address . fromBitsLEWord8 . extractMemoryAddress . blastLE $ x
+                      Just . Address . fromBitsLEWord8 . take 8 . blastLE $ x
   fromMemoryAddress x = MkData (fromIntegral x)
 
 instance TryOrd (Data Int8) where
@@ -340,7 +288,7 @@ fromBitsLEInt32 xs | length xs == 32 = fromBitsLE xs
 
 fromBitsLEWord8 :: [Bool] -> Word8
 fromBitsLEWord8 xs | length xs == 8 = fromBitsLE xs
-                   | otherwise = error $ "ISA.Types.fromBitsLEWord16: " <>
+                   | otherwise = error $ "ISA.Types.fromBitsLEWord8: " <>
                                          "the argument does not fit into Word8"
 
 fromBitsLEWord16 :: [Bool] -> Word16
@@ -360,5 +308,8 @@ blastLE x = map (testBit x) [0 .. finiteBitSize x - 1]
 pad :: Int -> [Bool]
 pad k = replicate k False
 
+-- extractMemoryAddress :: [Bool] -> [Bool]
+-- extractMemoryAddress = (++ pad 24) . take 8 . drop 8
+
 extractMemoryAddress :: [Bool] -> [Bool]
-extractMemoryAddress = (++ pad 24) . take 8 . drop 8
+extractMemoryAddress = take 8 . drop 8

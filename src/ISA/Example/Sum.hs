@@ -17,24 +17,26 @@ module ISA.Example.Sum
   , initCtx
   ) where
 
-import           Control.Monad.IO.Class          (liftIO)
-import           Data.Int                        (Int32)
-import qualified Data.Map                        as Map
-import           Data.Maybe                      (fromJust)
+import           Control.Monad.IO.Class       (liftIO)
+import           Data.Int                     (Int32)
+import qualified Data.Map                     as Map
+import           Data.Maybe                   (fromJust)
 
 import           ISA.Assembly
 -- import           ISA.Backend.Dependencies
-import           ISA.Types.Context               hiding (Context)
-import qualified ISA.Types.Context               as ISA.Types
+import           ISA.Types.Context            hiding (Context)
+import qualified ISA.Types.Context            as ISA.Types
 -- import           ISA.Semantics
-import           ISA.Backend.CFG
-import           ISA.Backend.Symbolic.Zipper
-import           ISA.Backend.Symbolic.Zipper.Run
+import           ISA.Backend.Graph
+import           ISA.Backend.Graph.BasicBlock
+-- import           ISA.Backend.Symbolic.Zipper
+-- import           ISA.Backend.Symbolic.Zipper.Run
 import           ISA.Example.Common
 import           ISA.Types
 import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
+import           ISA.Types.Prop
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Tree
@@ -111,7 +113,7 @@ initCtx = MkContext
 
 demo_sum :: IO ()
 demo_sum = do
-  trace <- runModel 3 initCtx
-  mapM_ putStrLn (draw (_layout trace))
+  -- trace <- runModel 3 initCtx
+  -- mapM_ putStrLn (draw (_layout trace))
   -- mapM_ (putStrLn . show) (_states trace)
   pure ()

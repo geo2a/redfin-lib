@@ -19,12 +19,12 @@ module ISA.Semantics
 import           Prelude               hiding (Monad, abs, div, mod)
 import qualified Prelude               (Monad, abs, div, mod)
 
-import           Control.Selective     hiding (whenS)
+import           Control.Selective
 import           Data.Int
 import           FS
-import           ISA.Selective         (Prop (..), elimProp)
 import           ISA.Types
 import           ISA.Types.Instruction
+import           ISA.Types.Prop
 import           ISA.Types.Symbolic
 
 type Monad f = (Selective f, Prelude.Monad f)
@@ -150,21 +150,25 @@ cmpLt reg addr = \read write ->
   --     (write (F Condition) (pure true))
   --     (write (F Condition) (pure false))
 
-e :: Boolean a => a -> Either a a
-e x = case toBool x of True  -> Left x
-                       False -> Right x
-
 -- | Perform jump if flag @Condition@ is set
 jumpCt :: Imm a -> FS Key Selective '[Boolean, Num] a
 jumpCt (Imm offset) read write =
-  select (e <$> read (F Condition))
-         (const <$> (write IC ((+) <$> pure offset <*> read IC)))
+  ifS (toBool <$> read (F Condition))
+      (jump (Imm 0) read write)
+      (jump (Imm offset) read write)
+  -- select (e <$> read (F Condition))
+  --        (const <$> jump (Imm offset) read write)
+         -- (const <$> (write  IC ((+) <$> pure offset <*> read IC)))
 
 -- | Perform jump if flag @Condition@ is set
 jumpCf :: Imm a -> FS Key Selective '[Boolean, Num] a
 jumpCf (Imm offset) read write =
-  select (e . ISA.Types.not <$> read (F Condition))
-         (const <$> (write IC ((+) <$> pure offset <*> read IC)))
+  ifS (toBool <$> read (F Condition))
+      (jump (Imm offset) read write)
+      (jump (Imm 0) read write)
+  -- select (e . ISA.Types.not <$> read (F Condition))
+  --        (const <$> jump (Imm offset) read write)
+         -- (const <$> (write IC ((+) <$> pure offset <*> read IC)))
 
 -- | Perform unconditional jump
 jump :: Imm a -> FS Key Applicative '[Num] a
