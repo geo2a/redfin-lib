@@ -13,34 +13,40 @@
 module ISA.Example.MotorControl
     (mc_loop, initCtx) where
 
-import           Control.Monad                   (filterM)
-import           Control.Monad.IO.Class          (liftIO)
+import           Control.Monad                (filterM)
+import           Control.Monad.IO.Class       (liftIO)
 import           Control.Selective
-import           Data.Foldable                   (sequenceA_)
+import           Data.Foldable                (sequenceA_)
 import           Data.Int
-import           Data.Maybe                      (fromJust)
-import           Prelude                         hiding (div, mod)
+import           Data.Maybe                   (fromJust)
+import           Prelude                      hiding (div, mod)
 import           System.CPUTime
-import           System.IO.Unsafe                (unsafePerformIO)
-import           Text.Pretty.Simple              (pPrint)
+import           System.IO.Unsafe             (unsafePerformIO)
+import           Text.Pretty.Simple           (pPrint)
 import           Text.Printf
 -- import qualified Data.Tree as Tree
-import qualified Data.Map.Strict                 as Map
-import qualified Data.SBV                        as SBV
+import qualified Data.Map.Strict              as Map
+import qualified Data.SBV                     as SBV
 
 import           ISA.Assembly
+import           ISA.Backend.CFG
 import           ISA.Backend.Dependencies
-import           ISA.Backend.Symbolic.List
-import           ISA.Backend.Symbolic.List.Run
-import           ISA.Backend.Symbolic.List.Trace
+-- import           ISA.Backend.Symbolic.List
+-- import           ISA.Backend.Symbolic.List.Run
+-- import           ISA.Backend.Symbolic.List.Trace
 import           ISA.Example.Common
 import           ISA.Semantics
 import           ISA.Types
+import           ISA.Types.Context            hiding (Context)
+import qualified ISA.Types.Context            as ISA.Types
 import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
 import           ISA.Types.Symbolic
-import           ISA.Types.Symbolic.Context
+
+
+type Context = ISA.Types.Context Sym
+
 
 -- | The loop body of a stepper motor control program.
 mc_loop :: Script

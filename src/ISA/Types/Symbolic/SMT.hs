@@ -27,19 +27,22 @@ module ISA.Types.Symbolic.SMT
     , toSMT
     ) where
 
-import qualified Data.Map.Strict            as Map
-import qualified Data.SBV.Trans             as SBV
-import           Data.Set                   (Set)
-import qualified Data.Set                   as Set
-import           Data.Text                  (Text)
-import qualified Data.Text                  as Text
-import           Data.Time.Clock            (NominalDiffTime)
+import qualified Data.Map.Strict    as Map
+import qualified Data.SBV.Trans     as SBV
+import           Data.Set           (Set)
+import qualified Data.Set           as Set
+import           Data.Text          (Text)
+import qualified Data.Text          as Text
+import           Data.Time.Clock    (NominalDiffTime)
 import           Data.Traversable
 import           GHC.Stack
-import           Prelude                    hiding (not)
+import           Prelude            hiding (not)
 
+import           ISA.Types.Context  hiding (Context)
+import qualified ISA.Types.Context  as ISA.Types
 import           ISA.Types.Symbolic
-import           ISA.Types.Symbolic.Context
+
+type Context = ISA.Types.Context Sym
 
 data SymExecStats = MkSymExecStats { _timing :: NominalDiffTime }
   deriving Show
@@ -116,7 +119,7 @@ symBool vars = \case
   (SAnd l r)         -> (SBV..&&) <$> symBool vars l  <*> symBool vars r
   (SOr  l r)         -> (SBV..||) <$> symBool vars l  <*> symBool vars r
   (SNot x  )         -> SBV.sNot  <$> symBool vars x
-  _ -> Nothing
+  _                  -> Nothing
 
 conjoinSBV :: [SBV.SBool] -> SBV.SBool
 conjoinSBV = foldr (\x y -> (SBV..&&) x y) (SBV.sTrue)

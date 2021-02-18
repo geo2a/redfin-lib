@@ -24,8 +24,10 @@ import           Data.Maybe                      (fromJust)
 
 import           ISA.Assembly
 -- import           ISA.Backend.Dependencies
-import           ISA.Types.Symbolic.Context
+import           ISA.Types.Context               hiding (Context)
+import qualified ISA.Types.Context               as ISA.Types
 -- import           ISA.Semantics
+import           ISA.Backend.CFG
 import           ISA.Backend.Symbolic.Zipper
 import           ISA.Backend.Symbolic.Zipper.Run
 import           ISA.Example.Common
@@ -36,6 +38,10 @@ import           ISA.Types.Instruction.Encode
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Tree
+
+
+type Context = ISA.Types.Context Sym
+
 
 sumArrayLowLevel :: Script
 sumArrayLowLevel = do

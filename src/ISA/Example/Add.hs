@@ -15,13 +15,17 @@
 module ISA.Example.Add (addLowLevel, initCtx)  where
 
 import           Control.Monad.State.Strict
-import           Data.Int                        (Int32)
-import qualified Data.IntMap                     as IntMap
-import qualified Data.Map                        as Map
-import           Data.Maybe                      (fromJust)
-import qualified Data.Set                        as Set
+import           Data.Bifunctor
+import           Data.Int                              (Int32)
+import qualified Data.IntMap                           as IntMap
+import qualified Data.Map                              as Map
+import           Data.Maybe                            (fromJust)
+import qualified Data.Set                              as Set
+
+import           Algebra.Graph.Export.Dot
 
 import           ISA.Assembly
+import           ISA.Backend.Symbolic.TransitionSystem
 -- import           ISA.Backend.Dependencies
 -- import           ISA.Semantics
 import           ISA.Backend.Symbolic.Zipper
@@ -30,14 +34,18 @@ import           ISA.Example.Common
 import           ISA.Types
 import           ISA.Types.CTL
 import           ISA.Types.CTL.Model
+import           ISA.Types.Context                     hiding (Context)
+import qualified ISA.Types.Context                     as ISA.Types
 import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
 import           ISA.Types.Symbolic
-import           ISA.Types.Symbolic.Context
 import           ISA.Types.Symbolic.Parser
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Tree
+
+type Context = ISA.Types.Context Sym
+
 
 addLowLevel :: Script
 addLowLevel = do

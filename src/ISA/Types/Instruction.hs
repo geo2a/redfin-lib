@@ -1,12 +1,12 @@
 {-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE TypeApplications            #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TypeApplications           #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -29,9 +29,8 @@ import           Control.Selective
 import           Data.Int          ()
 import           Data.Kind         (Constraint)
 import           Data.Word         ()
-import           Prelude           hiding (Read, readIO)
-import           Prelude           hiding (Monad, Read, abs, div, mod)
-import GHC.Generics
+import           GHC.Generics
+import           Prelude           hiding (Read, abs, div, mod, readIO)
 
 import           ISA.Types
 
@@ -102,9 +101,34 @@ data Instruction a = forall c v. v a => Instruction (InstructionImpl c v a)
 instance Eq a => Eq (Instruction a) where
   (Instruction i) == (Instruction j) = i `instrEq` j
 
+mapInstructionImpl :: forall c v a b. (v a, v b)
+                   => (a -> b)
+                   -> InstructionImpl c v a
+                   -> InstructionImpl c v b
+mapInstructionImpl f = \case
+   Halt           -> Halt
+   Load r a       -> Load r a
+   Set r (Imm i)  -> Set r (Imm (f i))
+   Store r a      -> Store r a
+   Add r a        -> Add r a
+   AddI r (Imm i) -> AddI r (Imm (f i))
+   Sub r a        -> Sub r a
+   SubI r (Imm i) -> SubI r (Imm (f i))
+   Mul r a        -> Mul r a
+   Div r a        -> Div r a
+   Mod r a        -> Mod r a
+   Abs r          -> Abs r
+   Jump (Imm i)   -> Jump (Imm (f i))
+   LoadMI r a     -> LoadMI r a
+   CmpEq r a      -> CmpEq r a
+   CmpGt r a      -> CmpGt r a
+   CmpLt r a      -> CmpLt r a
+   JumpCt (Imm i) -> JumpCt (Imm (f i))
+   JumpCf (Imm i) -> JumpCf (Imm (f i))
+
 instrEq :: Eq a => InstructionImpl c1 v1 a -> InstructionImpl c2 v2 a -> Bool
 instrEq i j = case (i, j) of
-  (Halt, Halt) -> True
+  (Halt, Halt)                           -> True
   (Load   reg1 addr1, Load   reg2 addr2) -> reg1 == reg2 && addr1 == addr2
   (Add    reg1 addr1, Add    reg2 addr2) -> reg1 == reg2 && addr1 == addr2
   (AddI   reg1 imm1 , AddI   reg2 imm2 ) -> reg1 == reg2 && imm1 == imm2
@@ -123,7 +147,7 @@ instrEq i j = case (i, j) of
   (CmpEq  reg1 addr1, CmpEq  reg2 addr2) -> reg1 == reg2 && addr1 == addr2
   (CmpGt  reg1 addr1, CmpGt  reg2 addr2) -> reg1 == reg2 && addr1 == addr2
   (CmpLt  reg1 addr1, CmpLt  reg2 addr2) -> reg1 == reg2 && addr1 == addr2
-  (_,_) -> False
+  (_,_)                                  -> False
 
 mkI :: forall c v a. v a => InstructionImpl c v a -> Instruction a
 mkI = Instruction

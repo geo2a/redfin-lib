@@ -11,7 +11,6 @@ import           ISA.Assembly
 import           ISA.Backend.Symbolic.List.Trace
 import           ISA.Types
 import           ISA.Types.Symbolic
-import           ISA.Types.Symbolic.Context
 
 defaultRegisters :: [(Register, Sym)]
 defaultRegisters = [ (R0, 0)

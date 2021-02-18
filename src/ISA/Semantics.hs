@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 -----------------------------------------------------------------------------
 -- |
@@ -178,7 +179,7 @@ jump (Imm offset) read write =
 --       read IC >>= \ic -> write IR (read (Prog ic))
 
 instructionSemanticsS :: Instruction a
-                      -> FS Key Selective '[Monoid, Integral, Bounded, Boolean, TryEq, TryOrd] a
+                      -> FS Key Selective '[Monoid, Integral, Bounded, Boolean, TryOrd] a
 instructionSemanticsS (Instruction i) r w = case i of
     Halt           -> halt r w
     Load reg addr  -> load reg addr r w

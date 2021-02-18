@@ -27,19 +27,22 @@ import           Control.Concurrent.STM
 import           Control.Monad.Reader
 import           Control.Monad.State.Class
 import           Control.Selective
-import           Data.IntMap.Strict         (IntMap)
-import qualified Data.IntMap.Strict         as IntMap
-import qualified Data.Map.Strict            as Map
+import           Data.IntMap.Strict        (IntMap)
+import qualified Data.IntMap.Strict        as IntMap
+import qualified Data.Map.Strict           as Map
 import           Data.Maybe
-import qualified Data.SBV.Trans             as SBV
+import qualified Data.SBV.Trans            as SBV
 import           GHC.Stack
-import           Prelude                    hiding (log, not, read, readIO)
+import           Prelude                   hiding (log, not, read, readIO)
 
 import           ISA.Types
+import           ISA.Types.Context         hiding (Context)
+import qualified ISA.Types.Context         as ISA.Types
 import           ISA.Types.Symbolic
-import           ISA.Types.Symbolic.Context
-import           ISA.Types.Tree             hiding (down, left, right, up)
-import qualified ISA.Types.Tree             as Tree
+import           ISA.Types.Tree            hiding (down, left, right, up)
+import qualified ISA.Types.Tree            as Tree
+
+type Context = ISA.Types.Context Sym
 
 -- | Trace of a symbolic simulation
 data Trace =
@@ -239,7 +242,7 @@ growTrace (Just choice) = do
                                    (IntMap.insert k1 ctx1 states)
 
     updateStatesCount :: Int -> OneTwo Context -> Int
-    updateStatesCount s = \case One _ -> s + 1
+    updateStatesCount s = \case One _   -> s + 1
                                 Two _ _ -> s + 2
 
 -- | The read callback to plug into FS semantics of instructions
@@ -253,11 +256,11 @@ readKey key = do
   where
     defaultFor :: Key -> Sym
     defaultFor = \case
-      Reg _ -> 0
-      F _ -> 0
+      Reg _  -> 0
+      F _    -> 0
       Addr _ -> 0
-      IR -> 0
-      IC -> -1
+      IR     -> 0
+      IC     -> -1
       Prog _ -> 0
 
 -- | The write callback to plug into FS semantics of instructions

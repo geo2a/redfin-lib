@@ -18,25 +18,27 @@ module ISA.Backend.Symbolic.List.Trace
     , subsetTrace, traceDepth
     , Path, paths, constrainTrace
     , Node(..), NodeId, lookup
-    , htmlTrace, writeTraceHtmlFile
     ) where
 
-import           Data.Aeson                 (FromJSON, ToJSON, defaultOptions,
-                                             genericToEncoding, toEncoding)
-import           Data.Maybe                 (catMaybes, listToMaybe)
-import           Data.Set                   (Set)
-import qualified Data.Set                   as Set
-import           Data.Text                  (Text)
-import           Data.Traversable           (forM)
-import           Data.Tree                  (Tree)
-import qualified Data.Tree                  as Tree
-import qualified Data.Tree.View             as TreeView
+import           Data.Aeson             (FromJSON, ToJSON, defaultOptions,
+                                         genericToEncoding, toEncoding)
+import           Data.Maybe             (catMaybes, listToMaybe)
+import           Data.Set               (Set)
+import qualified Data.Set               as Set
+import           Data.Text              (Text)
+import           Data.Traversable       (forM)
+import           Data.Tree              (Tree)
+import qualified Data.Tree              as Tree
+import qualified Data.Tree.View         as TreeView
 import           GHC.Generics
-import           Prelude                    hiding (lookup)
+import           Prelude                hiding (lookup)
 
+import           ISA.Types.Context      hiding (Context)
+import qualified ISA.Types.Context      as ISA.Types
 import           ISA.Types.Symbolic
-import           ISA.Types.Symbolic.Context
 import           ISA.Types.Symbolic.SMT
+
+type Context = ISA.Types.Context Sym
 
 type NodeId = Int
 
@@ -70,24 +72,6 @@ instance Foldable Trace where
 instance Traversable Trace where
   traverse f (Trace tree) =
     Trace <$> traverse (\(Node n b) -> Node n <$> f b) tree
-
--- instance ToJSON s => ToJSON (Trace s) where
---   toEncoding = genericToEncoding defaultOptions
--- instance FromJSON s => FromJSON (Trace s) where
-
--- | Render a trace as an HTML string
-htmlTrace :: (Context -> String) -> Trace Context -> String
-htmlTrace shower (Trace tree) =
-  TreeView.htmlTree Nothing $
-    fmap (\node -> TreeView.NodeInfo
-                   TreeView.InitiallyExpanded (show (_nodeId node) <> " | " <>
-                                               showIR (_nodeBody node))
-                                               (shower (_nodeBody node)))
-         tree
-
--- | Render a trace as HTML and write the result into a file
-writeTraceHtmlFile :: (Context -> String) -> FilePath -> Trace Context -> IO ()
-writeTraceHtmlFile shower path trace = writeFile path (htmlTrace shower trace)
 
 mkTrace :: Node Context -> [Trace Context] -> Trace Context
 mkTrace node children = Trace $ Tree.Node node (map unTrace children)

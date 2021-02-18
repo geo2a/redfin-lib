@@ -35,10 +35,13 @@ import           Numeric.Natural
 import           ISA.Backend.Symbolic.List.Trace
 import           ISA.Types
 import           ISA.Types.CTL
+import           ISA.Types.Context               hiding (Context)
+import qualified ISA.Types.Context               as ISA.Types
 import           ISA.Types.SBV
 import           ISA.Types.Symbolic
-import           ISA.Types.Symbolic.Context
 import           ISA.Types.Symbolic.SMT
+
+type Context = ISA.Types.Context Sym
 
 newtype Variable = MkVar Text
   deriving (Show, Generic, ToJSON, FromJSON)
@@ -65,12 +68,12 @@ data SolverTask a = Atomic (NodeId, a)
 
 instance Foldable SolverTask where
   foldMap f  = \case
-    Atomic (_, x) -> f x
+    Atomic (_, x)    -> f x
     Compound _ tasks -> mconcat (map (foldMap f) tasks)
 
 instance Traversable SolverTask where
   traverse action = \case
-    Atomic (n , x) -> Atomic . (n,) <$> action x
+    Atomic (n , x)    -> Atomic . (n,) <$> action x
     Compound op tasks -> Compound op <$> traverse (traverse action) tasks
 
 -- | The amount of atomic tasks in a solver task tree
@@ -79,14 +82,14 @@ size = getSum . foldMap (const (Sum 1))
 
 -- | Depth of solver task tree
 depth :: SolverTask a -> Natural
-depth = \case Atomic _ -> 0
+depth = \case Atomic _      -> 0
               Compound _ xs -> sum . map depth $ xs
 
 -- | Get a list of atomic solver tasks: useful for gathering free variables
 atomicTasks :: SolverTask a -> [(NodeId, a)]
 atomicTasks = go []
   where go acc = \case
-          Atomic n -> n : acc
+          Atomic n      -> n : acc
           Compound _ xs -> concatMap (go acc) xs
 
 instance Show a => Show (SolverTask a) where
@@ -132,7 +135,7 @@ flatten :: Schedule a -> [a]
 flatten = go []
   where
     go acc = \case
-      Literal x -> x : acc
+      Literal x   -> x : acc
       Conjunct xs -> concatMap flatten xs
       Disjunct xs -> concatMap flatten xs
 
@@ -146,8 +149,8 @@ flatten = go []
 deMorgan :: Schedule (NodeId, Sym) -> Schedule (NodeId, Sym)
 deMorgan = \case
   Literal (n, v) -> Literal (n, SNot v)
-  Conjunct xs -> Disjunct (map deMorgan xs)
-  Disjunct xs -> Conjunct (map deMorgan xs)
+  Conjunct xs    -> Disjunct (map deMorgan xs)
+  Disjunct xs    -> Conjunct (map deMorgan xs)
 
 
 -- | Interpret a CTL formula as a collection of Sym's, preparing it for solving
@@ -263,5 +266,5 @@ nodeQuery env resultBox expr = do
 prove :: CTL (Context -> Sym) -> Trace Context -> Constraints ->IO Proof
 prove property trace precondition =
   sat (Not property) trace precondition >>= \case
-    [] -> pure Proved
+    []     -> pure Proved
     contra -> pure $ Falsifiable contra

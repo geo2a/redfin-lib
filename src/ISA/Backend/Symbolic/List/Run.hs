@@ -35,13 +35,18 @@ import           Prelude                         hiding (log)
 
 import           ISA.Backend.Symbolic.List
 import           ISA.Backend.Symbolic.List.Trace
-import           ISA.SemanticsProp
+import           ISA.Semantics
 import           ISA.Types
+import           ISA.Types.Context               hiding (Context)
+import qualified ISA.Types.Context               as ISA.Types
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.SBV
 import           ISA.Types.Symbolic
-import           ISA.Types.Symbolic.Context
 import           ISA.Types.Symbolic.SMT
+
+
+type Context = ISA.Types.Context Sym
+
 
 -- | Fetching an instruction is a Monadic operation. It is possible
 --   (and natural) to implement in terms of @FS Key Monad Value@, but

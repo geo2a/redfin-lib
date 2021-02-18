@@ -25,19 +25,22 @@ import           Prelude                      hiding (log)
 import           ISA.Backend.Symbolic.Zipper
 import           ISA.Semantics
 import           ISA.Types
+import           ISA.Types.Context            hiding (Context)
+import qualified ISA.Types.Context            as ISA.Types
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.SBV
 import           ISA.Types.Symbolic
-import           ISA.Types.Symbolic.Context
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Tree               hiding (down, left, right, top,
                                                up)
+
+type Context = ISA.Types.Context Sym
 
 -- | Fetching an instruction is a Monadic operation. It is possible
 --   (and natural) to implement in terms of @FS Key Monad Value@, but
 --   for now we'll stick with this concrete implementation in the
 --   @Engine@ monad.
-fetchInstruction ::Engine (Data Sym)
+fetchInstruction :: Engine (Data Sym)
 fetchInstruction =
   readKey IC >>= \(MkData x) -> case (toAddress x) of
     Right ic ->
@@ -77,21 +80,23 @@ step = do
     putTMVar (_choice env) Nothing
     pure c
   case choice of
-    -- if no choice was encountered return a single child state
+    -- if no choice was encountered return a single child state (is reachable)
     Nothing           -> do
       focused <- getFocused
       (reachable, ctx) <- liftIO . SBV.runSMT $ reach focused
       if reachable then pure . Just $ One ctx
                    else pure Nothing
-    -- if there is a choice: check reachability and return reachable children
+    -- if there is a choice: return reachable children
     Just (ctx1, ctx2) -> do
       r1 <- liftIO . SBV.runSMT $ reach ctx1
       r2 <- liftIO . SBV.runSMT $ reach ctx2
       case (r1, r2) of
         -- both children are reachable
         ((True, ctx1'), (True, ctx2')) -> pure . Just $ Two ctx1' ctx2'
+        -- one is reachable
         ((False, _)   , (True, ctx2')) -> pure . Just $ One ctx2'
         ((True, ctx1') , (False, _))   -> pure . Just $ One ctx1'
+        -- none is reachable!
         ((False, _)   , (False, _))    -> pure Nothing
   where
     -- | Check satisfiability of a Context's path condition under its constraints

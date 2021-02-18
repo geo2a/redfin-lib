@@ -10,25 +10,25 @@
 -- Symbolic simulation backend using Data.Tree from containers
 -----------------------------------------------------------------------------
 module ISA.Backend.Symbolic.List
-    ( -- * symbolic execution state
-      Context(..), showKey
-      -- * symbolic execution engine
-    , Engine (..)
+    ( -- * symbolic execution engine
+      Engine (..)
       -- * instances of read/write callbacks for Engine
     , readKey, writeKey
     ) where
 
 import           Control.Monad.Reader
 import           Control.Monad.State.Class
-import qualified Data.Map.Strict            as Map
-import           Prelude                    hiding (log, not, read, readIO)
-import           Prelude                    hiding (log, not, read, readIO)
+import qualified Data.Map.Strict           as Map
+import           Prelude                   hiding (log, not, read, readIO)
 import           Unsafe.Coerce
 
 import           ISA.Selective
 import           ISA.Types
+import           ISA.Types.Context         hiding (Context)
+import qualified ISA.Types.Context         as ISA.Types
 import           ISA.Types.Symbolic
-import           ISA.Types.Symbolic.Context
+
+type Context = ISA.Types.Context Sym
 
 -- | A Symbolic Execution Engine is a combination of State and List monads:
 --   given a state, it produces a list of new possible states. Imagine conditional
@@ -97,7 +97,7 @@ readKey :: Key -> Engine (Data Sym)
 readKey key = do
   ctx <- get
   let x = case Map.lookup key (_bindings ctx) of
-            Just v -> v
+            Just v  -> v
             Nothing -> error $ "Engine.readKey: uninitialised key " <> show key
   pure (MkData x)
 

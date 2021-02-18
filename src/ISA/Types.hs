@@ -1,6 +1,6 @@
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE QuantifiedConstraints #-}
-{-# Language GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE QuantifiedConstraints      #-}
+{-# LANGUAGE UndecidableInstances       #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Types
@@ -38,30 +38,30 @@ module ISA.Types
     -- * Classes abstracting values that the ISA model can operate with
     -- ** Booleans
     , Boolean (..)
-    , Value
+    , Value, ToValue(..)
 
     -- * bitvector-to-binary expansion/compression
     , blastLE, fromBitsLE, fromBitsLEInt8, fromBitsLEInt32
     , fromBitsLEWord8, fromBitsLEWord16, pad
     ) where
 
-import           Data.Bits
-import Data.Bool
-import Control.Monad
-import           Data.Monoid
-import           Data.List (isPrefixOf, isInfixOf)
-import Prelude hiding (not)
-import qualified Prelude
-import           Data.Int        (Int32, Int8)
-import qualified Data.Text as Text
-import           Text.Read                  (readEither, readMaybe)
-import           Data.Typeable
-import           Data.Word       (Word16, Word8)
-import           Generic.Random
-import           GHC.Generics    (Generic)
-import           Test.QuickCheck (Arbitrary, arbitrary)
-import           Data.Aeson hiding (Value)
+import           Control.Monad
+import           Data.Aeson       hiding (Value)
 import           Data.Aeson.Types hiding (Value)
+import           Data.Bits
+import           Data.Bool
+import           Data.Int         (Int32, Int8)
+import           Data.List        (isInfixOf, isPrefixOf)
+import           Data.Monoid
+import qualified Data.Text        as Text
+import           Data.Typeable
+import           Data.Word        (Word16, Word8)
+import           GHC.Generics     (Generic)
+import           Generic.Random
+import           Prelude          hiding (not)
+import qualified Prelude
+import           Test.QuickCheck  (Arbitrary, arbitrary)
+import           Text.Read        (readMaybe)
 
 import           ISA.Selective
 
@@ -179,7 +179,7 @@ instance FromJSON Key where
 -- instance FromJSONKey Key where
 instance FromJSONKey Key where
   fromJSONKey = FromJSONKeyTextParser $ \t -> case parseKey (Text.unpack t) of
-    Just k -> pure k
+    Just k  -> pure k
     Nothing -> fail ("Invalid key: " ++ show t)
 
 -- instance FromJSONKey Key where
@@ -196,12 +196,12 @@ keyTag = \case
 
 instance Show Key where
     show = \case
-        Reg  reg   -> show reg
-        Addr addr  -> show addr
-        F    flag  -> show flag
-        IC         -> "IC"
-        IR         -> "IR"
-        Prog addr  -> "PROG " <> show addr
+        Reg  reg  -> show reg
+        Addr addr -> show addr
+        F    flag -> show flag
+        IC        -> "IC"
+        IR        -> "IR"
+        Prog addr -> "PROG " <> show addr
 
 class Boolean a where
   toBool  :: a -> Bool
@@ -271,18 +271,30 @@ instance TryEq (Data Int32) where
   (MkData x) === (MkData y) = Trivial (x == y)
 
 -- | Similar for TryEq, but for strict order
-class TryOrd a where
+class TryEq a => TryOrd a where
   lt :: a -> a -> Prop a
   gt :: a -> a -> Prop a
 
 class Addressable a where
   toMemoryAddress :: a -> Maybe Address
+  fromMemoryAddress :: Address -> a
+
+instance Addressable (Data Word16) where
+  toMemoryAddress x | x >= fromIntegral (maxBound :: Address) = Nothing
+                    | otherwise =
+                      Just . Address . fromBitsLEWord8 . extractMemoryAddress . blastLE $ x
+  fromMemoryAddress x = MkData (fromIntegral x)
+
+instance Addressable (Data Address) where
+  toMemoryAddress (MkData a) = Just . id $ a
+  fromMemoryAddress x = MkData (fromIntegral x)
 
 instance Addressable (Data Int32) where
   toMemoryAddress x | x < 0 = Nothing
                     | x >= fromIntegral (maxBound :: Address) = Nothing
                     | otherwise =
                       Just . Address . fromBitsLEWord8 . extractMemoryAddress . blastLE $ x
+  fromMemoryAddress x = MkData (fromIntegral x)
 
 instance TryOrd (Data Int8) where
   lt (MkData x) (MkData y) = Trivial (x < y)
@@ -310,6 +322,11 @@ class (Show a, TryEq a, TryOrd a, Monoid a, Num a, Integral a, Bounded a, Boolea
 
 instance (Show a, TryEq a, TryOrd a, Monoid a, Num a, Integral a, Bounded a, Boolean a) => Value a where
 
+class Value a => ToValue a where
+  toValue :: a -> a
+
+instance Value a => ToValue a where
+  toValue = id
 -----------------------------------------------------------------------------
 fromBitsLE :: (FiniteBits a, Num a) => [Bool] -> a
 fromBitsLE = go 0 0

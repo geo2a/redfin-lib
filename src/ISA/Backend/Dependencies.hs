@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Backend.Dependencies
@@ -35,7 +36,7 @@ trackingWrite :: key -> Over [Either key key] a -> Over [Either key key] a
 trackingWrite key producer = producer *> Over [Right key]
 
 -- | Extract input and output data-dependencies of a computation
-dependencies :: Value a => FS key Selective Value a
+dependencies :: FS key Selective '[Any] a
      -> ([key], [key])
 dependencies task =
     partitionEithers . getOver $
