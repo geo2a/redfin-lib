@@ -26,12 +26,12 @@ library
       ISA.Selective,
       ISA.Semantics,
 
-
       ISA.Types,
       ISA.Types.CTL,
       ISA.Types.CTL.Model,
       ISA.Types.SBV,
       ISA.Types.Tree,
+      ISA.Types.Context
       ISA.Types.Instruction,
       ISA.Types.Instruction.Decode,
       ISA.Types.Instruction.Encode,
@@ -40,17 +40,12 @@ library
       ISA.Backend.Dependencies,
       ISA.Backend.Symbolic.Zipper,
       ISA.Backend.Symbolic.Zipper.Run,
-      ISA.Types.Symbolic.Context,
       ISA.Types.Symbolic.SMT,
       ISA.Types.Symbolic.Parser
       ISA.Example.Sum,
       ISA.Example.MotorControl
   other-modules:
-      ISA.Backend.Symbolic.List,
-      ISA.Backend.Symbolic.List.Trace,
-      ISA.Backend.Symbolic.List.Run,
       ISA.Example.Common,
-      ISA.SemanticsProp,
       FS
   hs-source-dirs:
       src
@@ -80,7 +75,8 @@ library
                 time >= 1.8.0.2,
                 transformers,
                 tree-view >= 0.5,
-                hint
+                polysemy >= 1.4.0.0,
+                polysemy-plugin >= 0.2.5.2
   default-extensions: LambdaCase
                     , FlexibleContexts
                     , FlexibleInstances
@@ -99,6 +95,7 @@ library
                     -Wcompat
                     -Wincomplete-record-updates
                     -Wredundant-constraints
+                    -fplugin=Polysemy.Plugin
 test-suite tests
   GHC-options:     -Wall
                    -Werror=incomplete-replacements
