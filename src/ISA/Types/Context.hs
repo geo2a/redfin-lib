@@ -11,36 +11,39 @@
 -- A 'Context' is Map of bindings used in simulation
 -----------------------------------------------------------------------------
 module ISA.Types.Context
-  ( Context(..), emptyCtx
+  ( Context(..), SymbolicContext, emptyCtx
   , getBinding, showKey, isReachable) where
 
-import           Data.Aeson                   (FromJSON, ToJSON, defaultOptions,
-                                               genericToEncoding, toEncoding)
-import qualified Data.Map.Strict              as Map
-import qualified Data.SBV                     as SBV
-import           Data.Text                    (Text)
+import           Data.Aeson         (FromJSON, ToJSON)
+import qualified Data.Map.Strict    as Map
+import           Data.Text          (Text)
 import           GHC.Generics
 
 import           ISA.Types
-import           ISA.Types.Instruction.Decode
 import           ISA.Types.SBV
 import           ISA.Types.Symbolic
 
 -- | A record type for state of the (symbolically) simulated computation.
---   The type variable may be instantiated with 'Sym' for symbolic simulation
---   * '_bindings': keys (like register names, memory cells) mapped to their (symbolic) values
---   * '_pathCondition' : an expression which must hold for this state to be
---     reachable
-data Context a = MkContext { _bindings      :: Map.Map Key a
-                           , _pathCondition :: a
-                           , _constraints   :: [(Text, a)]
-                           , _solution      :: Maybe SMTResult
-                           }
+--   The type variable may be instantiated with 'Sym' for symbolic simulation, see 'ISA.Types.SymbolicContext'
+data Context a = MkContext {
+  -- | keys (like register names, memory cells) mapped to their (symbolic) values
+  _bindings        :: Map.Map Key a
+  -- | a boolean formula which must be satisfiable for this state to be reachable
+  , _pathCondition :: a
+  -- | a list of named boolean formulas, mostly used as preconditions and conjoined with @_pathCondition@
+  --   when checking Reachability
+  , _constraints   :: [(Text, a)]
+  -- | a response from a solver, usually regarding
+  --   satisfiability of @_pathCondition s && conjoin (_constraints s)@
+  , _solution      :: Maybe SMTResult }
   deriving (Generic, ToJSON, FromJSON)
 
--- | A context with defaults
-emptyCtx :: (Boolean a, Num a) => Context a
-emptyCtx = MkContext (Map.fromList [(IC, 0)]) true [] Nothing
+-- | Symbolic simulation is done with symbolic values
+type SymbolicContext = Context Sym
+
+-- | An empty context
+emptyCtx :: Boolean a => Context a
+emptyCtx = MkContext Map.empty true [] Nothing
 
 instance Eq a => Eq (Context a) where
   x == y = (_bindings x == _bindings y)
