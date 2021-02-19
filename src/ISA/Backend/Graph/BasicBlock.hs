@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 -----------------------------------------------------------------------------
@@ -44,10 +45,11 @@ data Block a = MkBlock { _entry   :: Address
 instance Show a => Show (Block a) where
   show (MkBlock a is t) =
     unlines $ (map (\(a, i) -> show a <> ". " <> show i) . zip [a..] $ is) ++
-            [ "Targets: " <> case t of
-                               Nothing     -> "⊥"
-                               Just (l, r) -> show l <> " " <> show r
-            ]
+      [ "Targets: " <> case t of
+                         Nothing     -> "⊥"
+                         Just (l, r) -> show l <> " " <> show r
+      ]
+
 
 
 
