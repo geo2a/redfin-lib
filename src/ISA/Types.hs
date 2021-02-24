@@ -86,7 +86,6 @@ instance Arbitrary Address where
 
 -- | Flag
 data Flag = Halted
-          | Zero
           | Condition
           | Overflow
   deriving (Show, Read, Eq, Ord, Generic)

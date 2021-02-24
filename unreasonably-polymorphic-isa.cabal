@@ -31,6 +31,7 @@ library
       ISA.Types.CTL.Model,
       ISA.Types.SBV,
       ISA.Types.Tree,
+      ISA.Types.ZeroOneTwo,
       ISA.Types.Context
       ISA.Types.Instruction,
       ISA.Types.Instruction.Decode,
@@ -38,10 +39,12 @@ library
       ISA.Types.Instruction.Opcodes,
       ISA.Types.Symbolic,
       ISA.Backend.Dependencies,
+      ISA.Backend.Simulation,
       ISA.Backend.Graph,
       ISA.Backend.Graph.BasicBlock,
       ISA.Backend.Symbolic.Zipper,
       ISA.Backend.Symbolic.Zipper.Run,
+      ISA.Backend.Symbolic.List.Trace,
       ISA.Types.Symbolic.SMT,
       ISA.Types.Symbolic.Parser
       ISA.Example.Sum,
@@ -89,6 +92,10 @@ library
                     , DeriveFunctor
                     , DeriveGeneric
                     , DerivingVia
+                    , DataKinds
+                    , PolyKinds
+                    , TypeApplications
+                    , ScopedTypeVariables
                     , GADTs
                     , TupleSections
 

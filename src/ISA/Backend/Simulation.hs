@@ -14,9 +14,9 @@
 -----------------------------------------------------------------------------
 
 module ISA.Backend.Simulation
-  (simulateRead, simulateWrite
-  , Missing(..), miss
-  , Ignored(..), ignore
+  ( Simulate, simulate
+  , simulateRead, simulateWrite
+  , Missing(..), missing
   ) where
 
 import qualified Data.Map          as Map
@@ -31,28 +31,29 @@ import           ISA.Types.Context
 newtype Missing key = MkMissing key
   deriving (Show, Eq)
 
-miss :: key -> Missing key
-miss = MkMissing
+missing :: key -> Missing key
+missing = MkMissing
 
--- | An exception type to track ignored keys
-newtype Ignored key = MkIgnored key
-  deriving (Show, Eq)
+-- | A type alias for the effect needed for simulation
+type Simulate s a = Sem [State (Context s), Error (Missing Key)] a
 
-ignore :: key -> Ignored key
-ignore = MkIgnored
+-- | Run simulation on an initial state with missing keys initialised with @missingDefault@
+simulate :: b -> Context a -> Simulate a b -> b
+simulate missingDefault init computation =
+  run .
+  fmap (either (const missingDefault) id) . runError @(Missing Key) .
+  evalState init $ computation
+
 
 -- | Simulate reads from a polymorphic 'ISA.Types.Context'.
-simulateRead :: ( Member (State (Context a)) r
-                , Member (Error (Missing Key)) r
-                ) => Key -> Sem r a
+simulateRead :: Key -> Simulate a a
 simulateRead key =
     Map.lookup key . _bindings <$> get >>= \case
       Just v  -> pure v
-      Nothing -> throw (miss key)
+      Nothing -> throw (missing key)
 
 -- | Simulate writes to a polymorphic 'ISA.Types.Context'.
-simulateWrite :: ( Member (State (Context a)) r
-                 ) => Key -> Sem r a -> Sem r a
+simulateWrite :: Key -> Simulate a a -> Simulate a a
 simulateWrite key fv = do
   val <- fv
   modify (\ctx -> ctx {_bindings = Map.insert key val (_bindings ctx)})

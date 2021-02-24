@@ -1,6 +1,4 @@
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Backend.Graph.BasicBlock
@@ -15,39 +13,49 @@
 -- and focusing on two specific aspects of it: how the instruction counter and the
 -- halting flag are modified. These are the keys we need to build basic blocks
 -----------------------------------------------------------------------------
-module ISA.Backend.Graph.BasicBlock (Block(..), basicBlocks, validateBlock) where
+-- module ISA.Backend.Graph.BasicBlock (Block(..), basicBlocks, validateBlock) where
+module ISA.Backend.Graph.BasicBlock where
 
-import qualified Debug.Trace            as Debug
+import qualified Debug.Trace              as Debug
 
+import           Control.Monad
 import           Control.Selective
+import           Data.Functor
 import           Data.Int
-import qualified Data.Map               as Map
+import qualified Data.List                as List
+import qualified Data.Map                 as Map
+import           Data.Maybe
+import           Data.Ord
 import           Polysemy
 import           Polysemy.Error
 import           Polysemy.State
 
 import           ISA.Assembly
+import           ISA.Backend.Dependencies
 import           ISA.Backend.Simulation
 import           ISA.Semantics
 import           ISA.Types
 import           ISA.Types.Context
 import           ISA.Types.Instruction
 import           ISA.Types.Prop
+import           ISA.Types.ZeroOneTwo
 
 -- | A basic block of a program is a sequence of instructions
 --   that starts with a label, finishes with a branching instruction and
 --   has no labels/branches in the body
 data Block a = MkBlock { _entry   :: Address
                        , _body    :: [Instruction a]
-                       , _targets :: Maybe (Address, Address)
+                       , _exit    :: Address
+                       , _targets :: ZeroOneTwo Address
                        }
 
 instance Show a => Show (Block a) where
-  show (MkBlock a is t) =
+  show (MkBlock a is _ t) =
     unlines $ (map (\(a, i) -> show a <> ". " <> show i) . zip [a..] $ is) ++
       [ "Targets: " <> case t of
-                         Nothing     -> "⊥"
-                         Just (l, r) -> show l <> " " <> show r
+                         Zero    -> "⊥"
+                         One n   -> show n
+                         Two l r -> show l <> " " <> show r
       ]
 
 
@@ -67,7 +75,7 @@ instance Selective (Sem r) where
 
 -- | Calculate basic blocks of an assembly script
 basicBlocks :: Script -> [Block (Data Int32)]
-basicBlocks = basicBlocksImpl . assemble
+basicBlocks = map postprocessBlock . basicBlocksImpl . assemble
 
 -- | For calculation of basic blocks we are interested only in changes in
 --   the 'ISA.Types.Key.IC' (instruction counter) key, thus we produce the following
@@ -83,96 +91,82 @@ basicBlocks = basicBlocksImpl . assemble
 --
 --   See 'ISA.Backend.CFG.controlFlowRead' and 'ISA.Backend.CFG.controlFlowRead'
 --   for further details
-basicBlocksImpl ::
+basicBlocksImpl src = simulate [] init $ do
+  -- calculate leaders -- starts of the blocks,
+  -- sort and consider only unique leaders to avoid spurious empty blocks
+  ls <- List.nub . List.sort <$> leaders src
+  -- calculate address ranges for each basic block: from a leader's address to
+  -- its corresponding finishing instruction (the one before the next leader)
+  let bodyRanges = (zip ls (tail ls ++ [fst (last src) + 1]))
+  -- for every leader, build a basic block by computing targets of the last
+  -- instruction
+  forM bodyRanges $ \(entry, exit) -> do
+    -- get the last instruction of the block from the source
+    i <- maybe (throw $ missing (Prog entry)) pure $
+      List.lookup entry src
+    -- lookup the instructions of the body in the source
+    let body = map (\a -> (a, fromJust $ List.lookup a src)) [entry..exit-1]
+    case body of
+      [] -> error $ "empty block starting at " <> show entry
+      _ -> do
+        targets <- computeTargets (last body)
+        pure (MkBlock entry (map snd body) (fst (last body)) targets)
+  where init = emptyCtx {_bindings = Map.fromList [(IC, 0), (F Condition, false)]}
+
+-- | Compute target addresses of an instruction, if any.
+--   * Conditional jumps have two targets
+--   * Unconditional jumps have one target
+--   * All other instructions don't alter control flow and thus have no targets
+computeTargets :: ( Addressable a, Num a, Show a
+                  , Monoid a, Integral a, Bounded a, Boolean a, TryOrd a)
+  => (Address, Instruction a) -> Simulate a (ZeroOneTwo Address)
+computeTargets (iAddr, i) = do
+  let (Reads reads, _) = dependencies (instructionSemanticsS i)
+  fetch >> execute >> incrementIC
+  addrAfter <- toMemoryAddress <$> simulateRead IC
+  case List.find (== IC) reads of
+    Nothing -> pure $ One (iAddr + 1)
+    Just _  -> case addrAfter of
+      -- malformed program address -- create an exception for it instead of crashing
+      Nothing -> error "basicBLocks: invalid program address reached"
+      Just target ->
+        case List.find (== F Condition) reads of
+          Nothing -> pure $ One target
+          Just _  -> pure $ Two (iAddr + 1) target
+  where
+    fetch = void $ simulateWrite IC (pure (fromMemoryAddress iAddr))
+    execute =   void $ try (instructionSemanticsM i simulateRead simulateWrite)
+    incrementIC = void $ simulateWrite IC ((+ 1) <$> simulateRead IC)
+
+-- | Calculate leaders --- instructions that start basic blocks
+--   See https://en.wikipedia.org/wiki/Basic_block
+leaders :: forall a.
   ( Addressable a, Num a, Show a
   , Monoid a, Integral a, Bounded a, Boolean a, TryOrd a)
-  => [(Address, Instruction a)] -> [Block a]
-basicBlocksImpl =
-  map postprocessBlock .
-  run .
-  fmap (either (const []) id) . runError @(Missing Key) .
-  fmap (either (const []) id) . runError @(Ignored Key) .
-  evalState initialState .
-  go 0 [] []
+  => [(Address, Instruction a)] -> Simulate a [Address]
+leaders [] = pure []
+leaders (x:xs) =
+  go [0] $ (x:xs)
   where
-    go entry body bs = \case
-      [] -> pure (reverse bs)
-      ((a, i):xs) -> do
-        -- set IC into the current address, essentially emulating instruction fetching
-        controlFlowWrite IC (pure (fromMemoryAddress a))
-        -- simulate semantics, together with post-incrementing IC
-        s <- try @(Ignored Key) (instructionSemanticsM i controlFlowRead controlFlowWrite >> incrementIC)
-        -- increment IC
-        case toMemoryAddress <$> s of
-          -- read of a non-IC key is ignored
-          (Left _) -> go entry (i:body) bs xs
-          -- invalid values of instruction counter fail the algorithm
-          (Right Nothing) -> pure []
-          -- a successful read means a jump was executed: start new block
-          (Right (Just target)) ->
-            let new = MkBlock entry (reverse $ i:body) (Just (a + 1, target))
-            in go (a + 1) [] (new:bs) xs
-
-    incrementIC =
-      controlFlowWrite IC ((+ 1) <$> controlFlowRead IC)
-
-    initialState = emptyCtx {_bindings = Map.fromList [ (IC, 0)
-                                                      , (F Condition, false)
-                                                      , (F Halted, false)
-                                                      ]}
+    go ls = \case
+      [] -> pure ls
+      ((a, i):ys) -> do
+        let (Reads reads, _) = dependencies (instructionSemanticsS i)
+        t <- computeTargets (a, i)
+        case List.find (== IC) reads of
+          Nothing -> go ls ys
+          Just _ ->
+            case t of
+              Zero            -> go ls ys
+              One target      -> go (target:ls) ys
+              Two next target -> go (next:target:ls) ys
 
 -- | Validate a basic block and remove spurious targets of @halt@'s
 postprocessBlock :: Block a -> Block a
-postprocessBlock b@(MkBlock a is t) =
+postprocessBlock b@(MkBlock a is e t) =
   case reverse is of
     [] -> error $ "empty block starting at " <> show a <> " with target " <> show t
     -- analyse the exit instruction
     ((Instruction i):_) -> case i of
-      Halt -> (MkBlock a is Nothing)
+      Halt -> (MkBlock a is e Zero)
       _    -> b
-
--- | Simulate reads on control-flow related keys:
---   instruction counter, Halted flag and Condition flag,
---   ignoring everything else
-controlFlowRead :: ( Member (State (Context a)) r
-           , Member (Error (Missing Key)) r
-           , Member (Error (Ignored Key)) r
-           ) => Key -> Sem r a
-controlFlowRead key = case key of
-  F Halted    -> simulateRead (F Halted)
-  F Condition -> simulateRead (F Condition)
-  IC          -> simulateRead IC
-  k           -> throw (ignore k)
-
--- | Simulate writes on control-flow related keys:
---   instruction counter, Halted flag and Condition flag,
---   ignoring everything else
-controlFlowWrite :: ( Member (State (Context a)) r
-            , Member (Error (Ignored Key)) r
-            , Member (Error (Missing Key)) r
-            ) => Key -> Sem r a -> Sem r a
-controlFlowWrite key fv = do
-  (flip catch) (\(MkMissing k) -> throw (ignore k)) $
-    case key of
-      F Halted    -> simulateWrite (F Halted) fv
-      F Condition -> simulateWrite (F Condition) fv
-      IC          -> simulateWrite IC fv
-      k           -> throw (ignore k)
-
-
--- | Check that a block is indeed basic, i.e. it is non-empty
---   it finishes with a jump of halt and there ary no jumps or
---   halts in the middle
-validateBlock :: Block a -> Bool
-validateBlock (MkBlock _ is _) = case reverse is of
-  [] -> False
-  (x:xs) -> isControlFlow x &&
-            null (filter isControlFlow xs)
-  where
-    isControlFlow :: Instruction a -> Bool
-    isControlFlow (Instruction i)= case i of
-      Halt     -> True
-      Jump _   -> True
-      JumpCt _ -> True
-      JumpCf _ -> True
-      _        -> False

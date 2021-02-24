@@ -35,15 +35,18 @@ import           ISA.Semantics
 import           ISA.Types
 import           ISA.Types.Context
 import           ISA.Types.Instruction
+import           ISA.Types.ZeroOneTwo
 
 cfg :: Script -> Alga.Graph (Maybe (Block (Data Int32)))
 cfg src =
   let blocks = basicBlocks src
-      ids = map (\(MkBlock a is _) -> map fst $ zip [a..] is) blocks
+      ids = map (\(MkBlock a is _ _) -> map fst $ zip [a..] is) blocks
       dict = Map.fromList $ zip ids blocks
   in Alga.overlays . concatMap (mkEdges dict) $ blocks
-  where mkEdges dict b@(MkBlock a _ Nothing)       = [Alga.edge (Just b) Nothing]
-        mkEdges dict b@(MkBlock a _ (Just (l, r))) =
+  where mkEdges dict b@(MkBlock a _ _ Zero)       = [Alga.edge (Just b) Nothing]
+        mkEdges dict b@(MkBlock a _ _ (One n)) =
+          [ Alga.edge (Just b) (find n dict) ]
+        mkEdges dict b@(MkBlock a _ _ (Two l r)) =
           [ Alga.edge (Just b) (find l dict)
           , Alga.edge (Just b) (find r dict) ]
         find :: Address -> Map.Map [Address] (Block (Data Int32)) -> Maybe (Block (Data Int32))
@@ -77,18 +80,19 @@ style = Alga.Style
         , "labelloc" Alga.:= "top"
         , "shape" Alga.:= "plain"]
     , Alga.vertexName              = \x   -> maybe "⊥" show (_entry <$> x)
-    , Alga.edgeAttributes          = \x y -> ["headport" := maybe "⊥" show (_entry <$> y)]
+    , Alga.edgeAttributes          = \x y -> [ "headport" := maybe "⊥" (show . show) (_entry <$> y)
+                                             , "tailport" := maybe "t" (show . show) (_exit <$> x)]
     }
   where table Nothing = "<TR><TD ALIGN=\"LEFT\">" <> "⊥" <> "</TD></TR>"
         table (Just b) = unlines $ map row (zip [_entry b..] (_body b))
                                      <> [lastRow (_targets $ b)]
           where
             row (a, i) = "<TR><TD ALIGN=\"LEFT\"" <>
-                    (if a == _entry b then " PORT=\"" <> show a <> "\" >" else ">") <>
+                    (" PORT=\"" <> show a <> "\" >") <>
                     show a <> ". " <> show i <>
                     "</TD></TR>"
             lastRow r = "<TR><TD ALIGN=\"CENTER\" BORDER=\"0\"> Targets: "
-                     <> (maybe "⊥" show r) <> "</TD></TR>"
+                     <> show r <> "</TD></TR>"
 
 writeCfgDot :: FilePath -> Script -> IO ()
 writeCfgDot path src =

@@ -154,8 +154,10 @@ cmpLt reg addr = \read write ->
 jumpCt :: Imm a -> FS Key Selective '[Boolean, Num] a
 jumpCt (Imm offset) read write =
   ifS (toBool <$> read (F Condition))
-      (jump (Imm 0) read write)
-      (jump (Imm offset) read write)
+      (write IC ((+) <$> pure offset <*> read IC))
+      (pure 0)
+      -- (jump (Imm 0) read write)
+      -- (jump (Imm offset) read write)
   -- select (e <$> read (F Condition))
   --        (const <$> jump (Imm offset) read write)
          -- (const <$> (write  IC ((+) <$> pure offset <*> read IC)))
@@ -164,8 +166,10 @@ jumpCt (Imm offset) read write =
 jumpCf :: Imm a -> FS Key Selective '[Boolean, Num] a
 jumpCf (Imm offset) read write =
   ifS (toBool <$> read (F Condition))
-      (jump (Imm offset) read write)
-      (jump (Imm 0) read write)
+      (pure 0)
+      (write IC ((+) <$> pure offset <*> read IC))
+      -- (jump (Imm offset) read write)
+      -- (jump (Imm 0) read write)
   -- select (e . ISA.Types.not <$> read (F Condition))
   --        (const <$> jump (Imm offset) read write)
          -- (const <$> (write IC ((+) <$> pure offset <*> read IC)))
@@ -187,15 +191,15 @@ instructionSemanticsS :: Instruction a
 instructionSemanticsS (Instruction i) r w = case i of
     Halt           -> halt r w
     Load reg addr  -> load reg addr r w
-    LoadMI _ _ ->
-      error $ "ISA.Semantics.instructionSemanticsS : "
-           ++ "LoadMI does not have Selective semantics "
+    LoadMI _ _     -> pure mempty  -- for now loadmi is a noop in selective semantics
+      -- error $ "ISA.Semantics.instructionSemanticsS : "
+      --      ++ "LoadMI does not have Selective semantics "
     Set reg imm    -> set reg imm r w
     Store reg addr -> store reg addr r w
     Add reg addr   -> add reg addr r w
     AddI reg imm   -> addI reg imm r w
     Sub reg addr   -> sub reg addr r w
-    SubI reg addr   -> subI reg addr r w
+    SubI reg addr  -> subI reg addr r w
     Mul reg addr   -> mul reg addr r w
     Div reg addr   -> div reg addr r w
     Mod reg addr   -> mod reg addr r w

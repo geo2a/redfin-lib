@@ -12,22 +12,22 @@
 -----------------------------------------------------------------------------
 
 module ISA.Backend.Dependencies
-  ( dependencies
-  , programDataGraph
-  , drawGraph) where
+  (Reads(..), Writes(..), dependencies, dependsOn) where
 
-import           Algebra.Graph
-import           Algebra.Graph.Export.Dot
-import           Control.Arrow            (second)
 import           Control.Selective
-import           Data.Either              (partitionEithers)
-import           Data.Maybe               (fromJust)
-import qualified Data.Set                 as Set
+import           Data.Bifunctor
+import           Data.Either       (partitionEithers)
+import           Data.List
 
 import           FS
-import           ISA.Semantics
-import           ISA.Types
-import           ISA.Types.Instruction
+
+-- | A datatype marking a read-dependency
+newtype Reads a = Reads a
+  deriving (Show, Eq)
+
+-- | A datatype marking a write-dependency
+newtype Writes a = Writes a
+  deriving (Show, Eq)
 
 trackingRead :: key -> Over [Either key key] a
 trackingRead key = Over [Left key]
@@ -37,47 +37,13 @@ trackingWrite key producer = producer *> Over [Right key]
 
 -- | Extract input and output data-dependencies of a computation
 dependencies :: FS key Selective '[Any] a
-     -> ([key], [key])
+     -> (Reads [key], Writes [key])
 dependencies task =
-    partitionEithers . getOver $
+    bimap Reads Writes . partitionEithers . getOver $
     task trackingRead trackingWrite
 
-type InstructionLabel = String
-
--- | Compute static data flow graph of an instruction. In case of supplying a
---   monadic, i.e. data-dependent instruction, 'Nothing' is returned.
---
--- Since no data requiring simulation is performed, the semantics metalanguage
--- terms are mocked: 'read' becomes 'const 0' and 'write' is simply ignored.
-instructionGraph :: Value a => (Address, Instruction a)
-                            -> Maybe (Graph (Either Key InstructionLabel))
-instructionGraph (addr, instr) = do
-    let (ins, outs) = dependencies (instructionSemanticsS instr)
-    let instrInfo = instructionLabel
-    pure $ overlay (star (Right instrInfo) (map Left outs))
-                   (transpose $ star (Right instrInfo) (map Left ins))
-    where instructionLabel = show addr <> "|" <> show instr
-
--- | Serialise data flow graph as a .dot string
-drawGraph :: Graph (Either Key InstructionLabel) -> String
-drawGraph g = export style g
-  where
-    style = defaultStyleViaShow
-        { vertexName = \v -> "v" ++ show (fromJust $ Set.lookupIndex v names)
-        , vertexAttributes = \x -> case x of
-            Left  k      -> [ "shape"  := "circle"
-                            , "label"  := show k ]
-            Right i -> [ "shape" := "record"
-                            , "label" := i ] }
-    names = vertexSet g
-    -- instructionLabel a i = fromString (show a <> "|" <> show i)
-
--- | Compute static data flow graph of a program. In case of supplying a
---   monadic, i.e. data-dependent instruction, 'Nothing' is returned.
-programDataGraph :: Value a => [(Address, Instruction a)]
-                            -> Maybe (Graph (Either Key InstructionLabel))
-programDataGraph p =
-    let p' = map (second id) p
-    in  foldl go (Just empty) (map instructionGraph p')
-    where go _   Nothing = Nothing
-          go acc g       = overlay <$> acc <*> g
+-- | Check if a computation depends on specified keys
+dependsOn :: Eq key => Reads [key] -> Writes [key] -> FS key Selective '[Any] a -> Bool
+dependsOn (Reads reads) (Writes writes) computation =
+  let (Reads readDeps, Writes writeDeps) = dependencies computation
+  in (not . null $ intersect reads readDeps) || (not . null $ intersect writes writeDeps)
