@@ -25,9 +25,21 @@ import           FS
 newtype Reads a = Reads a
   deriving (Show, Eq)
 
+instance Semigroup a => Semigroup (Reads a) where
+  (Reads x) <> (Reads y) = (Reads (x <> y))
+
+instance Monoid a => Monoid (Reads a) where
+  mempty = Reads mempty
+
 -- | A datatype marking a write-dependency
 newtype Writes a = Writes a
   deriving (Show, Eq)
+
+instance Semigroup a => Semigroup (Writes a) where
+  (Writes x) <> (Writes y) = (Writes (x <> y))
+
+instance Monoid a => Monoid (Writes a) where
+  mempty = Writes mempty
 
 trackingRead :: key -> Over [Either key key] a
 trackingRead key = Over [Left key]

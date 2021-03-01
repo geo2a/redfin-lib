@@ -3,76 +3,89 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Backend.Symbolic.QueryList
--- Copyright  : (c) Georgy Lukyanov 2021
+-- Copyright  : (c) Georgy Lucknow 2021
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
 --
 -- Symbolic simulation over a zipper-focused binary tree
 -----------------------------------------------------------------------------
-module ISA.Backend.Symbolic.Zipper
-  ( -- * symbolic simulation engine
-    Engine, execEngine
-  , EngineState(..), effectOnContext
-  -- * symbolic simulation trace
-  , OneTwo(..), Trace (..), getFocused, putFocused, growTrace
-    -- * Zipper interface for _trace of the Engine
-  , left, up, right, down
-    -- * instances of read/write callbacks for Engine
-  , readKey, writeKey
-  ) where
+module ISA.Backend.Symbolic.Zipper where
 
 import           Control.Applicative
 import           Control.Concurrent.STM
 import           Control.Monad.Reader
 import           Control.Monad.State.Class
+import           Control.Monad.Trans.Writer.CPS (WriterT, runWriterT)
+import qualified Control.Monad.Trans.Writer.CPS as Writer.CPS
+import           Control.Monad.Writer.Class
 import           Control.Selective
-import           Data.IntMap.Strict        (IntMap)
-import qualified Data.IntMap.Strict        as IntMap
-import qualified Data.Map.Strict           as Map
+import           Data.IntMap.Strict             (IntMap)
+import qualified Data.IntMap.Strict             as IntMap
+import qualified Data.Map.Strict                as Map
 import           Data.Maybe
-import qualified Data.SBV.Trans            as SBV
+import qualified Data.SBV.Trans                 as SBV
+import           Data.Text                      (Text)
+import qualified Data.Text                      as Text
 import           GHC.Stack
-import           Prelude                   hiding (log, not, read, readIO)
+import           ISA.Backend.Dependencies
+import           Prelude                        hiding (log, not, read, readIO)
 
 import           ISA.Types
-import           ISA.Types.Context         hiding (Context)
-import qualified ISA.Types.Context         as ISA.Types
+import           ISA.Types.Context              hiding (Context)
+import qualified ISA.Types.Context              as ISA.Types
+import           ISA.Types.Key
 import           ISA.Types.Symbolic
-import           ISA.Types.Tree            hiding (down, left, right, up)
-import qualified ISA.Types.Tree            as Tree
+import           ISA.Types.Symbolic.Address
+import           ISA.Types.Tree                 hiding (down, left, right, up)
+import qualified ISA.Types.Tree                 as Tree
+import           ISA.Types.ZeroOneTwo
 
-type Context = ISA.Types.Context Sym
+type Context = ISA.Types.Context (Data Sym)
 
 -- | Trace of a symbolic simulation
 data Trace =
   MkTrace { _layout :: Tree Int ()
-         -- ^ Binary tree of state identifiers
+          -- ^ Binary tree of state identifiers
           , _focus  :: Loc Int ()
-         -- ^ zipper for _layout
+          -- ^ zipper for _layout
           , _states :: IntMap Context
-         -- ^ the actual states
+          -- ^ the actual states
           }
-
--- | Choice between a single child node and a branch
-data OneTwo a = One a | Two a a
-  deriving (Show, Functor)
 
 -- | State of the symbolic engine
 data EngineState = MkEngineState
-  { _trace       :: TMVar Trace
- -- ^ symbolic simulation trace
-  , _choice      :: TMVar (Maybe (Context, Context))
- -- ^ branching instructions will fill this variable with
- --   a branch via Engine's Selective instance
-  , _statesCount :: TMVar Int
- -- ^ the number of (reachable) states discovered so far,
- --   i.e. the size of _states in _trace
+  { -- | symbolic simulation trace
+    _trace        :: TMVar Trace
+    -- | the number of (reachable) states discovered so far,
+    --   i.e. the size of _states in _trace
+  , _statesCount  :: TMVar Int
+  , _varCount     :: TVar Int
+  -- | For how much steps to simplify expressions on write
+  , _simplifyFuel :: Maybe Int
   }
+
+freshStoreAddr :: Engine Text
+freshStoreAddr = do
+  s <- ask
+  n <- liftIO . atomically $ modifyTVar (_varCount s) (+ 1)
+  pure ("a" <> (Text.pack $ show n))
+
+freshVarName :: Engine Text
+freshVarName = do
+  s <- ask
+  n <- liftIO . atomically $ modifyTVar (_varCount s) (+ 1)
+  pure ("v" <> (Text.pack $ show n))
+
+remember :: Text -> Data Sym -> Engine ()
+remember name expr = do
+  ctx <- getFocused
+  putFocused $ ctx {_store = Map.insert name expr (_store ctx) }
 
 -- | The symbolic simulation engine is a reader monad of the mutable
 --   environment and a state monad of the trace's zipper
-newtype Engine a = MkEngine (SBV.SymbolicT (ReaderT EngineState IO) a)
+newtype Engine a =
+  MkEngine (SBV.SymbolicT (ReaderT EngineState IO) a)
   deriving ( Functor, Applicative, Monad
            , MonadReader EngineState, MonadIO
            , SBV.MonadSymbolic)
@@ -95,44 +108,7 @@ instance Selective Engine where
 
 -- | The select implementation for Engine
 selectEngine :: Engine (Either a b) -> Engine (a -> b) -> Engine b
-selectEngine choice onLeft = do
-  c <- choice
-  ctx <- getFocused
-  let cond = fromJust $ getBinding (F Condition) ctx
-  let yes = ctx {_pathCondition = SAnd cond (_pathCondition ctx)}
-      no  = ctx {_pathCondition = SAnd (SNot cond) (_pathCondition ctx)}
-  (r, yes') <- effectOnContext yes (either (\x -> ($ x) <$> onLeft)
-                                           (\x -> onLeft *> pure x) c)
-  makeChoice yes' no
-  pure r
-
--- | Fill _choice with two new children nodes
-makeChoice :: Context -> Context -> Engine ()
-makeChoice ctx1 ctx2 = do
-  env <- ask
-  void . liftIO . atomically $ do
-    swapTMVar (_choice env) (Just (ctx1, ctx2))
-
--- | Perform a computation to snapshot it's effect on the mutable state, and backtrack the state
-effectAndBacktrack :: Engine a -> Engine a
-effectAndBacktrack effect = do
-  env <- ask
-  traceBefore <- liftIO . atomically $ readTMVar (_trace env)
-  result <- effect
-  void . liftIO . atomically $ do
-    swapTMVar (_trace env) traceBefore
-  pure result
-
--- | Execute a computation in the given state to observe its effect,
---   backtrack the state to the one before the execution and
---   return the observed changed state (and the result)
-effectOnContext :: Context -> Engine a -> Engine (a, Context)
-effectOnContext ctx effect =
-  effectAndBacktrack $ do
-    putFocused ctx
-    r <- effect
-    ctx' <- getFocused
-    pure (r, ctx')
+selectEngine = selectM
 
 -- | Execute an Engine computation from the given initial state
 execEngine :: Engine a -> Context -> IO Trace
@@ -140,8 +116,9 @@ execEngine (MkEngine computation) initialContext = do
   let layout = Leaf 0 ()
       initStates = IntMap.fromList [(0, initialContext)]
   env <- MkEngineState <$> newTMVarIO (MkTrace layout (Loc layout Top) initStates)
-                       <*> newTMVarIO Nothing
                        <*> newTMVarIO 0
+                       <*> newTVarIO 0
+                       <*> pure (Just 100)
   void $ runReaderT (SBV.runSMT computation) env
   liftIO . atomically $ readTMVar (_trace env)
 
@@ -201,9 +178,8 @@ putFocused ctx = do
 -- | Add a branch or grow the trunk of the trace without moving
 --   zipper's focus, i.e. the focus will stay at the parent node of
 --   the newly added node/nodes
-growTrace :: Maybe (OneTwo Context) -> Engine ()
-growTrace Nothing = pure ()
-growTrace (Just choice) = do
+growTrace :: ZeroOneTwo Context -> Engine ()
+growTrace choice = do
   focus <- get
   env <- ask
   (trace, size) <- liftIO . atomically $
@@ -211,6 +187,7 @@ growTrace (Just choice) = do
   let father = locKey focus
   let withKeys =
         case choice of
+          Zero    -> Zero
           One x   -> One (size + 1, x)
           Two x y -> Two (size + 1, x) (size + 2, y)
   void . liftIO . atomically $ do
@@ -221,8 +198,9 @@ growTrace (Just choice) = do
             }
     putTMVar (_statesCount env) (updateStatesCount size choice)
   where
-    updateLayout :: Int -> Loc Int () -> OneTwo (Int, Context) -> (Tree Int (), Loc Int ())
+    updateLayout :: Int -> Loc Int () -> ZeroOneTwo (Int, Context) -> (Tree Int (), Loc Int ())
     updateLayout father to = \case
+      Zero -> (Tree.travel to (Tree.getTree), to)
       One (k, _) ->
         let subtree = Tree.putTree (Trunk father (Leaf k ()))
         in ( Tree.travel to (subtree *> Tree.top *> Tree.getTree)
@@ -235,38 +213,53 @@ growTrace (Just choice) = do
            , Tree.shift to subtree
            )
 
-    updateStates :: IntMap Context -> OneTwo (Int, Context) -> IntMap Context
+    updateStates :: IntMap Context -> ZeroOneTwo (Int, Context) -> IntMap Context
     updateStates states = \case
+      Zero  -> states
       One (k, ctx) -> IntMap.insert k ctx states
       Two (k1, ctx1) (k2, ctx2) -> IntMap.insert k2 ctx2
                                    (IntMap.insert k1 ctx1 states)
 
-    updateStatesCount :: Int -> OneTwo Context -> Int
-    updateStatesCount s = \case One _   -> s + 1
-                                Two _ _ -> s + 2
+    updateStatesCount :: Int -> ZeroOneTwo Context -> Int
+    updateStatesCount s = \case
+      Zero    -> s
+      One _   -> s + 1
+      Two _ _ -> s + 2
 
 -- | The read callback to plug into FS semantics of instructions
 readKey :: HasCallStack => Key -> Engine (Data Sym)
 readKey key = do
-    ctx <- getFocused
-    let x = case Map.lookup key (_bindings ctx) of
-              Just v  -> v
-              Nothing -> defaultFor key
-    pure (MkData x)
+--  tell (Reads [key], Writes [])
+  ctx <- getFocused
+  x <-
+    case key of
+      (Addr (MkAddress (Left concrete))) ->
+        pure $ Map.lookup (Addr (MkAddress (Left concrete))) (_bindings ctx)
+      (Addr (MkAddress (Right sym))) -> do
+        addr <- freshStoreAddr
+        var <- freshVarName
+        remember addr (MkData sym)
+        pure $ Just (MkData $ SMapsTo (SAny addr) (SAny var))
+      (Prog (MkAddress (Left concrete))) ->
+        pure $ Map.lookup (Prog (MkAddress (Left concrete))) (_bindings ctx)
+      (Prog (MkAddress (Right sym))) -> do
+        addr <- freshStoreAddr
+        var <- freshVarName
+        remember addr (MkData sym)
+        pure $ Just (MkData $ SMapsTo (SAny addr) (SAny var))
+      _ -> pure $ Map.lookup key (_bindings ctx)
+  pure (maybe (defaultFor key) id x)
   where
-    defaultFor :: Key -> Sym
-    defaultFor = \case
-      Reg _  -> 0
-      F _    -> 0
-      Addr _ -> 0
-      IR     -> 0
-      IC     -> -1
-      Prog _ -> 0
+    defaultFor :: Key -> Data Sym
+    defaultFor key = error $ "ISA.Backend.Symbolic.Zipper.readKey: the key "
+                  <> show key <> " is not bound!"
 
 -- | The write callback to plug into FS semantics of instructions
 writeKey :: HasCallStack => Key -> Engine (Data Sym) -> Engine (Data Sym)
 writeKey key computation = do
-  (MkData value) <- computation
+--  tell (Reads [], Writes [key])
+  fuel <- _simplifyFuel <$> ask
+  value <- (simplify fuel <$>) <$> computation
   ctx <- getFocused
   putFocused $ ctx {_bindings = Map.insert key value (_bindings ctx)}
-  pure (MkData value)
+  pure value

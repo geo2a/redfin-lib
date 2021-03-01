@@ -22,7 +22,9 @@ import qualified Data.Text                    as Text
 import           ISA.Types
 import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Encode
+import           ISA.Types.Key
 import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.Address
 
 decIfNeg :: Integral a => a -> a
 decIfNeg x | x < 0     = x - 1
@@ -73,12 +75,12 @@ goto_cf name = do
                    (fromIntegral here :: Int32) - 1
              jmpi_cf (fromIntegral offset)
 
-type Labels = Map.Map Label Address
+type Labels = Map.Map Label CAddress
 
 data AssemblerState =
-    MkAssemblerState { program            :: [(Address, Instruction (Data Int32))]
+    MkAssemblerState { program            :: [(CAddress, Instruction (Data Int32))]
                      , labels             :: Labels
-                     , instructionCounter :: Address
+                     , instructionCounter :: CAddress
                      }
 
 type Script = State AssemblerState ()
@@ -87,18 +89,18 @@ collectLabels :: Script -> Labels
 collectLabels src =
     labels $ snd $ runState src (MkAssemblerState [] Map.empty 0)
 
-assemble :: Script -> [(Address, Instruction (Data Int32))]
+assemble :: Script -> [(CAddress, Instruction (Data Int32))]
 assemble src =
     prg
   where
     prg = reverse $ program $ snd $ runState src (MkAssemblerState [] labels 0)
     labels = collectLabels src
 
-mkProgram :: Script -> [(Key, Sym)]
+mkProgram :: Script -> [(Key, Data Sym)]
 mkProgram src =
   let prog = assemble src
-      addrs = map Prog [0..]
-      ics   = [ SConst (CWord ic) | (InstructionCode ic) <- map (encode . snd) prog]
+      addrs = map Prog (iterate inc 0)
+      ics   = [ MkData $ SConst (CWord ic) | (InstructionCode ic) <- map (encode . snd) prog]
   in zip addrs ics
 
 instr :: Instruction (Data Int32) -> Script

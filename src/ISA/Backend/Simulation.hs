@@ -26,6 +26,7 @@ import           Polysemy.State
 
 import           ISA.Types
 import           ISA.Types.Context
+import           ISA.Types.Key
 
 -- | An exception type to track uninitialised keys
 newtype Missing key = MkMissing key

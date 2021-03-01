@@ -16,16 +16,17 @@ module ISA.Semantics
     , willOverflowPure
     ) where
 
-import           Prelude               hiding (Monad, abs, div, mod)
-import qualified Prelude               (Monad, abs, div, mod)
+import           Prelude                    hiding (Monad, abs, div, mod)
+import qualified Prelude                    (Monad, abs, div, mod)
 
 import           Control.Selective
-import           Data.Int
 import           FS
 import           ISA.Types
 import           ISA.Types.Instruction
+import           ISA.Types.Key
 import           ISA.Types.Prop
 import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.Address
 
 type Monad f = (Selective f, Prelude.Monad f)
 
@@ -46,9 +47,10 @@ load reg addr read write = write (Reg reg) (read (Addr addr))
 loadMI :: Register -> Address -> FS Key Monad '[Addressable, Show] a
 loadMI reg pointer read write =
   read (Addr pointer) >>= \x ->
-    case toMemoryAddress x of
+    case toAddress x of
       Nothing   -> error $ "ISA.Semantics.loadMI: invalid address " <> show x
                  -- instead we actually need to rise a processor exception
+--        write (Reg reg) (read (SymAddr x))
       Just addr -> write (Reg reg) (read (Addr addr))
 
 -- | Write an immediate argument to a register
@@ -190,25 +192,25 @@ instructionSemanticsS :: Instruction a
                       -> FS Key Selective '[Monoid, Integral, Bounded, Boolean, TryOrd] a
 instructionSemanticsS (Instruction i) r w = case i of
     Halt           -> halt r w
-    Load reg addr  -> load reg addr r w
+    Load reg addr  -> load reg (literal addr) r w
     LoadMI _ _     -> pure mempty  -- for now loadmi is a noop in selective semantics
       -- error $ "ISA.Semantics.instructionSemanticsS : "
       --      ++ "LoadMI does not have Selective semantics "
     Set reg imm    -> set reg imm r w
-    Store reg addr -> store reg addr r w
-    Add reg addr   -> add reg addr r w
+    Store reg addr -> store reg (literal addr) r w
+    Add reg addr   -> add reg (literal addr) r w
     AddI reg imm   -> addI reg imm r w
-    Sub reg addr   -> sub reg addr r w
-    SubI reg addr  -> subI reg addr r w
-    Mul reg addr   -> mul reg addr r w
-    Div reg addr   -> div reg addr r w
-    Mod reg addr   -> mod reg addr r w
+    Sub reg addr   -> sub reg (literal addr) r w
+    SubI reg imm   -> subI reg imm r w
+    Mul reg addr   -> mul reg (literal addr) r w
+    Div reg addr   -> div reg (literal addr) r w
+    Mod reg addr   -> mod reg (literal addr) r w
     Abs reg        -> abs reg r w
     Jump simm8     -> jump simm8 r w
 
-    CmpEq reg addr -> cmpEq reg addr r w
-    CmpGt reg addr -> cmpGt reg addr r w
-    CmpLt reg addr -> cmpLt reg addr r w
+    CmpEq reg addr -> cmpEq reg (literal addr) r w
+    CmpGt reg addr -> cmpGt reg (literal addr) r w
+    CmpLt reg addr -> cmpLt reg (literal addr) r w
 
     JumpCt simm8   -> jumpCt simm8 r w
     JumpCf simm8   -> jumpCf simm8 r w
@@ -216,5 +218,5 @@ instructionSemanticsS (Instruction i) r w = case i of
 instructionSemanticsM :: Instruction a
                       -> FS Key Monad '[Show, Addressable, Monoid, Integral, Bounded, Boolean, TryEq, TryOrd] a
 instructionSemanticsM (Instruction i) r w = case i of
-  LoadMI reg addr -> loadMI reg addr r w
+  LoadMI reg addr -> loadMI reg (literal addr) r w
   _               -> instructionSemanticsS (Instruction i) r w

@@ -1,13 +1,3 @@
-{-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures             #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeApplications           #-}
-
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Instruction
@@ -29,16 +19,9 @@ import           Control.Selective
 import           Data.Int          ()
 import           Data.Kind         (Constraint)
 import           Data.Word         ()
-import           GHC.Generics
 import           Prelude           hiding (Read, abs, div, mod, readIO)
 
 import           ISA.Types
-
--- | We amend the standard 'Monad' constraint to include 'Selective' into
---   the hierarchy
--- type Monad (m :: * -> *) = (Selective m, Prelude.Monad m)
-
------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 ---------------- Instructions --------------------------------------------------
@@ -49,29 +32,28 @@ instance Unconstrained a
 
 data InstructionImpl (control :: (* -> *) -> Constraint) (value :: * -> Constraint) a where
   Halt     :: InstructionImpl Applicative value a
-  Load     :: Register -> Address -> InstructionImpl Functor value a
+  Load     :: Register -> CAddress -> InstructionImpl Functor value a
   Set      :: value a => Register -> Imm a         -> InstructionImpl Functor value a
-  Store    :: Register -> Address -> InstructionImpl Functor value a
-  Add      :: Register -> Address -> InstructionImpl Applicative value a
+  Store    :: Register -> CAddress -> InstructionImpl Functor value a
+  Add      :: Register -> CAddress -> InstructionImpl Applicative value a
   AddI     :: value a => Register -> Imm a -> InstructionImpl Applicative value a
-  Sub      :: Register -> Address -> InstructionImpl Applicative value a
+  Sub      :: Register -> CAddress -> InstructionImpl Applicative value a
   SubI     :: value a => Register -> Imm a -> InstructionImpl Applicative value a
-  Mul      :: Register -> Address -> InstructionImpl Applicative value a
-  Div      :: Register -> Address -> InstructionImpl Applicative value a
-  Mod      :: Register -> Address -> InstructionImpl Applicative value a
+  Mul      :: Register -> CAddress -> InstructionImpl Applicative value a
+  Div      :: Register -> CAddress -> InstructionImpl Applicative value a
+  Mod      :: Register -> CAddress -> InstructionImpl Applicative value a
   Abs      :: Register                  -> InstructionImpl Applicative value a
   Jump     :: value a => Imm a                    -> InstructionImpl Applicative value a
-  LoadMI   :: Register -> Address -> InstructionImpl Prelude.Monad value a
+  LoadMI   :: Register -> CAddress -> InstructionImpl Prelude.Monad value a
 
-  CmpEq    :: Register  -> Address -> InstructionImpl Selective value a
-  CmpGt    :: Register  -> Address -> InstructionImpl Selective value a
-  CmpLt    :: Register  -> Address -> InstructionImpl Selective value a
+  CmpEq    :: Register  -> CAddress -> InstructionImpl Selective value a
+  CmpGt    :: Register  -> CAddress -> InstructionImpl Selective value a
+  CmpLt    :: Register  -> CAddress -> InstructionImpl Selective value a
 
   JumpCt   :: value a => Imm a -> InstructionImpl Selective value a
   JumpCf   :: value a => Imm a -> InstructionImpl Selective value a
 
 deriving instance Eq a => Eq (InstructionImpl c v a)
--- deriving instance Ord (InstructionImpl c)
 
 instance Show a => Show (InstructionImpl control value a) where
   show = \case
@@ -154,29 +136,3 @@ mkI = Instruction
 
 instance Show a => Show (Instruction a) where
   show (Instruction i) = show i
-
-
-
--- -- | Programs are stored in program memory.
--- type InstructionAddress = Value
-
--- -- | Binary representation of an instruction
--- type InstructionCode = Word16
-
--- -- -- | Syntax of ISA instructions
--- -- data Instruction a = Ret
--- --                  -- ^ end execution
--- --                  --   @pc <- 0; halt@
--- --                  | Bnez Register (Imm a)
--- --                  -- ^ branch if the register contains nonzero
--- --                  --   @pc <- if (rs != 0) then iff else pc + 1
--- --                  | Sgtz Register{- @rd@ -} Register{- @rs@ -}
--- --                  -- ^ set if positive
--- --                  --   @pc <- pc + 1; rd <- if (rs > 0) then 1 else o
--- --                  | Sltz Register{- @rd@ -} Register{- @rs@ -}
--- --                  -- ^ set if positive
--- --                  --   @pc <- pc + 1; rd <- if (rs < 0) then 1 else o
--- --                  | Li Register (Imm a)
--- --                  -- ^ load immediate
--- --                  --   pc <- pc + 1; rd <- imm
--- --                  deriving (Show, Eq)

@@ -1,7 +1,3 @@
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiWayIf            #-}
-{-# LANGUAGE QuantifiedConstraints #-}
-{-# LANGUAGE TypeApplications      #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Types.Instruction.Decode
@@ -69,34 +65,34 @@ decode (InstructionCode code) =
       Just TagHalt   -> Just $ Instruction (Halt @Value)
       Just TagLoad   -> Just $ Instruction $
               Load @Value (decodeRegister . extractRegister $ expandedCode)
-                   (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
+                   (CAddress . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagSet    -> Just $ Instruction $
               Set @Value (decodeRegister . extractRegister $ expandedCode)
                   (Imm . fromIntegral . fromBitsLEInt8 $ extractSImm8 expandedCode)
       Just TagStore  -> Just $ Instruction $
               Store @Value (decodeRegister . extractRegister $ expandedCode)
-                   (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
+                   (CAddress . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagAdd    -> Just $ Instruction $
               Add @Value (decodeRegister . extractRegister $ expandedCode)
-                   (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
+                   (CAddress . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagAddI   -> Just $ Instruction $
               AddI @Value (decodeRegister . extractRegister $ expandedCode)
              (Imm . fromIntegral . fromBitsLEInt8 $ extractSImm8 expandedCode)
       Just TagSub    -> Just $ Instruction $
               Sub @Value (decodeRegister . extractRegister $ expandedCode)
-                  (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
+                  (CAddress . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagSubI   -> Just $ Instruction $
               SubI @Value (decodeRegister . extractRegister $ expandedCode)
              (Imm . fromIntegral . fromBitsLEInt8 $ extractSImm8 expandedCode)
       Just TagMul    -> Just $ Instruction $
               Mul @Value (decodeRegister . extractRegister $ expandedCode)
-                   (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
+                   (CAddress . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagDiv    -> Just $ Instruction $
               Div @Value (decodeRegister . extractRegister $ expandedCode)
-                   (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
+                   (CAddress . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagMod    -> Just $ Instruction $
               Mod @Value (decodeRegister . extractRegister $ expandedCode)
-                   (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
+                   (CAddress . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagAbs    -> Just $ Instruction $
               Abs @Value (decodeRegister . extractRegister $ expandedCode)
       Just TagJump   -> Just $ Instruction $
@@ -104,16 +100,16 @@ decode (InstructionCode code) =
                     $ extractSImm8Jump expandedCode)
       Just TagLoadMI -> Just $ Instruction $
               LoadMI @Value (decodeRegister . extractRegister $ expandedCode)
-                   (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
+                   (CAddress . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagCmpEq  -> Just $ Instruction $
               CmpEq @Value (decodeRegister . extractRegister $ expandedCode)
-                   (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
+                   (CAddress . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagCmpGt  -> Just $ Instruction $
               CmpGt @Value (decodeRegister . extractRegister $ expandedCode)
-                   (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
+                   (CAddress . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagCmpLt  -> Just $ Instruction $
               CmpLt @Value (decodeRegister . extractRegister $ expandedCode)
-                   (Address . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
+                   (CAddress . fromBitsLEWord8 $ extractMemoryAddress expandedCode)
       Just TagJumpCt -> Just $ Instruction $
               JumpCt @Value
              (Imm . fromIntegral . fromBitsLEInt8 $ extractSImm8Jump expandedCode)
@@ -138,7 +134,7 @@ extractRegister :: [Bool] -> [Bool]
 extractRegister = take 2 . drop 6
 
 extractMemoryAddress :: [Bool] -> [Bool]
-extractMemoryAddress = take 8 . drop 8
+extractMemoryAddress = take 16 . drop 8
 
 extractSImm8 :: [Bool] -> [Bool]
 extractSImm8 = take 8 . drop 8

@@ -12,7 +12,7 @@
 -----------------------------------------------------------------------------
 module ISA.Types.Context
   ( Context(..), SymbolicContext, emptyCtx
-  , getBinding, showKey, isReachable) where
+  , getBinding, putBinding, showKey, isReachable) where
 
 import           Data.Aeson         (FromJSON, ToJSON)
 import qualified Data.Map.Strict    as Map
@@ -20,6 +20,7 @@ import           Data.Text          (Text)
 import           GHC.Generics
 
 import           ISA.Types
+import           ISA.Types.Key
 import           ISA.Types.Prop
 import           ISA.Types.SBV
 import           ISA.Types.Symbolic
@@ -29,6 +30,8 @@ import           ISA.Types.Symbolic
 data Context a = MkContext {
   -- | keys (like register names, memory cells) mapped to their (symbolic) values
   _bindings        :: Map.Map Key a
+  -- | A store used for tracking symbolic points-to
+  , _store         :: Map.Map Text a
   -- | a boolean formula which must be satisfiable for this state to be reachable
   , _pathCondition :: a
   -- | a list of named boolean formulas, mostly used as preconditions and conjoined with @_pathCondition@
@@ -37,17 +40,18 @@ data Context a = MkContext {
   -- | a response from a solver, usually regarding
   --   satisfiability of @_pathCondition s && conjoin (_constraints s)@
   , _solution      :: Maybe SMTResult }
-  deriving (Generic, ToJSON, FromJSON)
+  deriving (Functor, Generic) -- , ToJSON, FromJSON)
 
 -- | Symbolic simulation is done with symbolic values
 type SymbolicContext = Context Sym
 
 -- | An empty context
 emptyCtx :: Boolean a => Context a
-emptyCtx = MkContext Map.empty true [] Nothing
+emptyCtx = MkContext Map.empty Map.empty true [] Nothing
 
 instance Eq a => Eq (Context a) where
   x == y = (_bindings x == _bindings y)
+        && (_store x == _store y)
         && (_constraints x == _constraints y)
 
 -- | A context is reachable if it's '_solution' is present and satisfiable
@@ -60,6 +64,13 @@ isReachable ctx = case (_solution ctx) of
 -- | Access a specific key
 getBinding :: Key -> Context a -> Maybe a
 getBinding key ctx = Map.lookup key (_bindings ctx)
+
+-- | Alter a specific key
+putBinding :: Key -> a -> Context a -> Context a
+putBinding key v ctx = ctx {_bindings = Map.insert key v (_bindings ctx)}
+
+getVar :: Text -> Context a -> Maybe a
+getVar key ctx = Map.lookup key (_store ctx)
 
 showKey :: Show a => Context a -> Key -> String
 showKey ctx key =

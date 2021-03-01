@@ -17,7 +17,7 @@ module ISA.Types.Symbolic
     ( Concrete(..), Sym (..), conjoin, disjoin
       , subst, simplify, trySolve
     -- try to concertise symbolic values
-    , getValue, tryFoldConstant, tryReduce, toAddress, toImm, toInstructionCode
+    , getValue, tryFoldConstant, tryReduce, toCAddress, toImm, toInstructionCode
     ) where
 
 import           Data.Aeson     (FromJSON, ToJSON, defaultOptions,
@@ -35,6 +35,8 @@ import           Prelude        hiding (not)
 
 import           ISA.Types
 import           ISA.Types.Prop
+-- import           ISA.Types.Symbolic
+-- import           ISA.Types.Symbolic.Address
 
 -----------------------------------------------------------------------------
 
@@ -55,11 +57,14 @@ instance FromJSON Concrete where
 instance Show Concrete where
   show (CInt32 i) = show i
   show (CWord w)  = show w
-  show (CBool b)  = show b
+  show (CBool b)  = if b then "⊤" else "⊥"
 
 instance Num Concrete where
   (CInt32 x) + (CInt32 y) = CInt32 (x + y)
-  x        + y        = error $ "Concrete.Num.+: non-integer arguments " <> show x <> " "
+  (CWord x)  + (CWord y) = CWord (x + y)
+  (CWord x)  + (CInt32 y) = CWord (x + fromIntegral y)
+  (CInt32 x)  + (CWord y) = CInt32 (x + fromIntegral y)
+  x + y = error $ "Concrete.Num.+: non-integer arguments " <> show x <> " "
                                                                          <> show y
   (CInt32 x) * (CInt32 y) = CInt32 (x + y)
   x        * y        = error $ "Concrete.Num.*: non-integer arguments " <> show x <> " "
@@ -124,6 +129,9 @@ instance Boolean Concrete where
 data Sym where
     SConst :: Concrete -> Sym
     SAny   :: Text -> Sym
+    -- | a tentative variant of points-to with arbitrary lvalue
+    -- which actually will be either a concrete address or a variable
+    SMapsTo :: Sym -> Sym -> Sym
     SAdd   :: Sym -> Sym -> Sym
     SSub   :: Sym -> Sym -> Sym
     SMul   :: Sym -> Sym -> Sym
@@ -146,20 +154,21 @@ instance ToJSON Sym where
 instance FromJSON Sym where
 
 instance Show Sym where
-    show (SAdd x y) = "(" <> show x <> " + " <> show y <> ")"
-    show (SSub x y) = "(" <> show x <> " - " <> show y <> ")"
-    show (SMul x y) = "(" <> show x <> " * " <> show y <> ")"
-    show (SDiv x y) = "(" <> show x <> " / " <> show y <> ")"
-    show (SMod x y) = "(" <> show x <> " % " <> show y <> ")"
-    show (SAbs x  ) = "abs " <> show x
-    show (SConst x) = show x
-    show (SAnd x y) = "(" <> show x <> " && " <> show y <> ")"
-    show (SOr  x y) = "(" <> show x <> " || " <> show y <> ")"
-    show (SAny n  ) = Text.unpack n
-    show (SEq  x y) = "(" <> show x <> " == " <> show y <> ")"
-    show (SGt  x y) = "(" <> show x <> " > " <> show y <> ")"
-    show (SLt  x y) = "(" <> show x <> " < " <> show y <> ")"
-    show (SNot b )  = "not " <> show b
+    show (SAdd x y)    = "(" <> show x <> " + " <> show y <> ")"
+    show (SSub x y)    = "(" <> show x <> " - " <> show y <> ")"
+    show (SMul x y)    = "(" <> show x <> " * " <> show y <> ")"
+    show (SDiv x y)    = "(" <> show x <> " / " <> show y <> ")"
+    show (SMod x y)    = "(" <> show x <> " % " <> show y <> ")"
+    show (SAbs x  )    = "abs " <> show x
+    show (SConst x)    = show x
+    show (SAnd x y)    = "(" <> show x <> " && " <> show y <> ")"
+    show (SOr  x y)    = "(" <> show x <> " || " <> show y <> ")"
+    show (SAny n  )    = Text.unpack n
+    show (SMapsTo x y) = "(" <> show x <> " -> " <> show y <> ")"
+    show (SEq  x y)    = "(" <> show x <> " == " <> show y <> ")"
+    show (SGt  x y)    = "(" <> show x <> " > " <> show y <> ")"
+    show (SLt  x y)    = "(" <> show x <> " < " <> show y <> ")"
+    show (SNot b )     = "not " <> show b
 
 instance Num Sym where
   x + y = SAdd x y
@@ -202,15 +211,15 @@ instance Monoid (Data Sym) where
 
 instance Boolean Sym where
   true = SConst (CBool True)
-  -- | Converting symbolic expressions to boolean always returns True
-  toBool _ = True
+  false = SConst (CBool False)
   fromBool b = SConst (CBool b)
   -- toBool _ = error "Hi from Sym.toBool"
-  -- toBool x = case getValue x of
-  --              Nothing        -> error $ "symbolic value" <> show x
-  --              Just (CBool b) -> trace (show b) b
-  --              Just x -> error $ "ISA.Symbolic.Sym.toBool: non-boolean concrete value "
-  --                             <> show x
+  -- | Converting a symbolic expressions to boolean always returns True
+  toBool x = case getValue x of
+               Nothing        -> True
+               Just (CBool b) -> b
+               Just x -> error $ "ISA.Symbolic.Sym.toBool: non-boolean concrete value "
+                              <> show x
   not x = SNot x
 
   x ||| y = SOr x y
@@ -241,12 +250,12 @@ instance TryOrd (Data Sym) where
   lt (MkData x) (MkData y) = Nontrivial (MkData $ SLt x y)
   gt (MkData x) (MkData y) = Nontrivial (MkData $ SGt x y)
 
-instance Addressable (Data Sym) where
-  toMemoryAddress (MkData x) =
-    case toAddress x of
-      Left _     -> Nothing
-      Right addr -> Just addr
-  fromMemoryAddress x = MkData (SConst (CWord (fromIntegral x)))
+-- instance Addressable (Data Sym) where
+--   toMemoryAddress (MkData x) =
+--     case toAddress x of
+--       Left _     -> Nothing
+--       Right addr -> Just addr
+--   fromMemoryAddress x = MkData (SConst (CWord (fromIntegral x)))
 
 conjoin :: [Sym] -> Sym
 conjoin cs = foldl' SAnd true cs
@@ -257,39 +266,41 @@ disjoin cs = foldl' SOr false cs
 -- | Substitute a variable named @name with @expr
 subst :: Sym -> Text -> Sym -> Sym
 subst expr name = \case
-  n@(SAny var) -> if var == name then expr else n
-  n@(SConst _) -> n
-  (SAdd p q)   -> SAdd (subst expr name p) (subst expr name q)
-  (SSub p q)   -> SSub (subst expr name p) (subst expr name q)
-  (SMul p q)   -> SMul (subst expr name p) (subst expr name q)
-  (SDiv p q)   -> SDiv (subst expr name p) (subst expr name q)
-  (SMod p q)   -> SMod (subst expr name p) (subst expr name q)
-  (SAbs x  )   -> SAbs (subst expr name x)
-  (SAnd p q)   -> SAnd (subst expr name p) (subst expr name q)
-  (SOr  p q)   -> SOr  (subst expr name p) (subst expr name q)
-  (SNot x  )   -> SNot (subst expr name x)
-  (SEq  p q)   -> SEq (subst expr name p) (subst expr name q)
-  (SGt  p q)   -> SGt (subst expr name p) (subst expr name q)
-  (SLt  p q)   -> SLt (subst expr name p) (subst expr name q)
+  n@(SAny var)  -> if var == name then expr else n
+  n@(SConst _)  -> n
+  (SMapsTo p q) -> SMapsTo (subst expr name p) (subst expr name q)
+  (SAdd p q)    -> SAdd (subst expr name p) (subst expr name q)
+  (SSub p q)    -> SSub (subst expr name p) (subst expr name q)
+  (SMul p q)    -> SMul (subst expr name p) (subst expr name q)
+  (SDiv p q)    -> SDiv (subst expr name p) (subst expr name q)
+  (SMod p q)    -> SMod (subst expr name p) (subst expr name q)
+  (SAbs x  )    -> SAbs (subst expr name x)
+  (SAnd p q)    -> SAnd (subst expr name p) (subst expr name q)
+  (SOr  p q)    -> SOr  (subst expr name p) (subst expr name q)
+  (SNot x  )    -> SNot (subst expr name x)
+  (SEq  p q)    -> SEq (subst expr name p) (subst expr name q)
+  (SGt  p q)    -> SGt (subst expr name p) (subst expr name q)
+  (SLt  p q)    -> SLt (subst expr name p) (subst expr name q)
 
 -- | Try to perform constant folding and get the resulting value. Return 'Nothing' on
 --   encounter of a symbolic variable.
 getValue :: Sym -> Maybe Concrete
 getValue = \case
-    (SAny   _) -> Nothing
-    (SConst x) -> Just x
-    (SAdd p q) -> (+)           <$> getValue p <*> getValue q
-    (SSub p q) -> (-)           <$> getValue p <*> getValue q
-    (SMul p q) -> (*)           <$> getValue p <*> getValue q
-    (SDiv p q) -> Prelude.div   <$> getValue p <*> getValue q
-    (SMod p q) -> (Prelude.mod) <$> getValue p <*> getValue q
-    (SAbs x  ) -> Prelude.abs   <$> getValue x
-    (SAnd p q) -> (&&&)          <$> getValue p <*> getValue q
-    (SOr  p q) -> (|||)          <$> getValue p <*> getValue q
-    (SNot x  ) -> not           <$> getValue x
-    (SEq  p q) -> CBool <$> ((==) <$> getValue p <*> getValue q)
-    (SGt  p q) -> CBool <$> ((>)           <$> getValue p <*> getValue q)
-    (SLt  p q) -> CBool <$> ((<)           <$> getValue p <*> getValue q)
+    (SAny   _)    -> Nothing
+    (SConst x)    -> Just x
+    (SMapsTo p q) -> Nothing
+    (SAdd p q)    -> (+)           <$> getValue p <*> getValue q
+    (SSub p q)    -> (-)           <$> getValue p <*> getValue q
+    (SMul p q)    -> (*)           <$> getValue p <*> getValue q
+    (SDiv p q)    -> Prelude.div   <$> getValue p <*> getValue q
+    (SMod p q)    -> (Prelude.mod) <$> getValue p <*> getValue q
+    (SAbs x  )    -> Prelude.abs   <$> getValue x
+    (SAnd p q)    -> (&&&)          <$> getValue p <*> getValue q
+    (SOr  p q)    -> (|||)          <$> getValue p <*> getValue q
+    (SNot x  )    -> not           <$> getValue x
+    (SEq  p q)    -> CBool <$> ((==) <$> getValue p <*> getValue q)
+    (SGt  p q)    -> CBool <$> ((>)           <$> getValue p <*> getValue q)
+    (SLt  p q)    -> CBool <$> ((<)           <$> getValue p <*> getValue q)
 
 -- | Constant-fold the expression if it only contains 'SConst' leafs; return the
 --   unchanged expression otherwise.
@@ -352,19 +363,19 @@ simplify steps =
 -- | Try to convert a symbolic value into a memory/program address,
 --   possibly doing constant folding.
 --   Return @Left@ in cases of symbolic value, concrete boolean and non-Word16 value
-toAddress :: HasCallStack => Sym -> Either Sym Address
-toAddress sym =
+toCAddress :: HasCallStack => Sym -> Either Sym CAddress
+toCAddress sym =
   case getValue (simplify Nothing sym) of
-    Just (CWord _)  -> error "ISA.Types.Symbolic.toAddress: not implemented for CWord"
-    Just (CInt32 i) -> if (i >= fromIntegral (minBound :: Address))
-                       && (i <= fromIntegral (maxBound :: Address))
+    Just (CWord _)  -> error "ISA.Types.Symbolic.toCAddress: not implemented for CWord"
+    Just (CInt32 i) -> if (i >= fromIntegral (minBound :: CAddress))
+                       && (i <= fromIntegral (maxBound :: CAddress))
                        then Right (fromIntegral i)
                        else error $ "ISA.Types.Symbolic.toAddress: " <>
-                                    "the value " <> show i <> "is out of address space"
+                                    "the value " <> show i <> " is out of address space"
     Just (CBool _)  -> error "ISA.Types.Symbolic.toAddress: not implemented for CBool"
     Nothing         -> Left sym
 
-toImm :: Sym -> Either Sym (Imm (Data Int8))
+toImm :: Sym -> Either Sym (Imm (Data Int32))
 toImm sym =
     case getValue (simplify Nothing sym) of
     Just (CWord _)   -> error "ISA.Types.Symbolic.toImm: not implemented for CWord"
@@ -378,9 +389,11 @@ toImm sym =
 
 toInstructionCode :: Sym -> Either Sym InstructionCode
 toInstructionCode sym =
-    case getValue (simplify Nothing sym) of
-    Just (CInt32  _) -> error $ "ISA.Types.Symbolic.toInstructionCode: " <>
-                                "not implemented for CInt32"
+    case getValue (simplify (Just 100) sym) of
+    Just (CInt32 a) ->
+      Right (fromIntegral a)
+      -- error $ "ISA.Types.Symbolic.toInstructionCode: " <>
+      --         "not implemented for CInt32"
     Just (CWord w)   -> Right (InstructionCode w)
     Just (CBool _)   -> error $ "ISA.Types.Symbolic.toInstructionCode: " <>
                                 "not implemented for CBool"

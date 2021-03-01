@@ -83,6 +83,7 @@ library
                 polysemy >= 1.4.0.0,
                 polysemy-plugin >= 0.2.5.2
   default-extensions: LambdaCase
+                    , MultiWayIf
                     , FlexibleContexts
                     , FlexibleInstances
                     , RankNTypes

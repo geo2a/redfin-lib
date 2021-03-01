@@ -17,10 +17,8 @@ module ISA.Types
     ( -- * Types describing architecture concepts
       -- ** data register
       Register (..)
-      -- ** memory location
-    , Address (..)
-      -- ** a typeclass representing things that could be converted to a memory location
-    , Addressable(..)
+      -- ** concrete memory location
+    , CAddress (..)
       -- ** flag
     , Flag (..)
       -- ** immediate argument
@@ -30,8 +28,6 @@ module ISA.Types
     -- * Data representation, equality types and keys
     -- ** packaged data
     , Data (..)
-    -- ** Abstraction over possible locations in the ISA
-    , Key(..), parseKey, keyTag
 
     -- * Classes abstracting values that the ISA model can operate with
     , Value, ToValue(..)
@@ -42,22 +38,22 @@ module ISA.Types
     ) where
 
 import           Control.Monad
-import           Data.Aeson       hiding (Value)
-import           Data.Aeson.Types hiding (Value)
+import           Data.Aeson            hiding (Value)
+import           Data.Aeson.Types      hiding (Value)
 import           Data.Bits
 import           Data.Bool
-import           Data.Int         (Int32, Int8)
-import           Data.List        (isInfixOf, isPrefixOf)
+import           Data.Functor.Identity
+import           Data.Int              (Int32, Int8)
 import           Data.Monoid
-import qualified Data.Text        as Text
+import qualified Data.Text             as Text
 import           Data.Typeable
-import           Data.Word        (Word16, Word8)
-import           GHC.Generics     (Generic)
+import           Data.Word             (Word16, Word8)
+import           GHC.Generics          (Generic)
 import           Generic.Random
-import           Prelude          hiding (not)
+import           Prelude               hiding (not)
 import qualified Prelude
-import           Test.QuickCheck  (Arbitrary, arbitrary)
-import           Text.Read        (readMaybe)
+import           Test.QuickCheck       (Arbitrary, arbitrary)
+
 
 import           ISA.Types.Prop
 
@@ -73,15 +69,15 @@ instance Arbitrary Register where
   arbitrary = genericArbitrary uniform
 
 -- | Memory location
-newtype Address = Address Word8
+newtype CAddress = CAddress Word8
   deriving (Eq, Ord, Num, Real, Enum, Integral, Bounded, Bits, FiniteBits, Generic)
   deriving (Show, Read) via Word8
 
-instance ToJSON Address where
+instance ToJSON CAddress where
   toEncoding = genericToEncoding defaultOptions
-instance FromJSON Address where
+instance FromJSON CAddress where
 
-instance Arbitrary Address where
+instance Arbitrary CAddress where
   arbitrary = genericArbitrary uniform
 
 -- | Flag
@@ -118,10 +114,11 @@ instance Arbitrary InstructionCode where
   arbitrary = genericArbitrary uniform
 
 -- | Packaging data in a newtype allows to redefine typeclass instances
-newtype Data a = MkData a
+newtype Data a = MkData { _unData :: a }
   deriving (Functor, Eq, Ord, Num, Enum, Real, Integral
            , Typeable, Bounded, Bits, FiniteBits, Generic)
   deriving Show via a
+  deriving Applicative via Identity
 
 instance ToJSON a => ToJSON (Data a) where
   toEncoding = genericToEncoding defaultOptions
@@ -131,72 +128,6 @@ instance Arbitrary a => Arbitrary (Data a) where
   arbitrary = genericArbitrary uniform
 
 -----------------------------------------------------------------------------
-
--- | Abstraction over possible locations in the ISA
-data Key where
-  Reg :: Register -> Key
-  -- ^ data register
-  Addr :: Address -> Key
-  -- ^ memory cell
-  F :: Flag -> Key
-  -- ^ flag, a special boolean register
-  IC :: Key
-  -- ^ instruction counter
-  IR :: Key
-  -- ^ instruction register
-  Prog :: Address -> Key
-  -- ^ program address
-
--- | Parse key heuristically: we only need to be able to parse
---   registers, flags, addresses and IR. If first three options
---   fail it should be the IR.
-parseKey :: String -> Maybe Key
-parseKey key =
-   getFirst . mconcat . map First $ [ Reg  <$> readMaybe key
-                                    , F    <$> readMaybe key
-                                    , Addr <$> readMaybe key
-                                    , join $ bool Nothing (Just IR) <$>
-                                    (isInfixOf <$> Just "IR" <*> Just key)
-                                    , join $ bool Nothing (Just (Prog 0)) <$>
-                                    (isPrefixOf <$> Just "PROG" <*> Just key)
-                                    , join $ bool Nothing (Just IC) <$>
-                                    (isInfixOf <$> Just "IC" <*> Just key)
-                                    ]
-deriving instance Eq Key
-deriving instance Ord Key
-deriving instance Generic Key
-
-instance ToJSON Key where
-  toEncoding = genericToEncoding defaultOptions
-instance ToJSONKey Key where
-  toJSONKey = toJSONKeyText (Text.pack . show)
-instance FromJSON Key where
--- instance FromJSONKey Key where
-instance FromJSONKey Key where
-  fromJSONKey = FromJSONKeyTextParser $ \t -> case parseKey (Text.unpack t) of
-    Just k  -> pure k
-    Nothing -> fail ("Invalid key: " ++ show t)
-
--- instance FromJSONKey Key where
---   fromJSONKey = genericFromJSONKey defaultJSONKeyOptions
-
-keyTag :: Key -> String
-keyTag = \case
-  Reg  _ -> "register"
-  Addr _ -> "address"
-  F    _ -> "flag"
-  IC     -> "instruction-counter"
-  IR     -> "instruction-register"
-  Prog _ -> "program-address"
-
-instance Show Key where
-    show = \case
-        Reg  reg  -> show reg
-        Addr addr -> show addr
-        F    flag -> show flag
-        IC        -> "IC"
-        IR        -> "IR"
-        Prog addr -> "PROG " <> show addr
 
 instance Boolean (Data Int8) where
   toBool (MkData x) = x /= 0
@@ -221,27 +152,6 @@ instance TryEq (Data Int8) where
 
 instance TryEq (Data Int32) where
   (MkData x) === (MkData y) = Trivial (x == y)
-
-class Addressable a where
-  toMemoryAddress :: a -> Maybe Address
-  fromMemoryAddress :: Address -> a
-
-instance Addressable (Data Word16) where
-  toMemoryAddress x | x >= fromIntegral (maxBound :: Address) = Nothing
-                    | otherwise =
-                      Just . Address . fromBitsLEWord8 . take 8 . blastLE $ x
-  fromMemoryAddress x = MkData (fromIntegral x)
-
-instance Addressable (Data Address) where
-  toMemoryAddress (MkData a) = Just . id $ a
-  fromMemoryAddress x = MkData (fromIntegral x)
-
-instance Addressable (Data Int32) where
-  toMemoryAddress x | x < 0 = Nothing
-                    | x >= fromIntegral (maxBound :: Address) = Nothing
-                    | otherwise =
-                      Just . Address . fromBitsLEWord8 . take 8 . blastLE $ x
-  fromMemoryAddress x = MkData (fromIntegral x)
 
 instance TryOrd (Data Int8) where
   lt (MkData x) (MkData y) = Trivial (x < y)
@@ -307,8 +217,8 @@ blastLE x = map (testBit x) [0 .. finiteBitSize x - 1]
 pad :: Int -> [Bool]
 pad k = replicate k False
 
--- extractMemoryAddress :: [Bool] -> [Bool]
--- extractMemoryAddress = (++ pad 24) . take 8 . drop 8
+-- extractMemoryCAddress :: [Bool] -> [Bool]
+-- extractMemoryCAddress = (++ pad 24) . take 8 . drop 8
 
-extractMemoryAddress :: [Bool] -> [Bool]
-extractMemoryAddress = take 8 . drop 8
+extractMemoryCAddress :: [Bool] -> [Bool]
+extractMemoryCAddress = take 8 . drop 8

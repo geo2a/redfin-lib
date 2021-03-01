@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 {-# OPTIONS_GHC -Wno-unused-binds #-}
+{-# OPTIONS_GHC -Wno-unused-local-binds #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Example.Sum
@@ -17,33 +18,33 @@ module ISA.Example.Sum
   , initCtx
   ) where
 
-import           Control.Monad.IO.Class       (liftIO)
-import           Data.Int                     (Int32)
-import qualified Data.Map                     as Map
-import           Data.Maybe                   (fromJust)
+import           Control.Monad.IO.Class          (liftIO)
+import           Data.Int                        (Int32)
+import qualified Data.Map                        as Map
+import           Data.Maybe                      (fromJust)
 
 import           ISA.Assembly
 -- import           ISA.Backend.Dependencies
-import           ISA.Types.Context            hiding (Context)
-import qualified ISA.Types.Context            as ISA.Types
+import           ISA.Types.Context               hiding (Context)
+import qualified ISA.Types.Context               as ISA.Types
 -- import           ISA.Semantics
-import           ISA.Backend.Graph
-import           ISA.Backend.Graph.BasicBlock
--- import           ISA.Backend.Symbolic.Zipper
--- import           ISA.Backend.Symbolic.Zipper.Run
+-- import           ISA.Backend.Graph
+-- import           ISA.Backend.Graph.BasicBlock
+import           ISA.Backend.Symbolic.Zipper
+import           ISA.Backend.Symbolic.Zipper.Run
 import           ISA.Example.Common
 import           ISA.Types
 import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
+import           ISA.Types.Key
 import           ISA.Types.Prop
 import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.Address
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Tree
 
-
-type Context = ISA.Types.Context Sym
-
+-- type Context = ISA.Types.Context (Data Sym)
 
 sumArrayLowLevel :: Script
 sumArrayLowLevel = do
@@ -90,22 +91,29 @@ showContext ctx =
 
 initCtx :: Context
 initCtx = MkContext
-  { _pathCondition = SConst (CBool True)
+  { _pathCondition = MkData (SConst (CBool True))
+  , _store = Map.empty
   , _constraints =
-    [ ("0 < x1 < 100", ((SGt (SAny "x1") 0) &&& (SLt (SAny "x1") 100)))
-    , ("0 < x2 < 100", ((SGt (SAny "x2") 0) &&& (SLt (SAny "x2") 100)))
-    , ("0 < x3 < 100", ((SGt (SAny "x3") 0) &&& (SLt (SAny "x3") 100)))
+    [ ("0 < x1 < 100", MkData $ ((SGt (SAny "x1") 0) &&& (SLt (SAny "x1") 100)))
+    , ("0 < x2 < 100", MkData $ ((SGt (SAny "x2") 0) &&& (SLt (SAny "x2") 100)))
+    , ("0 < x3 < 100", MkData $ ((SGt (SAny "x3") 0) &&& (SLt (SAny "x3") 100)))
+    , ("0 < n < 5", MkData $ ((SGt (SAny "n") 0) &&& (SLt (SAny "n") 10)))
     ]
-  , _bindings = Map.fromList $ [ (IC, SConst 0)
+  , _bindings = Map.fromList $ [ (IC, 0)
+--                               , (IR, )
                                , (Reg R0, 0)
                                , (Reg R1, 0)
                                , (Reg R2, 0)
-                               , (Addr 0, 3)
+                              , (Addr 0, MkData $ SAny "n")
+                               -- , (Addr 0, 3)
                                , (Addr 253, 0)
                                , (Addr 255, 1)
-                               , (Addr 1, SAny "x1")
-                               , (Addr 2, SAny "x2")
-                               , (Addr 3, SAny "x3")
+                               , (Addr 1, MkData $ SAny "x1")
+                               , (Addr 2, MkData $ SAny "x2")
+                               , (Addr 3, MkData $ SAny "x3")
+                               , (F Halted, false)
+                               , (F Condition, false)
+                               , (F Overflow, false)
                                ] ++ mkProgram sumArrayLowLevel
   , _solution = Nothing
   }
@@ -113,7 +121,7 @@ initCtx = MkContext
 
 demo_sum :: IO ()
 demo_sum = do
-  -- trace <- runModel 3 initCtx
-  -- mapM_ putStrLn (draw (_layout trace))
-  -- mapM_ (putStrLn . show) (_states trace)
+  trace <- runModel 30 initCtx
+  mapM_ putStrLn (draw (_layout trace))
+  mapM_ (putStrLn . show . getBinding IC) (_states trace)
   pure ()

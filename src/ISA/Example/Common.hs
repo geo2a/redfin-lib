@@ -11,6 +11,7 @@ import           ISA.Assembly
 import           ISA.Backend.Symbolic.List.Trace
 import           ISA.Types
 import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.Address
 
 defaultRegisters :: [(Register, Sym)]
 defaultRegisters = [ (R0, 0)
@@ -23,7 +24,6 @@ defaultFlags :: [(Flag, Sym)]
 defaultFlags = [ (Halted, SConst (CBool False))
                , (Overflow, SConst (CBool False))
                , (Condition, SConst (CBool False))
-               , (Zero, SConst (CBool False))
                ]
 
 mkMemory :: [(Address, Sym)] -> [(Address, Sym)]

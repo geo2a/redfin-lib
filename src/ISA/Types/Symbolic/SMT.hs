@@ -56,20 +56,21 @@ findFreeVars ctx =
 
 -- | Walk through a symbolic expression gathering up the free variables.
 gatherFree :: Sym -> Set Sym
-gatherFree c@(SAny _) = Set.singleton c
-gatherFree (SAdd l r) = gatherFree l <> gatherFree r
-gatherFree (SSub l r) = gatherFree l <> gatherFree r
-gatherFree (SMul l r) = gatherFree l <> gatherFree r
-gatherFree (SDiv l r) = gatherFree l <> gatherFree r
-gatherFree (SMod l r) = gatherFree l <> gatherFree r
-gatherFree (SAbs l)   = gatherFree l
-gatherFree (SNot c)   = gatherFree c
-gatherFree (SOr l r)  = gatherFree l <> gatherFree r
-gatherFree (SAnd l r) = gatherFree l <> gatherFree r
-gatherFree (SEq l r)  = gatherFree l <> gatherFree r
-gatherFree (SGt l r)  = gatherFree l <> gatherFree r
-gatherFree (SLt l r)  = gatherFree l <> gatherFree r
-gatherFree (SConst _) = mempty
+gatherFree c@(SAny _)    = Set.singleton c
+gatherFree (SMapsTo l r) = gatherFree l <> gatherFree r
+gatherFree (SAdd l r)    = gatherFree l <> gatherFree r
+gatherFree (SSub l r)    = gatherFree l <> gatherFree r
+gatherFree (SMul l r)    = gatherFree l <> gatherFree r
+gatherFree (SDiv l r)    = gatherFree l <> gatherFree r
+gatherFree (SMod l r)    = gatherFree l <> gatherFree r
+gatherFree (SAbs l)      = gatherFree l
+gatherFree (SNot c)      = gatherFree c
+gatherFree (SOr l r)     = gatherFree l <> gatherFree r
+gatherFree (SAnd l r)    = gatherFree l <> gatherFree r
+gatherFree (SEq l r)     = gatherFree l <> gatherFree r
+gatherFree (SGt l r)     = gatherFree l <> gatherFree r
+gatherFree (SLt l r)     = gatherFree l <> gatherFree r
+gatherFree (SConst _)    = mempty
 
 -- | Create existential SVals for each of SAny's in the input.
 createSym :: (HasCallStack, SBV.MonadSymbolic m)
