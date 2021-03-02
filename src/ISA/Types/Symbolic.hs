@@ -131,7 +131,7 @@ data Sym where
     SAny   :: Text -> Sym
     -- | a tentative variant of points-to with arbitrary lvalue
     -- which actually will be either a concrete address or a variable
-    SMapsTo :: Sym -> Sym -> Sym
+    SPointer :: Sym -> Sym
     SAdd   :: Sym -> Sym -> Sym
     SSub   :: Sym -> Sym -> Sym
     SMul   :: Sym -> Sym -> Sym
@@ -154,21 +154,21 @@ instance ToJSON Sym where
 instance FromJSON Sym where
 
 instance Show Sym where
-    show (SAdd x y)    = "(" <> show x <> " + " <> show y <> ")"
-    show (SSub x y)    = "(" <> show x <> " - " <> show y <> ")"
-    show (SMul x y)    = "(" <> show x <> " * " <> show y <> ")"
-    show (SDiv x y)    = "(" <> show x <> " / " <> show y <> ")"
-    show (SMod x y)    = "(" <> show x <> " % " <> show y <> ")"
-    show (SAbs x  )    = "abs " <> show x
-    show (SConst x)    = show x
-    show (SAnd x y)    = "(" <> show x <> " && " <> show y <> ")"
-    show (SOr  x y)    = "(" <> show x <> " || " <> show y <> ")"
-    show (SAny n  )    = Text.unpack n
-    show (SMapsTo x y) = "(" <> show x <> " -> " <> show y <> ")"
-    show (SEq  x y)    = "(" <> show x <> " == " <> show y <> ")"
-    show (SGt  x y)    = "(" <> show x <> " > " <> show y <> ")"
-    show (SLt  x y)    = "(" <> show x <> " < " <> show y <> ")"
-    show (SNot b )     = "not " <> show b
+    show (SAdd x y)   = "(" <> show x <> " + " <> show y <> ")"
+    show (SSub x y)   = "(" <> show x <> " - " <> show y <> ")"
+    show (SMul x y)   = "(" <> show x <> " * " <> show y <> ")"
+    show (SDiv x y)   = "(" <> show x <> " / " <> show y <> ")"
+    show (SMod x y)   = "(" <> show x <> " % " <> show y <> ")"
+    show (SAbs x  )   = "abs " <> show x
+    show (SConst x)   = show x
+    show (SAnd x y)   = "(" <> show x <> " && " <> show y <> ")"
+    show (SOr  x y)   = "(" <> show x <> " || " <> show y <> ")"
+    show (SAny n  )   = Text.unpack n
+    show (SPointer x) = "(*" <> show x <> ")"
+    show (SEq  x y)   = "(" <> show x <> " == " <> show y <> ")"
+    show (SGt  x y)   = "(" <> show x <> " > " <> show y <> ")"
+    show (SLt  x y)   = "(" <> show x <> " < " <> show y <> ")"
+    show (SNot b )    = "not " <> show b
 
 instance Num Sym where
   x + y = SAdd x y
@@ -266,41 +266,41 @@ disjoin cs = foldl' SOr false cs
 -- | Substitute a variable named @name with @expr
 subst :: Sym -> Text -> Sym -> Sym
 subst expr name = \case
-  n@(SAny var)  -> if var == name then expr else n
-  n@(SConst _)  -> n
-  (SMapsTo p q) -> SMapsTo (subst expr name p) (subst expr name q)
-  (SAdd p q)    -> SAdd (subst expr name p) (subst expr name q)
-  (SSub p q)    -> SSub (subst expr name p) (subst expr name q)
-  (SMul p q)    -> SMul (subst expr name p) (subst expr name q)
-  (SDiv p q)    -> SDiv (subst expr name p) (subst expr name q)
-  (SMod p q)    -> SMod (subst expr name p) (subst expr name q)
-  (SAbs x  )    -> SAbs (subst expr name x)
-  (SAnd p q)    -> SAnd (subst expr name p) (subst expr name q)
-  (SOr  p q)    -> SOr  (subst expr name p) (subst expr name q)
-  (SNot x  )    -> SNot (subst expr name x)
-  (SEq  p q)    -> SEq (subst expr name p) (subst expr name q)
-  (SGt  p q)    -> SGt (subst expr name p) (subst expr name q)
-  (SLt  p q)    -> SLt (subst expr name p) (subst expr name q)
+  n@(SAny var) -> if var == name then expr else n
+  n@(SConst _) -> n
+  (SPointer p) -> SPointer (subst expr name p)
+  (SAdd p q)   -> SAdd (subst expr name p) (subst expr name q)
+  (SSub p q)   -> SSub (subst expr name p) (subst expr name q)
+  (SMul p q)   -> SMul (subst expr name p) (subst expr name q)
+  (SDiv p q)   -> SDiv (subst expr name p) (subst expr name q)
+  (SMod p q)   -> SMod (subst expr name p) (subst expr name q)
+  (SAbs x  )   -> SAbs (subst expr name x)
+  (SAnd p q)   -> SAnd (subst expr name p) (subst expr name q)
+  (SOr  p q)   -> SOr  (subst expr name p) (subst expr name q)
+  (SNot x  )   -> SNot (subst expr name x)
+  (SEq  p q)   -> SEq (subst expr name p) (subst expr name q)
+  (SGt  p q)   -> SGt (subst expr name p) (subst expr name q)
+  (SLt  p q)   -> SLt (subst expr name p) (subst expr name q)
 
 -- | Try to perform constant folding and get the resulting value. Return 'Nothing' on
 --   encounter of a symbolic variable.
 getValue :: Sym -> Maybe Concrete
 getValue = \case
-    (SAny   _)    -> Nothing
-    (SConst x)    -> Just x
-    (SMapsTo p q) -> Nothing
-    (SAdd p q)    -> (+)           <$> getValue p <*> getValue q
-    (SSub p q)    -> (-)           <$> getValue p <*> getValue q
-    (SMul p q)    -> (*)           <$> getValue p <*> getValue q
-    (SDiv p q)    -> Prelude.div   <$> getValue p <*> getValue q
-    (SMod p q)    -> (Prelude.mod) <$> getValue p <*> getValue q
-    (SAbs x  )    -> Prelude.abs   <$> getValue x
-    (SAnd p q)    -> (&&&)          <$> getValue p <*> getValue q
-    (SOr  p q)    -> (|||)          <$> getValue p <*> getValue q
-    (SNot x  )    -> not           <$> getValue x
-    (SEq  p q)    -> CBool <$> ((==) <$> getValue p <*> getValue q)
-    (SGt  p q)    -> CBool <$> ((>)           <$> getValue p <*> getValue q)
-    (SLt  p q)    -> CBool <$> ((<)           <$> getValue p <*> getValue q)
+    (SAny   _)   -> Nothing
+    (SConst x)   -> Just x
+    (SPointer p) -> Nothing
+    (SAdd p q)   -> (+)           <$> getValue p <*> getValue q
+    (SSub p q)   -> (-)           <$> getValue p <*> getValue q
+    (SMul p q)   -> (*)           <$> getValue p <*> getValue q
+    (SDiv p q)   -> Prelude.div   <$> getValue p <*> getValue q
+    (SMod p q)   -> (Prelude.mod) <$> getValue p <*> getValue q
+    (SAbs x  )   -> Prelude.abs   <$> getValue x
+    (SAnd p q)   -> (&&&)          <$> getValue p <*> getValue q
+    (SOr  p q)   -> (|||)          <$> getValue p <*> getValue q
+    (SNot x  )   -> not           <$> getValue x
+    (SEq  p q)   -> CBool <$> ((==) <$> getValue p <*> getValue q)
+    (SGt  p q)   -> CBool <$> ((>)           <$> getValue p <*> getValue q)
+    (SLt  p q)   -> CBool <$> ((<)           <$> getValue p <*> getValue q)
 
 -- | Constant-fold the expression if it only contains 'SConst' leafs; return the
 --   unchanged expression otherwise.

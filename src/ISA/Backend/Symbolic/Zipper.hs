@@ -68,19 +68,18 @@ data EngineState = MkEngineState
 freshStoreAddr :: Engine Text
 freshStoreAddr = do
   s <- ask
-  n <- liftIO . atomically $ modifyTVar (_varCount s) (+ 1)
+  n <- liftIO . atomically $ modifyTVar (_varCount s) (+ 1) >>
+                             readTVar (_varCount s)
   pure ("a" <> (Text.pack $ show n))
-
-freshVarName :: Engine Text
-freshVarName = do
-  s <- ask
-  n <- liftIO . atomically $ modifyTVar (_varCount s) (+ 1)
-  pure ("v" <> (Text.pack $ show n))
 
 remember :: Text -> Data Sym -> Engine ()
 remember name expr = do
   ctx <- getFocused
   putFocused $ ctx {_store = Map.insert name expr (_store ctx) }
+
+resolvePointers :: Trace -> Trace
+resolvePointers trace =
+  trace {_states = fmap substPointers (_states trace)}
 
 -- | The symbolic simulation engine is a reader monad of the mutable
 --   environment and a state monad of the trace's zipper
@@ -200,7 +199,9 @@ growTrace choice = do
   where
     updateLayout :: Int -> Loc Int () -> ZeroOneTwo (Int, Context) -> (Tree Int (), Loc Int ())
     updateLayout father to = \case
-      Zero -> (Tree.travel to (Tree.getTree), to)
+      Zero -> let subtree = Tree.putTree (Leaf father ())
+              in ( Tree.travel to (subtree *> Tree.top *> Tree.getTree)
+                 , Tree.shift to subtree)
       One (k, _) ->
         let subtree = Tree.putTree (Trunk father (Leaf k ()))
         in ( Tree.travel to (subtree *> Tree.top *> Tree.getTree)
@@ -237,16 +238,14 @@ readKey key = do
         pure $ Map.lookup (Addr (MkAddress (Left concrete))) (_bindings ctx)
       (Addr (MkAddress (Right sym))) -> do
         addr <- freshStoreAddr
-        var <- freshVarName
         remember addr (MkData sym)
-        pure $ Just (MkData $ SMapsTo (SAny addr) (SAny var))
+        pure $ Just (MkData $ SPointer (SAny addr))
       (Prog (MkAddress (Left concrete))) ->
         pure $ Map.lookup (Prog (MkAddress (Left concrete))) (_bindings ctx)
       (Prog (MkAddress (Right sym))) -> do
         addr <- freshStoreAddr
-        var <- freshVarName
         remember addr (MkData sym)
-        pure $ Just (MkData $ SMapsTo (SAny addr) (SAny var))
+        pure $ Just (MkData $ SPointer (SAny addr))
       _ -> pure $ Map.lookup key (_bindings ctx)
   pure (maybe (defaultFor key) id x)
   where

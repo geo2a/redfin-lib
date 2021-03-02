@@ -20,6 +20,7 @@ module ISA.Example.Sum
 
 import           Control.Monad.IO.Class          (liftIO)
 import           Data.Int                        (Int32)
+import qualified Data.IntMap                     as IntMap
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromJust)
 
@@ -39,8 +40,10 @@ import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
 import           ISA.Types.Key
 import           ISA.Types.Prop
+import           ISA.Types.SBV
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Address
+import           ISA.Types.Symbolic.Logic.Adhoc
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Tree
 
@@ -97,14 +100,15 @@ initCtx = MkContext
     [ ("0 < x1 < 100", MkData $ ((SGt (SAny "x1") 0) &&& (SLt (SAny "x1") 100)))
     , ("0 < x2 < 100", MkData $ ((SGt (SAny "x2") 0) &&& (SLt (SAny "x2") 100)))
     , ("0 < x3 < 100", MkData $ ((SGt (SAny "x3") 0) &&& (SLt (SAny "x3") 100)))
-    , ("0 < n < 5", MkData $ ((SGt (SAny "n") 0) &&& (SLt (SAny "n") 10)))
+    , ("0 < n < 4", MkData $ ((SGt (SAny "n") 0) &&& (SLt (SAny "n") 10)))
+--    , ("n == 3", MkData $ ((SEq (SAny "n") 3)))
     ]
   , _bindings = Map.fromList $ [ (IC, 0)
 --                               , (IR, )
                                , (Reg R0, 0)
                                , (Reg R1, 0)
                                , (Reg R2, 0)
-                              , (Addr 0, MkData $ SAny "n")
+                             , (Addr 0, MkData $ SAny "n")
                                -- , (Addr 0, 3)
                                , (Addr 253, 0)
                                , (Addr 255, 1)
@@ -121,7 +125,23 @@ initCtx = MkContext
 
 demo_sum :: IO ()
 demo_sum = do
-  trace <- runModel 30 initCtx
+  trace <- runModel 50 initCtx
   mapM_ putStrLn (draw (_layout trace))
-  mapM_ (putStrLn . show . getBinding IC) (_states trace)
+  -- mapM_ (\s -> putStrLn . show $ (getBinding (Reg R0) s)) (_states trace)
+  let correct = InLeafs $ \s ->
+        SNot (
+           SAnd (SEq (_unData (fromJust (getBinding (Reg R0) s)))
+                      (SAny "x1" + SAny "x2" + SAny "x3"))
+                (SAnd (SEq (_unData (fromJust (getBinding (Reg R1) s)))
+                           (_unData (fromJust (getBinding (Addr 255) s))))
+                      ((_unData (fromJust (getBinding (F Halted) s)))
+                       ))
+           )
+  -- let trivial = InLeafs $ const true
+  r <- sat correct trace (ConstrainedBy (map _unData . map snd $ _constraints initCtx))
+  print r
+  -- -- case r of
+  -- --   Conjunct [Literal (n, Satisfiable s)] -> print ( modelAssocs s)
+  print (getBinding (F Halted) $ fromJust $ IntMap.lookup 23 (_states trace))
+  print (getBinding (F Halted) $ fromJust $ IntMap.lookup 32 (_states trace))
   pure ()

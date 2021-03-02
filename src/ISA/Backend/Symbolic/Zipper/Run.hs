@@ -33,6 +33,8 @@ import           ISA.Types.Instruction.Decode
 import           ISA.Types.Key
 import           ISA.Types.Prop
 import           ISA.Types.SBV
+import           ISA.Types.SBV.SFunArray      (SFunArray)
+import qualified ISA.Types.SBV.SFunArray      as SFunArray
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Address
 import           ISA.Types.Symbolic.SMT
@@ -87,7 +89,7 @@ step = do
 
 execute :: Engine () -> ZeroOneTwo Context -> Engine (ZeroOneTwo Context)
 execute todo = \case
-  Zero -> pure Zero
+  Zero -> getFocused >>= \end -> from end todo >> pure Zero
   One ctx -> do
     (reachable, alteredCtx) <- liftIO . SBV.runSMT . reach =<< from ctx todo
     if reachable then pure $ One alteredCtx
@@ -113,7 +115,8 @@ execute todo = \case
     reach ctx = do
       let freeVars = findFreeVars (_unData <$> ctx)
       vars <- createSym (Set.toList freeVars)
-      constrs <- toSMT vars ((_unData $ _pathCondition ctx)
+      constrs <- toSMT (SFunArray.sListArray 0 [])
+                       vars ((_unData $ _pathCondition ctx)
                              :(map (_unData . snd) (_constraints ctx)))
       SBV.query $ do
         SBV.constrain constrs

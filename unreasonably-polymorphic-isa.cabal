@@ -30,6 +30,7 @@ library
       ISA.Types.Prop,
       ISA.Types.CTL.Model,
       ISA.Types.SBV,
+      ISA.Types.SBV.SFunArray,
       ISA.Types.Tree,
       ISA.Types.ZeroOneTwo,
       ISA.Types.Context

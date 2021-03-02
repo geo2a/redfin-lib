@@ -12,11 +12,19 @@
 -----------------------------------------------------------------------------
 module ISA.Types.Context
   ( Context(..), SymbolicContext, emptyCtx
+
+  -- substitute pointers from @_store@ into @bindings@
+  , substPointers
+
+  -- extract memory from @_bindings@
+  , dumpMemory
+
   , getBinding, putBinding, showKey, isReachable) where
 
-import           Data.Aeson         (FromJSON, ToJSON)
-import qualified Data.Map.Strict    as Map
-import           Data.Text          (Text)
+import           Data.Aeson                 (FromJSON, ToJSON)
+import qualified Data.Map.Strict            as Map
+import           Data.Maybe
+import           Data.Text                  (Text)
 import           GHC.Generics
 
 import           ISA.Types
@@ -24,6 +32,7 @@ import           ISA.Types.Key
 import           ISA.Types.Prop
 import           ISA.Types.SBV
 import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.Address
 
 -- | A record type for state of the (symbolically) simulated computation.
 --   The type variable may be instantiated with 'Sym' for symbolic simulation, see 'ISA.Types.SymbolicContext'
@@ -49,6 +58,11 @@ type SymbolicContext = Context Sym
 emptyCtx :: Boolean a => Context a
 emptyCtx = MkContext Map.empty Map.empty true [] Nothing
 
+dumpMemory :: Context a -> [(Address, a)]
+dumpMemory = catMaybes . map (uncurry getAddr) . Map.assocs . _bindings
+  where getAddr (Addr a) v = Just (a, v)
+        getAddr _ _        = Nothing
+
 instance Eq a => Eq (Context a) where
   x == y = (_bindings x == _bindings y)
         && (_store x == _store y)
@@ -71,6 +85,15 @@ putBinding key v ctx = ctx {_bindings = Map.insert key v (_bindings ctx)}
 
 getVar :: Text -> Context a -> Maybe a
 getVar key ctx = Map.lookup key (_store ctx)
+
+substPointers :: Context (Data Sym) -> Context (Data Sym)
+substPointers ctx =
+  let ptrs = _store ctx
+  in foldr (uncurry substPointer) ctx (Map.assocs ptrs)
+
+substPointer :: Text -> Data Sym -> Context (Data Sym) -> Context (Data Sym)
+substPointer pname (MkData expr) ctx =
+  ctx {_bindings = fmap (subst expr pname <$>) (_bindings ctx)}
 
 showKey :: Show a => Context a -> Key -> String
 showKey ctx key =

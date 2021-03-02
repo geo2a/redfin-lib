@@ -1,6 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module ISA.Types.Tree
-  ( Tree(..), insert1, insert2, draw
+  ( Tree(..), insert1, insert2, leafs, draw
   , Cxt(..), Loc(..), locKey
   , Travel(..), travel, travelVerbose, shift
   , left, up, right, down, top
@@ -16,8 +16,8 @@ data Tree key a = Leaf key a
                 deriving (Show, Functor)
 
 rootKey :: Tree key a -> key
-rootKey = \case Leaf k _ -> k
-                Trunk k _ -> k
+rootKey = \case Leaf k _     -> k
+                Trunk k _    -> k
                 Branch k _ _ -> k
 
 insert1 :: (Enum key, Eq key) => Tree key a -> key -> a -> Tree key a
@@ -33,6 +33,14 @@ insert2 tree nid l r =
     Leaf n x -> if n == nid then Branch n (Leaf (succ nid) l) (Leaf (succ (succ nid)) r) else Leaf n x
     Trunk n x -> Trunk n (insert2 x nid l r)
     (Branch n l0 r0) -> Branch n (insert2 l0 nid l r) (insert2 r0 nid l r)
+
+leafs :: Tree key a -> [(key, a)]
+leafs = go []
+  where
+    go acc = \case
+      Leaf k v     -> (k, v):acc
+      Trunk _ t    -> go acc t
+      Branch _ l r -> go acc l ++ go acc r
 
 findLoc :: Eq key => key -> Tree key a -> Maybe (Loc key a)
 findLoc k tree =
