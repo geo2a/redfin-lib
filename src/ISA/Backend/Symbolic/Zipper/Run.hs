@@ -170,12 +170,16 @@ runModelImpl steps = do
        -- perform a step originating in the state (n, ctx)
        before <- getFocused
        choice <- step
+       after <- getFocused
        -- add one or two children at the focus point
        putFocused before
        growTrace choice
        case choice of
          Zero -> do
-           -- no reachable children! we are done
+           -- no reachable children! seal the branch
+           growTrace (One before)
+           down
+           putFocused after
            pure ()
          (One _) -> do
           -- go down the tree trunk and continue
