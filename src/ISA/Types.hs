@@ -70,12 +70,13 @@ instance Arbitrary Register where
 
 -- | Memory location
 newtype CAddress = CAddress Word8
-  deriving (Eq, Ord, Num, Real, Enum, Integral, Bounded, Bits, FiniteBits, Generic)
+  deriving (Eq, Ord, Num, Real, Enum, Integral
+           , Bounded, Bits, FiniteBits, Generic, ToJSON,  FromJSON)
   deriving (Show, Read) via Word8
 
-instance ToJSON CAddress where
-  toEncoding = genericToEncoding defaultOptions
-instance FromJSON CAddress where
+-- instance ToJSON CAddress where
+--   toEncoding = genericToEncoding defaultOptions
+-- instance FromJSON CAddress where
 
 instance Arbitrary CAddress where
   arbitrary = genericArbitrary uniform

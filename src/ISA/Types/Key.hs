@@ -1,22 +1,20 @@
+{-# LANGUAGE DeriveAnyClass #-}
 module ISA.Types.Key
     ( -- ** Abstraction over possible locations in the ISA
-      Key(..), keyTag )
+      Key(..), parseKey, keyTag )
     where
 
-import           Control.Monad
-import           Data.Aeson                 hiding (Value)
-import           Data.Aeson.Types           hiding (Value)
-import           Data.Bool
-import           Data.List                  (isInfixOf, isPrefixOf)
-import           Data.Maybe
-import           Data.Monoid
+import qualified Data.Aeson                 as Aeson
+import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
-import           GHC.Generics
-import           Text.Read                  (readMaybe)
+import           GHC.Generics               (Generic)
+import           Text.Megaparsec
+
 
 import           ISA.Types
-import           ISA.Types.Symbolic
+import           ISA.Types.Parser
 import           ISA.Types.Symbolic.Address
+import           ISA.Types.Symbolic.Parser
 
 -- | Abstraction over possible locations in the ISA
 data Key where
@@ -33,38 +31,18 @@ data Key where
   Prog :: Address -> Key
   -- ^ program address
 
--- -- | Parse key heuristically: we only need to be able to parse
--- --   registers, flags, addresses and IR. If first three options
--- --   fail it should be the IR.
--- parseKey :: String -> Maybe Key
--- parseKey key =
---    getFirst . mconcat . map First $ [ Reg  <$> readMaybe key
---                                     , F    <$> readMaybe key
---                                     , Addr <$> readMaybe key
---                                     , join $ bool Nothing (Just IR) <$>
---                                     (isInfixOf <$> Just "IR" <*> Just key)
---                                     , join $ bool Nothing (Just (Prog 0)) <$>
---                                     (isPrefixOf <$> Just "PROG" <*> Just key)
---                                     , join $ bool Nothing (Just IC) <$>
---                                     (isInfixOf <$> Just "IC" <*> Just key)
---                                     ]
 deriving instance Eq Key
 deriving instance Ord Key
 deriving instance Generic Key
 
-instance ToJSON Key where
-  toEncoding = genericToEncoding defaultOptions
-instance ToJSONKey Key where
-  toJSONKey = toJSONKeyText (Text.pack . show)
--- instance FromJSON Key where
--- -- instance FromJSONKey Key where
--- instance FromJSONKey Key where
---   fromJSONKey = FromJSONKeyTextParser $ \t -> case parseKey (Text.unpack t) of
---     Just k  -> pure k
---     Nothing -> fail ("Invalid key: " ++ show t)
+deriving instance Aeson.ToJSON Key
+deriving instance Aeson.FromJSON Key
+deriving instance Aeson.ToJSONKey Key
 
--- instance FromJSONKey Key where
---   fromJSONKey = genericFromJSONKey defaultJSONKeyOptions
+instance Aeson.FromJSONKey Key where
+  fromJSONKey = Aeson.FromJSONKeyTextParser $ \t -> case parseKey t of
+    Right k  -> pure k
+    Left err -> fail ("Invalid key: " <> Text.unpack err)
 
 keyTag :: Key -> String
 keyTag = \case
@@ -83,3 +61,28 @@ instance Show Key where
         IC        -> "IC"
         IR        -> "IR"
         Prog addr -> "PROG " <> show addr
+
+
+parseKey :: Text -> Either Text Key
+parseKey = either (Left . Text.pack . errorBundlePretty) (Right . id)
+         . parse pKey ""
+
+pKey :: Parser Key
+pKey =  Reg  <$> pReg
+    <|> Addr <$> pAddress
+    <|> F    <$> pFlag
+    <|> (IC <$ symbol "IC" <?> "instruction counter key label")
+    <|> (IR <$ symbol "IR" <?> "instruction register key label")
+    <|> (Prog <$> pAddress <?> "program address key")
+
+pReg :: Parser Register
+pReg = (symbol "R0" *> pure R0)
+   <|> (symbol "R1" *> pure R1)
+   <|> (symbol "R2" *> pure R2)
+   <|> (symbol "R3" *> pure R3)
+   <?> "register"
+
+pFlag :: Parser Flag
+pFlag = (symbol "Halted" *> pure Halted)
+    <|> (symbol "Overflow " *> pure Overflow)
+    <?> "flag"

@@ -26,9 +26,9 @@ library
       ISA.Semantics,
 
       ISA.Types,
-      ISA.Types.CTL,
+      ISA.Types.Parser,
+      ISA.Types.Key,
       ISA.Types.Prop,
-      ISA.Types.CTL.Model,
       ISA.Types.SBV,
       ISA.Types.SBV.SFunArray,
       ISA.Types.Tree,
@@ -39,15 +39,16 @@ library
       ISA.Types.Instruction.Encode,
       ISA.Types.Instruction.Opcodes,
       ISA.Types.Symbolic,
+      ISA.Types.Symbolic.Logic.Adhoc
+      ISA.Types.Symbolic.Address,
       ISA.Backend.Dependencies,
       ISA.Backend.Simulation,
-      ISA.Backend.Graph,
-      ISA.Backend.Graph.BasicBlock,
       ISA.Backend.Symbolic.Zipper,
       ISA.Backend.Symbolic.Zipper.Run,
       ISA.Backend.Symbolic.List.Trace,
       ISA.Types.Symbolic.SMT,
-      ISA.Types.Symbolic.Parser
+      ISA.Types.Symbolic.Parser,
+      ISA.Example.Add
       ISA.Example.Sum,
       ISA.Example.MotorControl
   other-modules:

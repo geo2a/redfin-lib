@@ -1,37 +1,31 @@
-{-# LANGUAGE OverloadedStrings #-}
-
-module ISA.Types.Symbolic.Parser (parseSym) where
+-----------------------------------------------------------------------------
+-- |
+-- Module     : ISA.Types.Symbolic.Parser
+-- Copyright  : (c) Georgy Lukyanov 2019
+-- License    : MIT (see the file LICENSE)
+-- Maintainer : mail@gmail.com
+-- Stability  : experimental
+--
+-- Parse symbolic expressions
+--
+-----------------------------------------------------------------------------
+module ISA.Types.Symbolic.Parser (parseSym, pAddress) where
 
 import           Control.Monad.Combinators.Expr
 import           Data.Text                      (Text)
 import qualified Data.Text                      as Text
-import           Data.Void
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer     as L
 
 import           ISA.Types
+import           ISA.Types.Parser
 import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.Address
 
 parseSym :: String -> Text -> Either Text Sym
 parseSym symName = either (Left . Text.pack . errorBundlePretty) (Right . id)
          . parse pSym symName
-
--- parseProp :: String -> Text -> Either Text Property
--- parseProp propName =
---   either (Left . Text.pack . errorBundlePretty) (Right . id)
---   . parse pProp propName
-
--- pProp :: Parser Property
--- pProp = symbol "whole" *>
---         (InWhole <$> pValidity <*> pKey <*> pPredicate)
---         <|>
---         symbol "leafs" *>
---         (InLeafs <$> pValidity <*> pKey <*> pPredicate)
-
--- pValidity :: Parser Validity
--- pValidity = (symbol "allsat" *> pure AllSat)
---         <|> (symbol "allunsat" *> pure AllUnsat)
 
 pPredicate :: Parser (Sym -> Sym)
 pPredicate = do
@@ -40,34 +34,13 @@ pPredicate = do
   property <- pSym
   pure (\expr -> subst expr var property)
 
-pKey :: Parser Key
-pKey = Reg <$> pReg
-   <|> F   <$> pFlag
+pCAddress :: Parser CAddress
+pCAddress = CAddress <$> lexeme L.decimal <?> "Concrete memory address"
 
-pReg :: Parser Register
-pReg = (symbol "R0" *> pure R0)
-   <|> (symbol "R1" *> pure R1)
-   <|> (symbol "R2" *> pure R2)
-   <|> (symbol "R3" *> pure R3)
-   <?> "register"
-
-pFlag :: Parser Flag
-pFlag = (symbol "Halted" *> pure Halted)
-    <|> (symbol "Overflow " *> pure Overflow)
-    <?> "flag"
-
---------------------------------------------------------------------------------
-type Parser = Parsec Void Text
-
--- | Skip spaces
-sc :: Parser ()
-sc = L.space space1 empty empty
-
-lexeme :: Parser a -> Parser a
-lexeme = L.lexeme sc
-
-symbol :: Text -> Parser Text
-symbol = L.symbol sc
+pAddress :: Parser Address
+pAddress =
+  MkAddress <$> (Left  <$> pCAddress
+             <|> Right <$> pSym)
 
 pInt32 :: Parser Concrete
 pInt32 = CInt32 <$>
@@ -79,7 +52,9 @@ pWord16 = CWord <$>
 
 pBool :: Parser Concrete
 pBool = CBool <$>
-  lexeme ((string "true" *> pure True) <|> (string "false" *> pure False)) <?> "boolean literal"
+  lexeme ((string "true" *> pure True) <|>
+          (string "false" *> pure False))
+  <?> "boolean literal"
 
 pConcrete :: Parser Concrete
 pConcrete = pInt32 <|> pWord16 <|> pBool

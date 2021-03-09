@@ -1,4 +1,6 @@
+{-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module ISA.Types.Tree
   ( Tree(..), insert1, insert2, leafs, draw
   , Cxt(..), Loc(..), locKey
@@ -7,13 +9,16 @@ module ISA.Types.Tree
   , getTree, putTree, findLoc
   )where
 
+import           Data.Aeson          (FromJSON, ToJSON)
+import           GHC.Generics
+
 import           Control.Applicative
 import           Control.Monad.State
 
 data Tree key a = Leaf key a
                 | Trunk key (Tree key a)
                 | Branch key (Tree key a) (Tree key a)
-                deriving (Show, Functor)
+                deriving (Show, Functor, Generic, ToJSON, FromJSON)
 
 rootKey :: Tree key a -> key
 rootKey = \case Leaf k _     -> k
@@ -75,17 +80,17 @@ data Cxt key a = Top
                | D key (Cxt key a)
                | L key (Cxt key a) (Tree key a)
                | R key (Tree key a) (Cxt key a)
-               deriving Show
+               deriving (Show, Generic, ToJSON, FromJSON)
 
 data Loc key a = Loc { struct :: Tree key a
                      , cxt    :: Cxt key a }
-  deriving Show
+  deriving (Show, Generic, ToJSON, FromJSON)
 
 locKey :: Loc key a -> key
 locKey (Loc k _) = rootKey k
 
 newtype Travel loc a = Travel { unT :: State loc a }
-     deriving (Functor, Applicative, Monad, MonadState loc)
+     deriving newtype (Functor, Applicative, Monad, MonadState loc)
 
 -- | Execute the zipper scrip form a starting location on a tree
 travel :: Loc key a

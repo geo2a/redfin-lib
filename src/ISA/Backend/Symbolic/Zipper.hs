@@ -16,29 +16,27 @@ import           Control.Applicative
 import           Control.Concurrent.STM
 import           Control.Monad.Reader
 import           Control.Monad.State.Class
-import           Control.Monad.Trans.Writer.CPS (WriterT, runWriterT)
-import qualified Control.Monad.Trans.Writer.CPS as Writer.CPS
-import           Control.Monad.Writer.Class
 import           Control.Selective
-import           Data.IntMap.Strict             (IntMap)
-import qualified Data.IntMap.Strict             as IntMap
-import qualified Data.Map.Strict                as Map
+import qualified Data.Aeson                 as Aeson
+import           Data.IntMap.Strict         (IntMap)
+import qualified Data.IntMap.Strict         as IntMap
+import qualified Data.Map.Strict            as Map
 import           Data.Maybe
-import qualified Data.SBV.Trans                 as SBV
-import           Data.Text                      (Text)
-import qualified Data.Text                      as Text
+import qualified Data.SBV.Trans             as SBV
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import           GHC.Generics               (Generic)
 import           GHC.Stack
-import           ISA.Backend.Dependencies
-import           Prelude                        hiding (log, not, read, readIO)
+import           Prelude                    hiding (log, not, read, readIO)
 
 import           ISA.Types
-import           ISA.Types.Context              hiding (Context)
-import qualified ISA.Types.Context              as ISA.Types
+import           ISA.Types.Context          hiding (Context)
+import qualified ISA.Types.Context          as ISA.Types
 import           ISA.Types.Key
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Address
-import           ISA.Types.Tree                 hiding (down, left, right, up)
-import qualified ISA.Types.Tree                 as Tree
+import           ISA.Types.Tree             hiding (down, left, right, up)
+import qualified ISA.Types.Tree             as Tree
 import           ISA.Types.ZeroOneTwo
 
 type Context = ISA.Types.Context (Data Sym)
@@ -51,20 +49,31 @@ data Trace =
           -- ^ zipper for _layout
           , _states :: IntMap Context
           -- ^ the actual states
-          }
+          } deriving Generic
+
+instance Aeson.ToJSON Trace where
+instance Aeson.FromJSON Trace where
+
+-- | Empty symbolic simulation trace
+emptyTrace :: Trace
+emptyTrace = MkTrace (Leaf 0 ()) (Loc (Leaf 0 ()) Top) mempty
 
 -- | State of the symbolic engine
 data EngineState = MkEngineState
   { -- | symbolic simulation trace
-    _trace        :: TMVar Trace
+    _trace        :: TVar Trace
     -- | the number of (reachable) states discovered so far,
     --   i.e. the size of _states in _trace
-  , _statesCount  :: TMVar Int
+  , _statesCount  :: TVar Int
   , _varCount     :: TVar Int
   -- | For how much steps to simplify expressions on write
   , _simplifyFuel :: Maybe Int
   }
 
+focusedStateId :: Trace -> Int
+focusedStateId = locKey . _focus
+
+-- | Generate a fresh symbolic store address name
 freshStoreAddr :: Engine Text
 freshStoreAddr = do
   s <- ask
@@ -72,11 +81,13 @@ freshStoreAddr = do
                              readTVar (_varCount s)
   pure ("a" <> (Text.pack $ show n))
 
+-- | Put the expression @expr@ into symbolic store with @name@
 remember :: Text -> Data Sym -> Engine ()
 remember name expr = do
   ctx <- getFocused
   putFocused $ ctx {_store = Map.insert name expr (_store ctx) }
 
+-- | Substitute the contents of the symbolic store into @_bindings@ of @_states@
 resolvePointers :: Trace -> Trace
 resolvePointers trace =
   trace {_states = fmap substPointers (_states trace)}
@@ -93,33 +104,53 @@ newtype Engine a =
 instance MonadState (Loc Int ()) Engine where
   get = do
     env <- ask
-    trace <- liftIO . atomically . readTMVar . _trace $ env
+    trace <- liftIO . atomically . readTVar . _trace $ env
     pure (_focus trace)
   put focus = do
     env <- ask
     liftIO . atomically $ do
-      trace <- takeTMVar (_trace env)
-      putTMVar (_trace env) $ trace {_focus = focus}
+      trace <- readTVar (_trace env)
+      writeTVar (_trace env) $ trace {_focus = focus}
 
 -- | Engine is a Selective functor
 instance Selective Engine where
   select = selectEngine
 
--- | The select implementation for Engine
+-- | The select implementation for Engine is monadic
 selectEngine :: Engine (Either a b) -> Engine (a -> b) -> Engine b
 selectEngine = selectM
+
+mkEngineState :: TVar Trace -> IO (EngineState)
+mkEngineState trace =
+  MkEngineState <$> pure trace
+                <*> newTVarIO 0
+                <*> newTVarIO 0
+                <*> pure (Just 100)
 
 -- | Execute an Engine computation from the given initial state
 execEngine :: Engine a -> Context -> IO Trace
 execEngine (MkEngine computation) initialContext = do
   let layout = Leaf 0 ()
       initStates = IntMap.fromList [(0, initialContext)]
-  env <- MkEngineState <$> newTMVarIO (MkTrace layout (Loc layout Top) initStates)
-                       <*> newTMVarIO 0
-                       <*> newTVarIO 0
-                       <*> pure (Just 100)
+  trace <- liftIO (newTVarIO (MkTrace layout (Loc layout Top) initStates))
+  env <- mkEngineState trace
   void $ runReaderT (SBV.runSMT computation) env
-  liftIO . atomically $ readTMVar (_trace env)
+  liftIO . atomically $ readTVar (_trace env)
+
+-- | Evaluate an Engine computation from the given initial state,
+--   returning the resulting mutable environment
+evalEngine :: Engine a -> Context -> IO EngineState
+evalEngine (MkEngine computation) initialContext = do
+  let layout = Leaf 0 ()
+      initStates = IntMap.fromList [(0, initialContext)]
+  trace <- liftIO (newTVarIO (MkTrace layout (Loc layout Top) initStates))
+  env <- mkEngineState trace
+  void $ runReaderT (SBV.runSMT computation) env
+  pure env
+
+continueEngine :: Engine a -> EngineState -> IO ()
+continueEngine (MkEngine computation) env = do
+  void $ runReaderT (SBV.runSMT computation) env
 
 -- | Zip into left subtrace
 left :: Engine ()
@@ -158,7 +189,7 @@ down = do
 -- | Get the state focused by the trace zipper
 getFocused :: HasCallStack => Engine Context
 getFocused = do
-  trace <- liftIO . atomically . readTMVar =<< _trace <$> ask
+  trace <- liftIO . atomically . readTVar =<< _trace <$> ask
   focus <- get
   let k = locKey focus
   case IntMap.lookup k (_states trace) of
@@ -170,8 +201,8 @@ putFocused :: Context -> Engine ()
 putFocused ctx = do
   traceVar <- _trace <$> ask
   void . liftIO . atomically $ do
-    trace <- takeTMVar traceVar
-    putTMVar traceVar $
+    trace <- readTVar traceVar
+    writeTVar traceVar $
       trace { _states = IntMap.insert (locKey (_focus trace)) ctx (_states trace) }
 
 -- | Add a branch or grow the trunk of the trace without moving
@@ -181,8 +212,8 @@ growTrace :: ZeroOneTwo Context -> Engine ()
 growTrace choice = do
   focus <- get
   env <- ask
-  (trace, size) <- liftIO . atomically $
-    (,) <$> takeTMVar (_trace env) <*> takeTMVar (_statesCount env)
+  (trace, size) <- liftIO $
+    (,) <$> readTVarIO (_trace env) <*> readTVarIO (_statesCount env)
   let father = locKey focus
   let withKeys =
         case choice of
@@ -190,12 +221,12 @@ growTrace choice = do
           One x   -> One (size + 1, x)
           Two x y -> Two (size + 1, x) (size + 2, y)
   void . liftIO . atomically $ do
-    putTMVar (_trace env)
+    writeTVar (_trace env)
       trace { _layout = fst $ updateLayout father focus withKeys
             , _focus = snd $ updateLayout father focus withKeys
             , _states = updateStates (_states trace) withKeys
             }
-    putTMVar (_statesCount env) (updateStatesCount size choice)
+    writeTVar (_statesCount env) (updateStatesCount size choice)
   where
     updateLayout :: Int -> Loc Int () -> ZeroOneTwo (Int, Context) -> (Tree Int (), Loc Int ())
     updateLayout father to = \case
@@ -230,7 +261,6 @@ growTrace choice = do
 -- | The read callback to plug into FS semantics of instructions
 readKey :: HasCallStack => Key -> Engine (Data Sym)
 readKey key = do
---  tell (Reads [key], Writes [])
   ctx <- getFocused
   x <-
     case key of
@@ -256,7 +286,6 @@ readKey key = do
 -- | The write callback to plug into FS semantics of instructions
 writeKey :: HasCallStack => Key -> Engine (Data Sym) -> Engine (Data Sym)
 writeKey key computation = do
---  tell (Reads [], Writes [key])
   fuel <- _simplifyFuel <$> ask
   value <- (simplify fuel <$>) <$> computation
   ctx <- getFocused

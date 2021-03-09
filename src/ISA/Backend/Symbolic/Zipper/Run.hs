@@ -9,14 +9,16 @@
 -- Symbolic simulation over a zipper-focused binary tree
 -----------------------------------------------------------------------------
 
-module ISA.Backend.Symbolic.Zipper.Run (runModel) where
+module ISA.Backend.Symbolic.Zipper.Run (runModel, runModelImpl, continueModel) where
 
 import           Control.Applicative
+import           Control.Concurrent.STM
 import           Control.Monad.IO.Class       (MonadIO (..))
 import           Control.Monad.Reader
 import           Control.Monad.Reader.Class   ()
 import           Control.Monad.State.Class
 import           Data.Functor                 (void)
+import qualified Data.IntMap                  as IntMap
 import           Data.Maybe
 import qualified Data.SBV.Trans               as SBV
 import qualified Data.SBV.Trans.Control       as SBV
@@ -33,7 +35,6 @@ import           ISA.Types.Instruction.Decode
 import           ISA.Types.Key
 import           ISA.Types.Prop
 import           ISA.Types.SBV
-import           ISA.Types.SBV.SFunArray      (SFunArray)
 import qualified ISA.Types.SBV.SFunArray      as SFunArray
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Address
@@ -163,27 +164,29 @@ runModel steps init = execEngine (runModelImpl steps) init
 
 runModelImpl :: Int -> Engine ()
 runModelImpl steps = do
-  case pure (steps <= 0) of
-    Just True -> pure ()
-    _ -> do
-      -- perform a step originating in the state (n, ctx)
-      choice <- step
-      -- add one or two children at the focus point
-      growTrace choice
-      case choice of
-        Zero -> do
-          -- no reachable children! we are done
-          pure ()
-        (One _) -> do
-         -- go down the tree trunk and continue
-         down
-         runModelImpl (steps - 1)
-        (Two _ _) -> do
-          branch <- get
-          -- go into the left subtree
-          leftBottom <- left *> runModelImpl (steps - 1) *> get
-          -- backtrack to the branch and go into the right subtree
-          wayUp branch leftBottom >> right >> runModelImpl (steps -1)
+  if | steps == 0 -> pure ()
+--     | steps == 1 -> void step
+     | otherwise -> do
+       -- perform a step originating in the state (n, ctx)
+       before <- getFocused
+       choice <- step
+       -- add one or two children at the focus point
+       putFocused before
+       growTrace choice
+       case choice of
+         Zero -> do
+           -- no reachable children! we are done
+           pure ()
+         (One _) -> do
+          -- go down the tree trunk and continue
+          down
+          runModelImpl (steps - 1)
+         (Two _ _) -> do
+           branch <- get
+           -- go into the left subtree
+           leftBottom <- left *> runModelImpl (steps - 1) *> get
+           -- backtrack to the branch and go into the right subtree
+           wayUp branch leftBottom >> right >> runModelImpl (steps -1)
   where
     wayUp :: Loc Int () -> Loc Int () -> Engine ()
     wayUp there = go
@@ -191,3 +194,14 @@ runModelImpl steps = do
              case locKey here == locKey there of
                True  -> put here
                False -> up >> get >>= go
+
+-- | Continue execution from a specific state
+continueModel :: Int -> Int -> Engine ()
+continueModel state steps = do
+  env <- ask
+  trace <- liftIO $ readTVarIO (_trace env)
+  case IntMap.lookup state (_states trace) of
+    Nothing -> error $ "undefined states with id " <> show state
+    Just ctx -> do
+      putFocused ctx
+      runModelImpl steps

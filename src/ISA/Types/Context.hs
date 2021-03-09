@@ -49,7 +49,7 @@ data Context a = MkContext {
   -- | a response from a solver, usually regarding
   --   satisfiability of @_pathCondition s && conjoin (_constraints s)@
   , _solution      :: Maybe SMTResult }
-  deriving (Functor, Generic) -- , ToJSON, FromJSON)
+  deriving (Functor, Generic, ToJSON, FromJSON)
 
 -- | Symbolic simulation is done with symbolic values
 type SymbolicContext = Context Sym

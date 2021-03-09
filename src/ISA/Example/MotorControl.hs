@@ -30,7 +30,7 @@ import qualified Data.SBV                     as SBV
 
 import           ISA.Assembly
 import           ISA.Backend.Dependencies
-import           ISA.Backend.Graph.BasicBlock
+--import           ISA.Backend.Graph.BasicBlock
 -- import           ISA.Backend.Symbolic.List
 -- import           ISA.Backend.Symbolic.List.Run
 -- import           ISA.Backend.Symbolic.List.Trace
@@ -42,11 +42,12 @@ import qualified ISA.Types.Context            as ISA.Types
 import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
+import           ISA.Types.Key
 import           ISA.Types.Prop
 import           ISA.Types.Symbolic
 
 
-type Context = ISA.Types.Context Sym
+type Context = ISA.Types.Context (Data Sym)
 
 
 -- | The loop body of a stepper motor control program.
@@ -136,25 +137,26 @@ mc_loop = do
 
 initCtx :: Context
 initCtx = MkContext
-  { _pathCondition = SConst (CBool True)
+  { _pathCondition = true
   , _constraints =
-    [ ("0 < a_max < 10",  (SGt a_max 0) &&& (SLt a_max 100))
-    , ("0 < v_max < 100", (SGt v_max 0) &&& (SLt v_max 100))
-    , ("0 < dist < 1000", (SGt dist 0) &&& (SLt dist 100))
-    , ("0 < s < 100",     (SGt s 0) &&& (SLt s 100))
-    , ("0 < v < v_max",   (SGt v 0) &&& (SLt v v_max))
+    [ ("0 < a_max < 10",  MkData $ (SGt a_max 0) &&& (SLt a_max 100))
+    , ("0 < v_max < 100", MkData $ (SGt v_max 0) &&& (SLt v_max 100))
+    , ("0 < dist < 1000", MkData $ (SGt dist 0) &&& (SLt dist 100))
+    , ("0 < s < 100",     MkData $ (SGt s 0) &&& (SLt s 100))
+    , ("0 < v < v_max",   MkData $ (SGt v 0) &&& (SLt v v_max))
     ]
-  , _bindings = Map.fromList $ [ (IC, SConst 0)
+  , _bindings = Map.fromList $ [ (IC, 0)
                                , (IR, 0)
-                               , (F Condition, SConst (CBool False))
-                               , (F Halted, SConst (CBool False))
-                               , (F Overflow, SConst (CBool False))
-                               , (Addr 0, SAny "a_max")
-                               , (Addr 1, SAny "v_max")
-                               , (Addr 2, SAny "dist")
-                               , (Addr 3, SAny "s")
-                               , (Addr 4, SAny "v")
+                               , (F Condition, false)
+                               , (F Halted, false)
+                               , (F Overflow, false)
+                               , (Addr 0, MkData $ SAny "a_max")
+                               , (Addr 1, MkData $ SAny "v_max")
+                               , (Addr 2, MkData $ SAny "dist")
+                               , (Addr 3, MkData $ SAny "s")
+                               , (Addr 4, MkData $ SAny "v")
                                ] ++ mkProgram mc_loop
+  , _store = Map.empty
   , _solution = Nothing
   }
   where a_max = SAny "a_max"
@@ -287,13 +289,3 @@ showContext ctx =
 --                 -- putStrLn $ "Find VC : "      <> show symVC
 --                 -- putStrLn $ show satResult
 --             putStrLn $ "--------------------------------------------"
-
--- | Generate a data-flow graph of the motor control program's loop body
---   and write it to an .dot file
---
---   It may be then converted to .svg with the following command:
---   dot -Tsvg motorControlLoop.dot -o motorControlLoop.svg
-mtLoopGraph :: FilePath -> IO ()
-mtLoopGraph fname =
-    writeFile fname $
-        drawGraph $ fromJust $ programDataGraph (assemble mc_loop)

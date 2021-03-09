@@ -16,36 +16,31 @@ module ISA.Example.Add (addLowLevel, initCtx)  where
 
 import           Control.Monad.State.Strict
 import           Data.Bifunctor
-import           Data.Int                              (Int32)
-import qualified Data.IntMap                           as IntMap
-import qualified Data.Map                              as Map
-import           Data.Maybe                            (fromJust)
-import qualified Data.Set                              as Set
+import           Data.Int                        (Int32)
+import qualified Data.IntMap                     as IntMap
+import qualified Data.Map                        as Map
+import           Data.Maybe                      (fromJust)
+import qualified Data.Set                        as Set
 
-import           Algebra.Graph.Export.Dot
 
 import           ISA.Assembly
-import           ISA.Backend.Symbolic.TransitionSystem
 -- import           ISA.Backend.Dependencies
 -- import           ISA.Semantics
 import           ISA.Backend.Symbolic.Zipper
 import           ISA.Backend.Symbolic.Zipper.Run
 import           ISA.Example.Common
 import           ISA.Types
-import           ISA.Types.CTL
-import           ISA.Types.CTL.Model
-import           ISA.Types.Context                     hiding (Context)
-import qualified ISA.Types.Context                     as ISA.Types
+import           ISA.Types.Context               hiding (Context)
+import qualified ISA.Types.Context               as ISA.Types
 import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.Instruction.Encode
+import           ISA.Types.Key
+import           ISA.Types.Prop
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Parser
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Tree
-
-type Context = ISA.Types.Context Sym
-
 
 addLowLevel :: Script
 addLowLevel = do
@@ -77,11 +72,12 @@ initCtx =
             , _constraints = []
               -- ((SGt (SAny "x") 0) &&& (SLt (SAny "x") 100))
               --              &&& ((SGt (SAny "y") 0) &&& (SLt (SAny "y") 100))
-            , _bindings = Map.fromList $ [ (IC, SConst 0)
+            , _bindings = Map.fromList $ [ (IC, 0)
                                          , (Reg R0, 0)
-                                         , (Addr 0, SAny "x")
-                                         , (Addr 1, SAny "y")
+                                         , (Addr 0, MkData $ SAny "x")
+                                         , (Addr 1, MkData $ SAny "y")
                                          ] ++ mkProgram addLowLevel
+            , _store = Map.empty
             , _solution = Nothing
             }
 demo_add :: IO ()

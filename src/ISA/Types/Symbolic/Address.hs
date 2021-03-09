@@ -20,7 +20,11 @@ import           ISA.Types
 import           ISA.Types.Symbolic
 
 newtype Address = MkAddress (Either CAddress Sym)
-  deriving (Eq, Ord, Show, ToJSON, FromJSON) via (Either CAddress Sym)
+  deriving (Eq, Ord, ToJSON, FromJSON) via (Either CAddress Sym)
+
+instance Show Address where
+  show = \case (MkAddress (Left (CAddress concrete))) -> show concrete
+               (MkAddress (Right symbolic))           -> show symbolic
 
 -- | The instance of @Num@ is defined only for
 --   initialising concrete addresses with numeric literals;
