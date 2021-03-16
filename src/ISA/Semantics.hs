@@ -145,7 +145,7 @@ cmpGt reg addr = \read write ->
   --      (write (F Condition) (pure true))
   --      (write (F Condition) (pure false))
 
-cmpLt :: Register -> Address -> FS Key Selective '[Boolean, TryOrd, Monoid] a
+cmpLt :: Register -> Address -> FS Key Selective '[Boolean, TryOrd] a
 cmpLt reg addr = \read write ->
   write (F Condition) (elimProp <$> (lt <$> read (Reg reg) <*> read (Addr addr)))
   -- ifS ((<) <$> read (Reg reg) <*> read (Addr addr))
