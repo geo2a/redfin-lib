@@ -15,6 +15,7 @@ module ISA.Types.Symbolic.Address
     ) where
 
 import           Data.Aeson         (FromJSON, ToJSON)
+import           Data.Int
 
 import           ISA.Types
 import           ISA.Types.Symbolic
@@ -91,3 +92,12 @@ instance Addressable (Data Sym) where
     case a of
       Left (CAddress concrete) -> MkData (SConst (CWord $ fromIntegral concrete))
       Right sym                -> MkData sym
+
+instance Addressable (Data Int32) where
+  toAddress (MkData x) = toAddress (MkData (CInt32 x))
+  fromAddress (MkAddress a) =
+    case a of
+      Left (CAddress concrete) -> MkData (fromIntegral concrete)
+      Right sym -> error $
+        "Addressable.(Data Int32): can't interpret symbolic expression " <> show sym
+        <> " as a concrete word"

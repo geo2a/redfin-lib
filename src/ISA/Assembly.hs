@@ -45,7 +45,7 @@ goto name = do
          Nothing -> jmpi 0
            -- error $ "ISA.Assembly.goto: no such label " <> show name-- jmpi 0
          Just there -> do
-             let offset  =
+p             let offset  =
                    (fromIntegral there :: Int32) -
                    (fromIntegral here :: Int32) - 1
              jmpi (fromIntegral offset)
@@ -101,6 +101,13 @@ mkProgram src =
   let prog = assemble src
       addrs = map Prog (iterate inc 0)
       ics   = [ MkData $ SConst (CWord ic) | (InstructionCode ic) <- map (encode . snd) prog]
+  in zip addrs ics
+
+mkProgram1 :: Script -> [(Key, Data Int32)]
+mkProgram1 src =
+  let prog = assemble src
+      addrs = map Prog (iterate inc 0)
+      ics   = [ MkData $ fromIntegral ic | (InstructionCode ic) <- map (encode . snd) prog]
   in zip addrs ics
 
 instr :: Instruction (Data Int32) -> Script
