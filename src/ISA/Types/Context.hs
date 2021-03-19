@@ -19,7 +19,7 @@ module ISA.Types.Context
   -- extract memory from @_bindings@
   , dumpMemory
 
-  , getBinding, putBinding, keyProp, showKey, isReachable) where
+  , getBinding, putBinding, showKey, isReachable) where
 
 import           Data.Aeson                 (FromJSON, ToJSON)
 import qualified Data.Map.Strict            as Map
@@ -79,11 +79,6 @@ isReachable ctx = case (_solution ctx) of
 getBinding :: Key -> Context a -> Maybe a
 getBinding key ctx = Map.lookup key (_bindings ctx)
 
--- | Formulate a property considering the symbolic value of
---   a particular key. Return 'false' if the key is not bound
-keyProp :: Boolean a => Context a -> Key -> a
-keyProp ctx key = maybe false id (getBinding key ctx)
-
 -- | Alter a specific key
 putBinding :: Key -> a -> Context a -> Context a
 putBinding key v ctx = ctx {_bindings = Map.insert key v (_bindings ctx)}
@@ -91,14 +86,14 @@ putBinding key v ctx = ctx {_bindings = Map.insert key v (_bindings ctx)}
 getVar :: Text -> Context a -> Maybe a
 getVar key ctx = Map.lookup key (_store ctx)
 
-substPointers :: Context (Data Sym) -> Context (Data Sym)
+substPointers :: Context Sym -> Context Sym
 substPointers ctx =
   let ptrs = _store ctx
   in foldr (uncurry substPointer) ctx (Map.assocs ptrs)
 
-substPointer :: Text -> Data Sym -> Context (Data Sym) -> Context (Data Sym)
-substPointer pname (MkData expr) ctx =
-  ctx {_bindings = fmap (subst expr pname <$>) (_bindings ctx)}
+substPointer :: Text -> Sym -> Context Sym -> Context Sym
+substPointer pname expr ctx =
+  ctx {_bindings = fmap (subst expr pname) (_bindings ctx)}
 
 showKey :: Show a => Context a -> Key -> String
 showKey ctx key =

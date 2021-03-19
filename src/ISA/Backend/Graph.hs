@@ -46,7 +46,7 @@ import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Address   hiding (literal)
 import           ISA.Types.ZeroOneTwo
 
-cfg :: Maybe (Context (Data Int32)) -> Script -> Alga.Graph (Data Int32) (Maybe (Block (Data Int32)))
+cfg :: Maybe (Context Int32) -> Script -> Alga.Graph Int32 (Maybe (Block Int32))
 cfg init src =
   let blocks = basicBlocks init src
       ids = map (\(MkBlock a is _ _) -> map fst $ zip [a..] is) blocks
@@ -113,7 +113,7 @@ style = Alga.Style
             lastRow r = "<TR><TD ALIGN=\"CENTER\" BORDER=\"0\"> Targets: "
                      <> (Text.pack . show . (fst <$>)) r <> "</TD></TR>"
 
-writeCfgDot :: FilePath -> Maybe (Context (Data Int32)) -> Script -> IO ()
+writeCfgDot :: FilePath -> Maybe (Context Int32) -> Script -> IO ()
 writeCfgDot path init src =
   writeFile path . unpack . myExport style $ cfg init src
 

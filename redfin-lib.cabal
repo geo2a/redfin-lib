@@ -42,6 +42,8 @@ library
       ISA.Types.Symbolic.Logic.Adhoc
       ISA.Types.Symbolic.Address,
       ISA.Backend.Dependencies,
+      ISA.Backend.Graph,
+      ISA.Backend.Graph.BasicBlock,
       ISA.Backend.Simulation,
       ISA.Backend.Symbolic.Zipper,
       ISA.Backend.Symbolic.Zipper.Run,

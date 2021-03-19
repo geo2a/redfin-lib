@@ -39,7 +39,7 @@ import           ISA.Types.Tree             hiding (down, left, right, up)
 import qualified ISA.Types.Tree             as Tree
 import           ISA.Types.ZeroOneTwo
 
-type Context = ISA.Types.Context (Data Sym)
+type Context = ISA.Types.Context Sym
 
 -- | Trace of a symbolic simulation
 data Trace =
@@ -82,7 +82,7 @@ freshStoreAddr = do
   pure ("a" <> (Text.pack $ show n))
 
 -- | Put the expression @expr@ into symbolic store with @name@
-remember :: Text -> Data Sym -> Engine ()
+remember :: Text -> Sym -> Engine ()
 remember name expr = do
   ctx <- getFocused
   putFocused $ ctx {_store = Map.insert name expr (_store ctx) }
@@ -259,7 +259,7 @@ growTrace choice = do
       Two _ _ -> s + 2
 
 -- | The read callback to plug into FS semantics of instructions
-readKey :: HasCallStack => Key -> Engine (Data Sym)
+readKey :: HasCallStack => Key -> Engine Sym
 readKey key = do
   ctx <- getFocused
   x <-
@@ -268,26 +268,26 @@ readKey key = do
         pure $ Map.lookup (Addr (MkAddress (Left concrete))) (_bindings ctx)
       (Addr (MkAddress (Right sym))) -> do
         addr <- freshStoreAddr
-        remember addr (MkData sym)
-        pure $ Just (MkData $ SPointer (SAny addr))
+        remember addr sym
+        pure $ Just (SPointer (SAny addr))
       (Prog (MkAddress (Left concrete))) ->
         pure $ Map.lookup (Prog (MkAddress (Left concrete))) (_bindings ctx)
       (Prog (MkAddress (Right sym))) -> do
         addr <- freshStoreAddr
-        remember addr (MkData sym)
-        pure $ Just (MkData $ SPointer (SAny addr))
+        remember addr sym
+        pure $ Just (SPointer (SAny addr))
       _ -> pure $ Map.lookup key (_bindings ctx)
   pure (maybe (defaultFor key) id x)
   where
-    defaultFor :: Key -> Data Sym
+    defaultFor :: Key -> Sym
     defaultFor key = error $ "ISA.Backend.Symbolic.Zipper.readKey: the key "
                   <> show key <> " is not bound!"
 
 -- | The write callback to plug into FS semantics of instructions
-writeKey :: HasCallStack => Key -> Engine (Data Sym) -> Engine (Data Sym)
+writeKey :: HasCallStack => Key -> Engine Sym -> Engine Sym
 writeKey key computation = do
   fuel <- _simplifyFuel <$> ask
-  value <- (simplify fuel <$>) <$> computation
+  value <- simplify fuel <$> computation
   ctx <- getFocused
   putFocused $ ctx {_bindings = Map.insert key value (_bindings ctx)}
   pure value

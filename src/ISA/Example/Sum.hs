@@ -93,29 +93,29 @@ showContext ctx =
   , showKey ctx (Addr 255)
   ]
 
-initCtx :: Context (Data Sym)
+initCtx :: Context Sym
 initCtx = MkContext
   { _pathCondition = true
   , _store = Map.empty
   , _constraints =
-    [ ("0 < x1 < 100", MkData $ ((SGt (SAny "x1") 0) &&& (SLt (SAny "x1") 100)))
-    , ("0 < x2 < 100", MkData $ ((SGt (SAny "x2") 0) &&& (SLt (SAny "x2") 100)))
-    , ("0 < x3 < 100", MkData $ ((SGt (SAny "x3") 0) &&& (SLt (SAny "x3") 100)))
+    [ ("0 < x1 < 100", (SGt (SAny "x1") 0) &&& (SLt (SAny "x1") 100))
+    , ("0 < x2 < 100", (SGt (SAny "x2") 0) &&& (SLt (SAny "x2") 100))
+    , ("0 < x3 < 100", (SGt (SAny "x3") 0) &&& (SLt (SAny "x3") 100))
 --    , ("0 < n < 4", MkData $ ((SGt (SAny "n") 0) &&& (SLt (SAny "n") 10)))
-    , ("n == 3", MkData $ ((SEq (SAny "n") 3)))
+    , ("n == 3", (SEq (SAny "n") 3))
     ]
   , _bindings = Map.fromList $ [ (IC, 0)
 --                               , (IR, )
                                , (Reg R0, 0)
                                , (Reg R1, 0)
                                , (Reg R2, 0)
-                             , (Addr 0, MkData $ SAny "n")
+                             , (Addr 0, SAny "n")
                                -- , (Addr 0, 3)
                                , (Addr 253, 0)
                                , (Addr 255, 1)
-                               , (Addr 1, MkData $ SAny "x1")
-                               , (Addr 2, MkData $ SAny "x2")
-                               , (Addr 3, MkData $ SAny "x3")
+                               , (Addr 1, SAny "x1")
+                               , (Addr 2, SAny "x2")
+                               , (Addr 3, SAny "x3")
                                , (F Halted, false)
                                , (F Condition, false)
                                , (F Overflow, false)
@@ -123,12 +123,12 @@ initCtx = MkContext
   , _solution = Nothing
   }
 
-initCtx1 :: Context (Data Int32)
+initCtx1 :: Context Int32
 initCtx1 = MkContext
   { _pathCondition = true
   , _store = Map.empty
   , _constraints = []
-  , _bindings = Map.fromList $ [ (IC, (0 :: Data Int32))
+  , _bindings = Map.fromList $ [ (IC, (0 :: Int32))
 --                               , (IR, )
                                , (Reg R0, 0)
                                , (Reg R1, 0)
@@ -146,10 +146,10 @@ initCtx1 = MkContext
   , _solution = Nothing
   }
 
-correct = InLeafs $ \s -> _unData . not $
-          keyProp s (Reg R0) === (MkData $ SAny "x1" + SAny "x2" + SAny "x3")
-      &&& keyProp s (Reg R1) === 0
-      &&& keyProp s (F Halted)
+correct = InLeafs $ not $
+          key (Reg R0) === (var "x1" + var "x2" + var "x3")
+      &&& key (Reg R1) === 0
+      &&& key (F Halted)
 
 demo_sum :: IO ()
 demo_sum = do
@@ -158,7 +158,7 @@ demo_sum = do
   -- mapM_ (\s -> putStrLn . show $ (getBinding (Reg R0) s)) (_states trace)
 
   -- let trivial = InLeafs $ const true
-  r <- sat correct trace (ConstrainedBy (map _unData . map snd $ _constraints initCtx))
+  r <- sat correct trace (ConstrainedBy (map snd $ _constraints initCtx))
   print r
   -- -- case r of
   -- --   Conjunct [Literal (n, Satisfiable s)] -> print ( modelAssocs s)

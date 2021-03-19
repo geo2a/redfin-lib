@@ -26,31 +26,31 @@ import           ISA.Types.Instruction.Opcodes
 import           ISA.Types.Symbolic
 
 -- | Covert a concrete instruction into a symbolic one
-symbolise :: Instruction (Data Int32) -> Instruction (Data Sym)
+symbolise :: Instruction Int32 -> Instruction Sym
 symbolise (Instruction i) =
   case i of
     Halt              -> mkI $ Halt @Value
     Load   reg1 addr1 -> mkI $ Load @Value   reg1 addr1
     Add    reg1 addr1 -> mkI $ Add @Value    reg1 addr1
-    AddI   reg1 imm   -> mkI $ AddI @Value   reg1 ((fmap (SConst . CInt32)) <$> imm)
+    AddI   reg1 imm   -> mkI $ AddI @Value   reg1 (SConst . CInt32 <$> imm)
     Sub    reg1 addr1 -> mkI $ Sub @Value    reg1 addr1
-    SubI   reg1 imm   -> mkI $ SubI @Value   reg1 ((fmap (SConst . CInt32)) <$> imm)
+    SubI   reg1 imm   -> mkI $ SubI @Value   reg1 (SConst . CInt32 <$> imm)
     Mul    reg1 addr1 -> mkI $ Mul @Value    reg1 addr1
     Div    reg1 addr1 -> mkI $ Div @Value    reg1 addr1
     Mod    reg1 addr1 -> mkI $ Mod @Value    reg1 addr1
     Store  reg1 addr1 -> mkI $ Store @Value  reg1 addr1
-    Set    reg1 imm1  -> mkI $ Set @Value    reg1 ((fmap (SConst . CInt32)) <$> imm1)
+    Set    reg1 imm   -> mkI $ Set @Value    reg1 (SConst . CInt32 <$> imm)
     Abs    reg1       -> mkI $ Abs @Value    reg1
-    Jump   offset1    -> mkI $ Jump @Value   ((fmap (SConst . CInt32)) <$> offset1)
-    JumpCt offset1    -> mkI $ JumpCt @Value ((fmap (SConst . CInt32)) <$> offset1)
-    JumpCf offset1    -> mkI $ JumpCf @Value ((fmap (SConst . CInt32)) <$> offset1)
+    Jump   offset1    -> mkI $ Jump @Value   (SConst . CInt32 <$> offset1)
+    JumpCt offset1    -> mkI $ JumpCt @Value (SConst . CInt32 <$> offset1)
+    JumpCf offset1    -> mkI $ JumpCf @Value (SConst . CInt32 <$> offset1)
     LoadMI reg1 addr1 -> mkI $ LoadMI @Value reg1 addr1
     CmpEq  reg1 addr1 -> mkI $ CmpEq @Value  reg1 addr1
     CmpGt  reg1 addr1 -> mkI $ CmpGt @Value  reg1 addr1
     CmpLt  reg1 addr1 -> mkI $ CmpLt @Value  reg1 addr1
 
 -- | Try to decode the instruction represented by a concrete symbolic instruction code
-toInstruction :: Sym -> Either Sym (Instruction (Data Int32))
+toInstruction :: Sym -> Either Sym (Instruction Int32)
 toInstruction sym = case sym of
   (SConst (CWord ic)) -> case decode (InstructionCode ic) of
                            Just i  -> Right i

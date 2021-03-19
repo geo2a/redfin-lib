@@ -21,14 +21,14 @@ import           ISA.Types.Instruction.Opcodes
 import           ISA.Types.Symbolic
 
 {-# WARNING concretiseImm "Throws a runtime exception if the argument is symbolic" #-}
-concretiseImm :: Imm (Data Sym) -> Imm (Data Int32)
-concretiseImm (Imm (MkData i)) =
+concretiseImm :: Imm Sym -> Imm Int32
+concretiseImm (Imm i) =
   case toImm i of
     Right imm -> imm
     Left sym -> error $ "Instruction.encode: symbolic immediate argument"
                 <> show sym
 
-concretiseInstr :: Instruction (Data Sym) -> Instruction (Data Int32)
+concretiseInstr :: Instruction Sym -> Instruction Int32
 concretiseInstr = \case
     Instruction Halt                -> Instruction (Halt   @Value)
     Instruction (Load     r addr)   -> Instruction (Load   @Value r addr)
@@ -50,7 +50,7 @@ concretiseInstr = \case
     Instruction (Mod      r addr)   -> Instruction (Mod    @Value r addr)
     Instruction (Abs      r)        -> Instruction (Abs    @Value r)
 
-encode :: Instruction (Data Int32) -> InstructionCode
+encode :: Instruction Int32 -> InstructionCode
 encode i = InstructionCode . fromBitsLEWord16 $ case i of
     Instruction Halt -> take 16 $ repeat False
     Instruction (Load     r addr) -> (asBools . opcode $ i)
@@ -59,7 +59,7 @@ encode i = InstructionCode . fromBitsLEWord16 $ case i of
     Instruction (LoadMI   r addr) -> (asBools . opcode $ i)
                                      <> encodeRegister r
                                      <> encodeMemoryAddress addr
-    Instruction (Set      r (Imm (MkData byte))) -> (asBools . opcode $ i)
+    Instruction (Set      r (Imm (byte))) -> (asBools . opcode $ i)
                                                     <> encodeRegister r
                                                     <> encodeByte (Imm byte)
     Instruction (Store    r addr) -> (asBools . opcode $ i)
@@ -67,10 +67,10 @@ encode i = InstructionCode . fromBitsLEWord16 $ case i of
                                      <> encodeMemoryAddress addr
     Instruction (Add      r addr) -> (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeMemoryAddress addr
-    Instruction (AddI     r (Imm (MkData byte))) -> (asBools . opcode $ i)
+    Instruction (AddI     r (Imm (byte))) -> (asBools . opcode $ i)
                                                  <> encodeRegister r
                                             ++ encodeByte (Imm byte)
-    Instruction (Jump     (Imm (MkData byte)))   -> (asBools . opcode $ i)
+    Instruction (Jump     (Imm (byte)))   -> (asBools . opcode $ i)
                                                  <> encodeByte (Imm byte)
                                                  <> pad 2
     Instruction (CmpEq      r addr) -> (asBools . opcode $ i) ++ encodeRegister r
@@ -79,16 +79,16 @@ encode i = InstructionCode . fromBitsLEWord16 $ case i of
                                             ++ encodeMemoryAddress addr
     Instruction (CmpGt      r addr) -> (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeMemoryAddress addr
-    Instruction (JumpCt (Imm (MkData byte)))   ->
+    Instruction (JumpCt (Imm (byte)))   ->
         (asBools . opcode $ i) ++ encodeByte (Imm byte)
                                             ++ pad 2
-    Instruction (JumpCf (Imm (MkData byte)))   ->
+    Instruction (JumpCf (Imm (byte)))   ->
         (asBools . opcode $ i) ++ encodeByte (Imm byte)
                                             ++ pad 2
     Instruction (Sub      r addr) ->
         (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeMemoryAddress addr
-    Instruction (SubI     r (Imm (MkData byte))) ->
+    Instruction (SubI     r (Imm (byte))) ->
         (asBools . opcode $ i) ++ encodeRegister r
                                             ++ encodeByte (Imm byte)
     Instruction (Mul      r addr) ->

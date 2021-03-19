@@ -203,11 +203,11 @@ instance Bounded Sym where
   maxBound = SConst maxBound
   minBound = SConst minBound
 
-instance Semigroup (Data Sym) where
-  (MkData x) <> (MkData y) = MkData (SAdd x y)
+instance Semigroup Sym where
+  x <> y = SAdd x y
 
-instance Monoid (Data Sym) where
-  mempty = MkData $ SConst 0
+instance Monoid Sym where
+  mempty = SConst 0
 
 instance Boolean Sym where
   true = SConst (CBool True)
@@ -225,16 +225,16 @@ instance Boolean Sym where
   x ||| y = SOr x y
   x &&& y = SAnd x y
 
-instance Boolean (Data Sym) where
-  true = MkData $ SConst (CBool True)
-  toBool (MkData x) =
-    -- trace (show x) True
-    toBool x
-  fromBool b = MkData (fromBool b)
-  not (MkData x) = MkData (SNot x)
+-- instance Boolean (Data Sym) where
+--   true = MkData $ SConst (CBool True)
+--   toBool (MkData x) =
+--     -- trace (show x) True
+--     toBool x
+--   fromBool b = MkData (fromBool b)
+--   not (MkData x) = MkData (SNot x)
 
-  (MkData x) ||| (MkData y) = MkData (SOr x y)
-  (MkData x) &&& (MkData y) = MkData (SAnd x y)
+--   (MkData x) ||| (MkData y) = MkData (SOr x y)
+--   (MkData x) &&& (MkData y) = MkData (SAnd x y)
 
 instance TryEq Sym where
   x === y = (SEq x y)
@@ -243,12 +243,12 @@ instance TryOrd Sym where
   lt x y = (SLt x y)
   gt x y = (SGt x y)
 
-instance TryEq (Data Sym) where
-  (MkData x) === (MkData y) = (MkData $ SEq x y)
+-- instance TryEq (Data Sym) where
+--   (MkData x) === (MkData y) = (MkData $ SEq x y)
 
-instance TryOrd (Data Sym) where
-  lt (MkData x) (MkData y) = (MkData $ SLt x y)
-  gt (MkData x) (MkData y) = (MkData $ SGt x y)
+-- instance TryOrd (Data Sym) where
+--   lt (MkData x) (MkData y) = (MkData $ SLt x y)
+--   gt (MkData x) (MkData y) = (MkData $ SGt x y)
 
 -- instance Addressable (Data Sym) where
 --   toMemoryAddress (MkData x) =
@@ -375,13 +375,13 @@ toCAddress sym =
     Just (CBool _)  -> error "ISA.Types.Symbolic.toAddress: not implemented for CBool"
     Nothing         -> Left sym
 
-toImm :: Sym -> Either Sym (Imm (Data Int32))
+toImm :: Sym -> Either Sym (Imm Int32)
 toImm sym =
     case getValue (simplify Nothing sym) of
     Just (CWord _)   -> error "ISA.Types.Symbolic.toImm: not implemented for CWord"
     Just (CInt32  i) -> if (i >= fromIntegral (minBound :: Int8))
                         && (i <= fromIntegral (maxBound :: Int8))
-                        then Right (Imm . MkData $ fromIntegral i)
+                        then Right (Imm $ fromIntegral i)
                         else error $ "ISA.Types.Symbolic.toImm: " <>
                                      "the value " <> show i <> "is not a valid immediate"
     Just (CBool _)   -> error "ISA.Types.Symbolic.toImm: not implemented for CBool"

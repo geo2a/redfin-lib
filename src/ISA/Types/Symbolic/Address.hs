@@ -70,8 +70,8 @@ instance Addressable CAddress where
         "Addressable.CAddress: can't interpret symbolic expression " <> show sym
         <> " as a concrete memory address"
 
-instance Addressable (Data Concrete) where
-  toAddress (MkData c) = case c of
+instance Addressable Concrete where
+  toAddress c = case c of
     (CWord w)  -> if w <= fromIntegral (maxBound :: CAddress)
                   then Just (MkAddress (Left (CAddress (fromIntegral w))))
                   else Nothing
@@ -81,23 +81,23 @@ instance Addressable (Data Concrete) where
     (CBool _)  -> Nothing
   fromAddress (MkAddress a) =
     case a of
-      Left (CAddress concrete) -> MkData (CWord . fromIntegral $ concrete)
+      Left (CAddress concrete) -> CWord . fromIntegral $ concrete
       Right sym -> error $
         "Addressable.(Data Concrete): can't interpret symbolic expression " <> show sym
         <> " as a concrete word"
 
-instance Addressable (Data Sym) where
-  toAddress = Just . MkAddress . Right . _unData
+instance Addressable Sym where
+  toAddress = Just . MkAddress . Right
   fromAddress (MkAddress a) =
     case a of
-      Left (CAddress concrete) -> MkData (SConst (CWord $ fromIntegral concrete))
-      Right sym                -> MkData sym
+      Left (CAddress concrete) -> SConst (CWord $ fromIntegral concrete)
+      Right sym                -> sym
 
-instance Addressable (Data Int32) where
-  toAddress (MkData x) = toAddress (MkData (CInt32 x))
+instance Addressable Int32 where
+  toAddress x = toAddress (CInt32 x)
   fromAddress (MkAddress a) =
     case a of
-      Left (CAddress concrete) -> MkData (fromIntegral concrete)
+      Left (CAddress concrete) -> fromIntegral concrete
       Right sym -> error $
         "Addressable.(Data Int32): can't interpret symbolic expression " <> show sym
         <> " as a concrete word"

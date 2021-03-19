@@ -25,9 +25,6 @@ module ISA.Types
     , Imm (..)
       -- ** instruction code
     , InstructionCode (..)
-    -- * Data representation, equality types and keys
-    -- ** packaged data
-    , Data (..)
 
     -- * Classes abstracting values that the ISA model can operate with
     , Value, ToValue(..)
@@ -38,21 +35,16 @@ module ISA.Types
     ) where
 
 import           Control.Monad
-import           Data.Aeson            hiding (Value)
-import           Data.Aeson.Types      hiding (Value)
+import           Data.Aeson      hiding (Value)
 import           Data.Bits
 import           Data.Bool
-import           Data.Functor.Identity
-import           Data.Int              (Int32, Int8)
+import           Data.Int        (Int32, Int8)
 import           Data.Monoid
-import qualified Data.Text             as Text
-import           Data.Typeable
-import           Data.Word             (Word16, Word8)
-import           GHC.Generics          (Generic)
+import           Data.Word       (Word16, Word8)
+import           GHC.Generics    (Generic)
 import           Generic.Random
-import           Prelude               hiding (not)
-import qualified Prelude
-import           Test.QuickCheck       (Arbitrary, arbitrary)
+import           Prelude         hiding (not)
+import           Test.QuickCheck (Arbitrary, arbitrary)
 
 
 import           ISA.Types.Prop
@@ -73,10 +65,6 @@ newtype CAddress = CAddress Word8
   deriving (Eq, Ord, Num, Real, Enum, Integral
            , Bounded, Bits, FiniteBits, Generic, ToJSON,  FromJSON)
   deriving (Show, Read) via Word8
-
--- instance ToJSON CAddress where
---   toEncoding = genericToEncoding defaultOptions
--- instance FromJSON CAddress where
 
 instance Arbitrary CAddress where
   arbitrary = genericArbitrary uniform
@@ -114,36 +102,36 @@ instance FromJSON InstructionCode where
 instance Arbitrary InstructionCode where
   arbitrary = genericArbitrary uniform
 
--- | Packaging data in a newtype allows to redefine typeclass instances
-newtype Data a = MkData { _unData :: a }
-  deriving (Functor, Eq, Ord, Num, Enum, Real, Integral
-           , Typeable, Bounded, Bits, FiniteBits, Generic)
-  deriving Show via a
-  deriving Applicative via Identity
+-- -- | Packaging data in a newtype allows to redefine typeclass instances
+-- newtype Data a = MkData { _unData :: a }
+--   deriving (Functor, Eq, Ord, Num, Enum, Real, Integral
+--            , Typeable, Bounded, Bits, FiniteBits, Generic)
+--   deriving Show via a
+--   deriving Applicative via Identity
 
-instance ToJSON a => ToJSON (Data a) where
-  toEncoding = genericToEncoding defaultOptions
-instance FromJSON a => FromJSON (Data a) where
+-- instance ToJSON a => ToJSON (Data a) where
+--   toEncoding = genericToEncoding defaultOptions
+-- instance FromJSON a => FromJSON (Data a) where
 
-instance Arbitrary a => Arbitrary (Data a) where
-  arbitrary = genericArbitrary uniform
+-- instance Arbitrary a => Arbitrary (Data a) where
+--   arbitrary = genericArbitrary uniform
 
 -----------------------------------------------------------------------------
 
-instance Boolean (Data Int8) where
-  toBool (MkData x) = x /= 0
+instance Boolean Int8 where
+  toBool x = x /= 0
   fromBool b = if b then 1 else 0
-  true = MkData 1
-  not  (MkData x) = if x == 0 then 1 else 0
+  true = 1
+  not  x = if x == 0 then 1 else 0
 
   x ||| y = if toBool x ||| toBool y then 1 else 0
   x &&& y = if toBool x &&& toBool y then 1 else 0
 
-instance Boolean (Data Int32) where
-  toBool (MkData x) = x /= 0
+instance Boolean Int32 where
+  toBool x = x /= 0
   fromBool b = if b then 1 else 0
-  true = MkData 1
-  not  (MkData x) = if x == 0 then 1 else 0
+  true = 1
+  not x = if x == 0 then 1 else 0
 
   x ||| y = if toBool x ||| toBool y then 1 else 0
   x &&& y = if toBool x &&& toBool y then 1 else 0
@@ -155,36 +143,38 @@ instance Boolean (Data Int32) where
 --   (MkData x) `lt` (MkData y) = MkData (x `lt` y)
 --   (MkData x) `gt` (MkData y) = MkData (x `gt` y)
 
-instance TryEq (Data Int8) where
-  (MkData x) === (MkData y) = fromBool $ x == y
+instance TryEq Int8 where
+  x === y = fromBool $ x == y
 
-instance TryEq (Data Int32) where
-  (MkData x) === (MkData y) = fromBool $ x == y
-instance TryOrd (Data Int8) where
-  lt (MkData x) (MkData y) = fromBool $ x < y
-  gt (MkData x) (MkData y) = fromBool $ x > y
+instance TryEq Int32 where
+  x === y = fromBool $ x == y
+instance TryOrd Int8 where
+  lt x y = fromBool $ x < y
+  gt x y = fromBool $ x > y
 
-instance TryOrd (Data Int32) where
-  lt (MkData x) (MkData y) = fromBool $ x < y
-  gt (MkData x) (MkData y) = fromBool $ x > y
+instance TryOrd Int32 where
+  lt x y = fromBool $ x < y
+  gt x y = fromBool $ x > y
 
-instance Semigroup (Data Int8) where
+instance Semigroup Int8 where
   (<>) = (+)
 
-instance Monoid (Data Int8) where
+instance Monoid Int8 where
   mempty = 0
 
-instance Semigroup (Data Int32) where
+instance Semigroup Int32 where
   (<>) = (+)
 
-instance Monoid (Data Int32) where
+instance Monoid Int32 where
   mempty = 0
 
 -- | We now consider a value to be a numeric monoid which could also be converted
 --   into booleans
-class (Show a, TryEq a, TryOrd a, Monoid a, Num a, Integral a, Bounded a, Boolean a) => Value a where
+class (Show a, TryEq a, TryOrd a, Monoid a, Num a, Integral a, Bounded a, Boolean a) =>
+  Value a where
 
-instance (Show a, TryEq a, TryOrd a, Monoid a, Num a, Integral a, Bounded a, Boolean a) => Value a where
+instance (Show a, TryEq a, TryOrd a, Monoid a, Num a, Integral a, Bounded a, Boolean a) =>
+  Value a where
 
 class Value a => ToValue a where
   toValue :: a -> a

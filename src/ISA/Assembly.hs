@@ -45,7 +45,7 @@ goto name = do
          Nothing -> jmpi 0
            -- error $ "ISA.Assembly.goto: no such label " <> show name-- jmpi 0
          Just there -> do
-p             let offset  =
+             let offset  =
                    (fromIntegral there :: Int32) -
                    (fromIntegral here :: Int32) - 1
              jmpi (fromIntegral offset)
@@ -78,7 +78,7 @@ goto_cf name = do
 type Labels = Map.Map Label CAddress
 
 data AssemblerState =
-    MkAssemblerState { program            :: [(CAddress, Instruction (Data Int32))]
+    MkAssemblerState { program            :: [(CAddress, Instruction Int32)]
                      , labels             :: Labels
                      , instructionCounter :: CAddress
                      }
@@ -89,28 +89,28 @@ collectLabels :: Script -> Labels
 collectLabels src =
     labels $ snd $ runState src (MkAssemblerState [] Map.empty 0)
 
-assemble :: Script -> [(CAddress, Instruction (Data Int32))]
+assemble :: Script -> [(CAddress, Instruction Int32)]
 assemble src =
     prg
   where
     prg = reverse $ program $ snd $ runState src (MkAssemblerState [] labels 0)
     labels = collectLabels src
 
-mkProgram :: Script -> [(Key, Data Sym)]
+mkProgram :: Script -> [(Key, Sym)]
 mkProgram src =
   let prog = assemble src
       addrs = map Prog (iterate inc 0)
-      ics   = [ MkData $ SConst (CWord ic) | (InstructionCode ic) <- map (encode . snd) prog]
+      ics   = [ SConst (CWord ic) | (InstructionCode ic) <- map (encode . snd) prog]
   in zip addrs ics
 
-mkProgram1 :: Script -> [(Key, Data Int32)]
+mkProgram1 :: Script -> [(Key, Int32)]
 mkProgram1 src =
   let prog = assemble src
       addrs = map Prog (iterate inc 0)
-      ics   = [ MkData $ fromIntegral ic | (InstructionCode ic) <- map (encode . snd) prog]
+      ics   = [ fromIntegral ic | (InstructionCode ic) <- map (encode . snd) prog]
   in zip addrs ics
 
-instr :: Instruction (Data Int32) -> Script
+instr :: Instruction Int32 -> Script
 instr i = do
     s <- get
     let ic = instructionCounter s

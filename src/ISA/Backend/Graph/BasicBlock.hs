@@ -74,7 +74,7 @@ instance Selective (Sem r) where
   select = selectA
 
 -- | Calculate basic blocks of an assembly script
-basicBlocks :: Maybe (Context (Data Int32)) -> Script -> [Block (Data Int32)]
+basicBlocks :: Maybe (Context Int32) -> Script -> [Block Int32]
 basicBlocks (Just init) = map postprocessBlock . basicBlocksImpl init . assemble
 basicBlocks Nothing = map postprocessBlock . basicBlocksImpl defaultInit . assemble
   where defaultInit = emptyCtx {_bindings = Map.fromList [(IC, 0), (F Condition, false)]}

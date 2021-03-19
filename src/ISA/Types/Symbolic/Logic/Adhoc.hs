@@ -28,10 +28,12 @@ import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
 import           GHC.Generics
+import           Prelude                     hiding (not)
 
 import           ISA.Backend.Symbolic.Zipper
 import           ISA.Types
-import           ISA.Types.Context           (dumpMemory)
+import           ISA.Types.Context           (dumpMemory, getBinding)
+import           ISA.Types.Key
 import           ISA.Types.Prop
 import           ISA.Types.SBV
 import           ISA.Types.SBV.SFunArray     (SFunArray)
@@ -40,11 +42,53 @@ import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Tree
 
-
 -- | Syntax of the logic: we are interested in symbolic
 --   qualities that hold for the whole trace, or in leafs
 data Logic = InWhole (Context -> Sym)
            | InLeafs (Context -> Sym)
+
+-- instance Num Sym where
+--   x + y = SAdd x y
+--   x - y = SSub x y
+--   x * y = SMul x y
+--   abs x = SAbs x
+--   signum _ = error "Sym.Num: signum is not defined"
+--   fromInteger x = SConst (CInt32 $ fromInteger x)
+--   negate _ = error "Sym.Num: negate is not defined"
+--   -- negate x = SSub 0 x
+
+instance Num (Context -> Sym) where
+  x + y = \s -> SAdd (x s) (y s)
+  x - y = \s -> SSub (x s) (y s)
+  x * y = \s -> SMul (x s) (y s)
+  abs x = \s -> SAbs (x s)
+  signum _ = error "(Context -> Sym).Num: signum is not defined"
+  fromInteger x = const (SConst (CInt32 $ fromInteger x))
+  negate _ = error "(Context -> Sym).Num: negate is not defined"
+
+instance Boolean (Context -> Sym) where
+  true = const true
+  false = const false
+  toBool = error "Boolean.(Context -> Sym): not implemented"
+  fromBool b = const (fromBool b)
+  not f = \s -> not (f s)
+  p ||| q = \s -> p s ||| q s
+  p &&& q = \s -> p s &&& q s
+
+instance TryEq (Context -> Sym) where
+  p === q = \s -> p s === q s
+
+instance TryOrd (Context -> Sym) where
+  lt p q = \s -> p s `lt` q s
+  gt p q = \s -> p s `gt` q s
+
+-- | Formulate a property considering the symbolic value of
+--   a particular key. Return 'false' if the key is not bound
+key :: Key -> (Context -> Sym)
+key k = \ctx -> maybe false id (getBinding k ctx)
+
+var :: Text -> (Context -> Sym)
+var name = const (SAny name)
 
 -----------------------------------------------------------------------------
 
@@ -105,7 +149,7 @@ prepare init mem env freeVars (ConstrainedBy cs) = do
         SFunArray.sListArray 0 .
         map (bimap (fromJust . symAddress vars)
               (fromJust . symInt32 (SFunArray.sListArray 0 []) vars)) .
-        map (second _unData) . dumpMemory $ init
+        dumpMemory $ init
   liftIO . atomically . writeTVar mem $ memory
   pre <- toSMT memory vars cs
   SBV.constrain pre

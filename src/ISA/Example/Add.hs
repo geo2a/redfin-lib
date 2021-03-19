@@ -74,8 +74,8 @@ initCtx =
               --              &&& ((SGt (SAny "y") 0) &&& (SLt (SAny "y") 100))
             , _bindings = Map.fromList $ [ (IC, 0)
                                          , (Reg R0, 0)
-                                         , (Addr 0, MkData $ SAny "x")
-                                         , (Addr 1, MkData $ SAny "y")
+                                         , (Addr 0, SAny "x")
+                                         , (Addr 1, SAny "y")
                                          ] ++ mkProgram addLowLevel
             , _store = Map.empty
             , _solution = Nothing

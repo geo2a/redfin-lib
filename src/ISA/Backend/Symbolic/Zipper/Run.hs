@@ -47,10 +47,10 @@ import           ISA.Types.ZeroOneTwo
 --   (and natural) to implement in terms of @FS Key Monad Value@, but
 --   for now we'll stick with this concrete implementation in the
 --   @Engine@ monad.
-fetchInstruction :: Engine (Data Sym)
+fetchInstruction :: Engine Sym
 fetchInstruction =
-  readKey IC >>= \(MkData x) ->
-    case (toAddress . MkData =<< (getValue (simplify (Just 100) x))) of
+  readKey IC >>= \x ->
+    case (toAddress =<< (getValue (simplify (Just 100) x))) of
       Just ic -> do
         i <- readKey (Prog ic)
         writeKey IR (pure i)
@@ -63,10 +63,10 @@ incrementInstructionCounter = do
 
 readInstructionRegister :: Engine InstructionCode
 readInstructionRegister =  do
-  x <- (fmap toInstructionCode) <$> readKey IR
+  x <- toInstructionCode <$> readKey IR
   case x of
-    (MkData (Right instr)) -> pure instr
-    (MkData (Left sym)) -> error $ "Engine.readInstructionRegister: " <>
+    (Right instr) -> pure instr
+    (Left sym) -> error $ "Engine.readInstructionRegister: " <>
                            "symbolic instruction code encountered " <> show sym
 
 -- | Perform one step of symbolic execution
@@ -114,11 +114,11 @@ execute todo = \case
     -- | Check satisfiability of a Context's path condition under its constraints
     reach :: Context -> SBV.Symbolic (Bool, Context)
     reach ctx = do
-      let freeVars = findFreeVars (_unData <$> ctx)
+      let freeVars = findFreeVars ctx
       vars <- createSym (Set.toList freeVars)
       constrs <- toSMT (SFunArray.sListArray 0 [])
-                       vars ((_unData $ _pathCondition ctx)
-                             :(map (_unData . snd) (_constraints ctx)))
+                       vars (_pathCondition ctx
+                             :map snd (_constraints ctx))
       SBV.query $ do
         SBV.constrain constrs
         SBV.checkSat >>= \case
@@ -133,7 +133,7 @@ execute todo = \case
 
 -- | Decide how many children states there will be according to the dependencies
 --   of an instruction
-analyse :: Instruction (Data Sym) -> Engine (ZeroOneTwo Context)
+analyse :: Instruction Sym -> Engine (ZeroOneTwo Context)
 analyse i =
   let (Reads rs, Writes ws) = dependencies (instructionSemanticsS i)
   in if | F Halted `elem` ws -> pure Zero
