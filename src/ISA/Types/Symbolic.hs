@@ -15,7 +15,7 @@
 -----------------------------------------------------------------------------
 module ISA.Types.Symbolic
     ( Concrete(..), Sym (..), conjoin, disjoin
-      , subst, simplify, trySolve
+      , subst, simplify
     -- try to concertise symbolic values
     , getValue, tryFoldConstant, tryReduce, toCAddress, toImm, toInstructionCode
     ) where
@@ -237,18 +237,18 @@ instance Boolean (Data Sym) where
   (MkData x) &&& (MkData y) = MkData (SAnd x y)
 
 instance TryEq Sym where
-  x === y = Nontrivial (SEq x y)
+  x === y = (SEq x y)
 
 instance TryOrd Sym where
-  lt x y = Nontrivial (SLt x y)
-  gt x y = Nontrivial (SGt x y)
+  lt x y = (SLt x y)
+  gt x y = (SGt x y)
 
 instance TryEq (Data Sym) where
-  (MkData x) === (MkData y) = Nontrivial (MkData $ SEq x y)
+  (MkData x) === (MkData y) = (MkData $ SEq x y)
 
 instance TryOrd (Data Sym) where
-  lt (MkData x) (MkData y) = Nontrivial (MkData $ SLt x y)
-  gt (MkData x) (MkData y) = Nontrivial (MkData $ SGt x y)
+  lt (MkData x) (MkData y) = (MkData $ SLt x y)
+  gt (MkData x) (MkData y) = (MkData $ SGt x y)
 
 -- instance Addressable (Data Sym) where
 --   toMemoryAddress (MkData x) =
@@ -342,15 +342,15 @@ tryReduce = \case
     (SLt x y) -> tryReduce x `SLt` tryReduce y
     s -> s
 
--- | Try to solve a symbolic equality check by constant-folding
-trySolve :: Prop Sym -> Prop Sym
-trySolve (Trivial x) = Trivial x
-trySolve (Nontrivial x) =
-  case getValue x of
-    Nothing        -> Nontrivial x
-    Just (CBool b) -> Trivial b
-    Just i -> error $ "ISA.Symbolic.Sym.trySolve: non-boolean concrete value "
-              <> show i
+-- -- | Try to solve a symbolic equality check by constant-folding
+-- trySolve :: Prop Sym -> Prop Sym
+-- trySolve (Trivial x) = Trivial x
+-- trySolve (Nontrivial x) =
+--   case getValue x of
+--     Nothing        -> Nontrivial x
+--     Just (CBool b) -> Trivial b
+--     Just i -> error $ "ISA.Symbolic.Sym.trySolve: non-boolean concrete value "
+--               <> show i
 
 simplify :: (Maybe Int) -> Sym -> Sym
 simplify steps =

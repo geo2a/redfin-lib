@@ -19,7 +19,7 @@ module ISA.Types.Context
   -- extract memory from @_bindings@
   , dumpMemory
 
-  , getBinding, putBinding, showKey, isReachable) where
+  , getBinding, putBinding, keyProp, showKey, isReachable) where
 
 import           Data.Aeson                 (FromJSON, ToJSON)
 import qualified Data.Map.Strict            as Map
@@ -78,6 +78,11 @@ isReachable ctx = case (_solution ctx) of
 -- | Access a specific key
 getBinding :: Key -> Context a -> Maybe a
 getBinding key ctx = Map.lookup key (_bindings ctx)
+
+-- | Formulate a property considering the symbolic value of
+--   a particular key. Return 'false' if the key is not bound
+keyProp :: Boolean a => Context a -> Key -> a
+keyProp ctx key = maybe false id (getBinding key ctx)
 
 -- | Alter a specific key
 putBinding :: Key -> a -> Context a -> Context a

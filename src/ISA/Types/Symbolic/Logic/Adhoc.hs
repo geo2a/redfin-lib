@@ -32,12 +32,14 @@ import           GHC.Generics
 import           ISA.Backend.Symbolic.Zipper
 import           ISA.Types
 import           ISA.Types.Context           (dumpMemory)
+import           ISA.Types.Prop
 import           ISA.Types.SBV
 import           ISA.Types.SBV.SFunArray     (SFunArray)
 import qualified ISA.Types.SBV.SFunArray     as SFunArray
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Tree
+
 
 -- | Syntax of the logic: we are interested in symbolic
 --   qualities that hold for the whole trace, or in leafs
@@ -50,13 +52,17 @@ formulate :: Trace -> Logic -> Schedule (Int, Sym)
 formulate tr = \case InWhole _ -> undefined
                      InLeafs p -> formulateLeafs p tr
 
+-- | Prepare a solving schedule considering only leafs of the trace.
+--   Return 'false' if the trace is malformed
 formulateLeafs :: (Context -> Sym) -> Trace -> Schedule (Int, Sym)
 formulateLeafs prop trace =
   let ids = map fst . leafs $ _layout trace
       states = _states (resolvePointers trace)
   in Conjunct ( map Literal . zip ids
-               . map (\i -> prop . fromJust $ IntMap.lookup i states) $ ids)
+               . map (\i -> maybe false prop $ IntMap.lookup i states) $ ids)
 
+-- | From a solving schedule, produce a list of queries for the solver and a
+--   schedule of results.
 produce :: TVar (SFunArray SBV.Int32 SBV.Int32) -> TVar (Map Text SBV.SInt32)
         -> Schedule (Int, Sym) -> IO ([SBV.Query ()], Schedule (Int, TMVar SMTResult))
 produce mem vars schedule =
@@ -104,12 +110,14 @@ prepare init mem env freeVars (ConstrainedBy cs) = do
   pre <- toSMT memory vars cs
   SBV.constrain pre
 
+-- | Take all 'TMVar's in the schedule --- awaiting the results
 consume :: Schedule (Int, TMVar SMTResult) -> STM (Schedule (Int, SMTResult))
 consume schedule = case schedule of
   Literal (nid, var) -> Literal . (nid,) <$> takeTMVar var
   Conjunct xs        -> Conjunct <$> mapM consume xs
   Disjunct xs        -> Disjunct <$> mapM consume xs
 
+-- | Flatten the schedule and apply it's node operations to the results
 postprocess :: Schedule (Int, SMTResult) -> [(Int, SMTResult)]
 postprocess schedule =
   let sats = postprocessImpl [] schedule

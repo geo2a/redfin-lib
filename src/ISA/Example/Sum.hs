@@ -23,6 +23,7 @@ import           Data.Int                        (Int32)
 import qualified Data.IntMap                     as IntMap
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromJust)
+import           Prelude                         hiding (not)
 
 import           ISA.Assembly
 -- import           ISA.Backend.Dependencies
@@ -100,8 +101,8 @@ initCtx = MkContext
     [ ("0 < x1 < 100", MkData $ ((SGt (SAny "x1") 0) &&& (SLt (SAny "x1") 100)))
     , ("0 < x2 < 100", MkData $ ((SGt (SAny "x2") 0) &&& (SLt (SAny "x2") 100)))
     , ("0 < x3 < 100", MkData $ ((SGt (SAny "x3") 0) &&& (SLt (SAny "x3") 100)))
-    , ("0 < n < 4", MkData $ ((SGt (SAny "n") 0) &&& (SLt (SAny "n") 10)))
---    , ("n == 3", MkData $ ((SEq (SAny "n") 3)))
+--    , ("0 < n < 4", MkData $ ((SGt (SAny "n") 0) &&& (SLt (SAny "n") 10)))
+    , ("n == 3", MkData $ ((SEq (SAny "n") 3)))
     ]
   , _bindings = Map.fromList $ [ (IC, 0)
 --                               , (IR, )
@@ -145,25 +146,25 @@ initCtx1 = MkContext
   , _solution = Nothing
   }
 
+correct = InLeafs $ \s -> _unData . not $
+          keyProp s (Reg R0) === (MkData $ SAny "x1" + SAny "x2" + SAny "x3")
+      &&& keyProp s (Reg R1) === 0
+      &&& keyProp s (F Halted)
+
 demo_sum :: IO ()
 demo_sum = do
-  trace <- runModel 50 initCtx
+  trace <- resolvePointers <$> runModel 50 initCtx
   mapM_ putStrLn (draw (_layout trace))
   -- mapM_ (\s -> putStrLn . show $ (getBinding (Reg R0) s)) (_states trace)
-  let correct = InLeafs $ \s ->
-        SNot (
-           SAnd (SEq (_unData (fromJust (getBinding (Reg R0) s)))
-                      (SAny "x1" + SAny "x2" + SAny "x3"))
-                (SAnd (SEq (_unData (fromJust (getBinding (Reg R1) s)))
-                           (_unData (fromJust (getBinding (Addr 255) s))))
-                      ((_unData (fromJust (getBinding (F Halted) s)))
-                       ))
-           )
+
   -- let trivial = InLeafs $ const true
   r <- sat correct trace (ConstrainedBy (map _unData . map snd $ _constraints initCtx))
   print r
   -- -- case r of
   -- --   Conjunct [Literal (n, Satisfiable s)] -> print ( modelAssocs s)
-  print (getBinding (F Halted) $ fromJust $ IntMap.lookup 23 (_states trace))
-  print (getBinding (F Halted) $ fromJust $ IntMap.lookup 32 (_states trace))
+  -- print (getBinding (F Halted) $ fromJust $ IntMap.lookup 23 (_states trace))
+  print (getBinding (F Halted) $ fromJust $ IntMap.lookup 29 (_states trace))
+  print (getBinding (Reg R0) $ fromJust $ IntMap.lookup 29 (_states trace))
+  print (getBinding (Reg R1) $ fromJust $ IntMap.lookup 29 (_states trace))
+
   pure ()

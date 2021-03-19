@@ -148,19 +148,25 @@ instance Boolean (Data Int32) where
   x ||| y = if toBool x ||| toBool y then 1 else 0
   x &&& y = if toBool x &&& toBool y then 1 else 0
 
+-- instance TryEq a => TryEq (Data a) where
+--   (MkData x) === (MkData y) = MkData (x === y)
+
+-- instance TryOrd a => TryOrd (Data a) where
+--   (MkData x) `lt` (MkData y) = MkData (x `lt` y)
+--   (MkData x) `gt` (MkData y) = MkData (x `gt` y)
+
 instance TryEq (Data Int8) where
-  (MkData x) === (MkData y) = Trivial (x == y)
+  (MkData x) === (MkData y) = fromBool $ x == y
 
 instance TryEq (Data Int32) where
-  (MkData x) === (MkData y) = Trivial (x == y)
-
+  (MkData x) === (MkData y) = fromBool $ x == y
 instance TryOrd (Data Int8) where
-  lt (MkData x) (MkData y) = Trivial (x < y)
-  gt (MkData x) (MkData y) = Trivial (x > y)
+  lt (MkData x) (MkData y) = fromBool $ x < y
+  gt (MkData x) (MkData y) = fromBool $ x > y
 
 instance TryOrd (Data Int32) where
-  lt (MkData x) (MkData y) = Trivial (x < y)
-  gt (MkData x) (MkData y) = Trivial (x > y)
+  lt (MkData x) (MkData y) = fromBool $ x < y
+  gt (MkData x) (MkData y) = fromBool $ x > y
 
 instance Semigroup (Data Int8) where
   (<>) = (+)

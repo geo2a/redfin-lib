@@ -64,7 +64,7 @@ store reg addr read write =
   write (Addr addr) (read (Reg reg))
 
 -- | A pure check for integer overflow during addition.
-willOverflowPure :: (Num a, Bounded a, Boolean a, TryOrd a) => a -> a -> Prop a
+willOverflowPure :: (Num a, Bounded a, Boolean a, TryOrd a) => a -> a -> a
 willOverflowPure x y =
     let o1 = gt y 0
         o2 = gt x((-) maxBound y)
@@ -81,7 +81,7 @@ add reg addr read write =
       result = (+) <$> arg1 <*> arg2
       -- when @result@ is zero we set @Zero@ flag to @true@
   in
-    write (F Overflow) (elimProp <$> o) *>
+    write (F Overflow) o *>
     -- select o (const (pure mempty)) (pure id) *>
     write (Reg reg) result
 
@@ -136,18 +136,18 @@ abs reg read write =
 -- | Compare the values in the register and memory cell
 cmpEq :: Register -> Address -> FS Key Selective '[Boolean, TryEq, Monoid] a
 cmpEq reg addr = \read write ->
-  write (F Condition) (elimProp <$> ((===) <$> read (Reg reg) <*> read (Addr addr)))
+  write (F Condition) ((===) <$> read (Reg reg) <*> read (Addr addr))
 
 cmpGt :: Register -> Address -> FS Key Selective '[Boolean, TryOrd, Monoid] a
 cmpGt reg addr = \read write ->
-  write (F Condition) (elimProp <$> (gt <$> read (Reg reg) <*> read (Addr addr)))
+  write (F Condition) (gt <$> read (Reg reg) <*> read (Addr addr))
   -- ifS ((>) <$> read (Reg reg) <*> read (Addr addr))
   --      (write (F Condition) (pure true))
   --      (write (F Condition) (pure false))
 
 cmpLt :: Register -> Address -> FS Key Selective '[Boolean, TryOrd] a
 cmpLt reg addr = \read write ->
-  write (F Condition) (elimProp <$> (lt <$> read (Reg reg) <*> read (Addr addr)))
+  write (F Condition) (lt <$> read (Reg reg) <*> read (Addr addr))
   -- ifS ((<) <$> read (Reg reg) <*> read (Addr addr))
   --     (write (F Condition) (pure true))
   --     (write (F Condition) (pure false))
