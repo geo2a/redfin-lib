@@ -2,7 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module ISA.Types.Tree
-  ( Tree(..), insert1, insert2, leafs, draw
+  ( Tree(..), insert1, insert2, keys, leafs, draw
   , Cxt(..), Loc(..), locKey
   , Travel(..), travel, travelVerbose, shift
   , left, up, right, down, top
@@ -39,13 +39,21 @@ insert2 tree nid l r =
     Trunk n x -> Trunk n (insert2 x nid l r)
     (Branch n l0 r0) -> Branch n (insert2 l0 nid l r) (insert2 r0 nid l r)
 
-leafs :: Tree key a -> [(key, a)]
+leafs :: Tree key a -> [key]
 leafs = go []
   where
     go acc = \case
-      Leaf k v     -> (k, v):acc
+      Leaf k _     -> k:acc
       Trunk _ t    -> go acc t
       Branch _ l r -> go acc l ++ go acc r
+
+keys :: Tree key a -> [key]
+keys = go []
+  where
+    go acc = \case
+      Leaf k _     -> k:acc
+      Trunk k t    -> go (k:acc) t
+      Branch k l r -> k : go acc l ++ go acc r
 
 findLoc :: Eq key => key -> Tree key a -> Maybe (Loc key a)
 findLoc k tree =

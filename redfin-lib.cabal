@@ -39,7 +39,6 @@ library
       ISA.Types.Instruction.Encode,
       ISA.Types.Instruction.Opcodes,
       ISA.Types.Symbolic,
-      ISA.Types.Symbolic.Logic.Adhoc
       ISA.Types.Symbolic.Address,
       ISA.Backend.Dependencies,
       ISA.Backend.Graph,
@@ -49,6 +48,7 @@ library
       ISA.Backend.Symbolic.Zipper.Run,
       ISA.Backend.Symbolic.List.Trace,
       ISA.Types.Symbolic.SMT,
+      ISA.Types.Symbolic.Property,
       ISA.Types.Symbolic.Parser,
       ISA.Example.Add
       ISA.Example.Sum,

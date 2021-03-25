@@ -11,13 +11,15 @@
 -----------------------------------------------------------------------------
 
 module ISA.Types.Parser
-    (Parser, sc, lexeme, symbol) where
+    (Parser, sc, lexeme, symbol, parens, curly) where
 
 import           Data.Text                  (Text)
 import           Data.Void
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
+
+import           ISA.Types
 
 --------------------------------------------------------------------------------
 type Parser = Parsec Void Text
@@ -31,3 +33,9 @@ lexeme = L.lexeme sc
 
 symbol :: Text -> Parser Text
 symbol = L.symbol sc
+
+parens :: Parser a -> Parser a
+parens = between (symbol "(") (symbol ")")
+
+curly :: Parser a -> Parser a
+curly = between (symbol "{") (symbol "}")

@@ -24,6 +24,7 @@ import           Data.Aeson     (FromJSON, ToJSON, defaultOptions,
                                  genericToEncoding, toEncoding)
 import           Data.Foldable
 import           Data.Int       (Int32, Int8)
+import qualified Data.Map       as Map
 import           Data.Text      (Text)
 import qualified Data.Text      as Text
 import           Data.Typeable
@@ -34,6 +35,7 @@ import           GHC.Stack
 import           Prelude        hiding (not)
 
 import           ISA.Types
+-- import           ISA.Types.Key
 import           ISA.Types.Prop
 -- import           ISA.Types.Symbolic
 -- import           ISA.Types.Symbolic.Address
@@ -153,6 +155,31 @@ instance ToJSON Sym where
   toEncoding = genericToEncoding defaultOptions
 instance FromJSON Sym where
 
+foldSym :: Monoid a => (Sym -> a) -> Sym -> a
+foldSym f = \case
+  s@(SConst _)   -> (f s)
+  s@(SAny _)     -> (f s)
+  s@(SPointer _) -> (f s)
+  (SAdd x y)     -> (f x) <> (f y)
+  (SSub x y)     -> (f x) <> (f y)
+  (SMul x y)     -> (f x) <> (f y)
+  (SDiv x y)     -> (f x) <> (f y)
+  (SMod x y)     -> (f x) <> (f y)
+  (SAbs x)       -> (f x)
+  (SEq x y)      -> (f x) <> (f y)
+  (SGt x y)      -> (f x) <> (f y)
+  (SLt x y)      -> (f x) <> (f y)
+  (SAnd x y)     -> (f x) <> (f y)
+  (SOr x y)      -> (f x) <> (f y)
+  (SNot x)       -> (f x)
+
+
+-- | Check if the symbolic expression is actually concrete
+isConcrete :: Sym -> Bool
+isConcrete = \case
+  SConst _ -> True
+  _        -> False
+
 instance Show Sym where
     show (SAdd x y)   = "(" <> show x <> " + " <> show y <> ")"
     show (SSub x y)   = "(" <> show x <> " - " <> show y <> ")"
@@ -164,7 +191,7 @@ instance Show Sym where
     show (SAnd x y)   = "(" <> show x <> " && " <> show y <> ")"
     show (SOr  x y)   = "(" <> show x <> " || " <> show y <> ")"
     show (SAny n  )   = Text.unpack n
-    show (SPointer x) = "(*" <> show x <> ")"
+    show (SPointer x) = "(&" <> show x <> ")"
     show (SEq  x y)   = "(" <> show x <> " == " <> show y <> ")"
     show (SGt  x y)   = "(" <> show x <> " > " <> show y <> ")"
     show (SLt  x y)   = "(" <> show x <> " < " <> show y <> ")"
@@ -225,37 +252,12 @@ instance Boolean Sym where
   x ||| y = SOr x y
   x &&& y = SAnd x y
 
--- instance Boolean (Data Sym) where
---   true = MkData $ SConst (CBool True)
---   toBool (MkData x) =
---     -- trace (show x) True
---     toBool x
---   fromBool b = MkData (fromBool b)
---   not (MkData x) = MkData (SNot x)
-
---   (MkData x) ||| (MkData y) = MkData (SOr x y)
---   (MkData x) &&& (MkData y) = MkData (SAnd x y)
-
 instance TryEq Sym where
   x === y = (SEq x y)
 
 instance TryOrd Sym where
   lt x y = (SLt x y)
   gt x y = (SGt x y)
-
--- instance TryEq (Data Sym) where
---   (MkData x) === (MkData y) = (MkData $ SEq x y)
-
--- instance TryOrd (Data Sym) where
---   lt (MkData x) (MkData y) = (MkData $ SLt x y)
---   gt (MkData x) (MkData y) = (MkData $ SGt x y)
-
--- instance Addressable (Data Sym) where
---   toMemoryAddress (MkData x) =
---     case toAddress x of
---       Left _     -> Nothing
---       Right addr -> Just addr
---   fromMemoryAddress x = MkData (SConst (CWord (fromIntegral x)))
 
 conjoin :: [Sym] -> Sym
 conjoin cs = foldl' SAnd true cs
@@ -319,9 +321,11 @@ tryReduce = \case
     (SAdd (SConst 0) y) -> tryReduce y
     -- x + 0 = x
     (SAdd x (SConst 0)) -> tryReduce x
+    (SAdd (SConst x) (SConst y)) -> SConst (x + y)
     (SAdd x y) -> tryReduce x `SAdd` tryReduce y
     -- x - 0 = x
     (SSub x (SConst 0)) -> tryReduce x
+    (SSub (SConst x) (SConst y)) -> SConst (x - y)
     (SSub x y) -> tryReduce x `SSub` tryReduce y
     -- T && y = y
     (SAnd (SConst (CBool True)) y) -> tryReduce y
@@ -340,17 +344,9 @@ tryReduce = \case
     (SGt x y) -> tryReduce x `SGt` tryReduce y
     (SLt (SConst 0) (SConst 0)) -> SConst (CBool False)
     (SLt x y) -> tryReduce x `SLt` tryReduce y
-    s -> s
 
--- -- | Try to solve a symbolic equality check by constant-folding
--- trySolve :: Prop Sym -> Prop Sym
--- trySolve (Trivial x) = Trivial x
--- trySolve (Nontrivial x) =
---   case getValue x of
---     Nothing        -> Nontrivial x
---     Just (CBool b) -> Trivial b
---     Just i -> error $ "ISA.Symbolic.Sym.trySolve: non-boolean concrete value "
---               <> show i
+    (SPointer x) -> SPointer (tryReduce x)
+    s -> s
 
 simplify :: (Maybe Int) -> Sym -> Sym
 simplify steps =
@@ -365,7 +361,7 @@ simplify steps =
 --   Return @Left@ in cases of symbolic value, concrete boolean and non-Word16 value
 toCAddress :: HasCallStack => Sym -> Either Sym CAddress
 toCAddress sym =
-  case getValue (simplify Nothing sym) of
+  case getValue (simplify (Just 100) sym) of
     Just (CWord _)  -> error "ISA.Types.Symbolic.toCAddress: not implemented for CWord"
     Just (CInt32 i) -> if (i >= fromIntegral (minBound :: CAddress))
                        && (i <= fromIntegral (maxBound :: CAddress))
@@ -398,3 +394,5 @@ toInstructionCode sym =
     Just (CBool _)   -> error $ "ISA.Types.Symbolic.toInstructionCode: " <>
                                 "not implemented for CBool"
     Nothing          -> Left sym
+
+--------------------------------------------------------------------------------

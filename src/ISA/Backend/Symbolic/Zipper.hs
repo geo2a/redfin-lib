@@ -29,7 +29,6 @@ import           GHC.Generics               (Generic)
 import           GHC.Stack
 import           Prelude                    hiding (log, not, read, readIO)
 
-import           ISA.Types
 import           ISA.Types.Context          hiding (Context)
 import qualified ISA.Types.Context          as ISA.Types
 import           ISA.Types.Key
@@ -90,7 +89,7 @@ remember name expr = do
 -- | Substitute the contents of the symbolic store into @_bindings@ of @_states@
 resolvePointers :: Trace -> Trace
 resolvePointers trace =
-  trace {_states = fmap substPointers (_states trace)}
+  trace {_states = fmap (unstarAll . substPointers) (_states trace)}
 
 -- | The symbolic simulation engine is a reader monad of the mutable
 --   environment and a state monad of the trace's zipper

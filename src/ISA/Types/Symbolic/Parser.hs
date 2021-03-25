@@ -9,7 +9,7 @@
 -- Parse symbolic expressions
 --
 -----------------------------------------------------------------------------
-module ISA.Types.Symbolic.Parser (parseSym, pAddress) where
+module ISA.Types.Symbolic.Parser (parseSym, pSym, pSAny, pAddress) where
 
 import           Control.Monad.Combinators.Expr
 import           Data.Text                      (Text)
@@ -27,20 +27,20 @@ parseSym :: String -> Text -> Either Text Sym
 parseSym symName = either (Left . Text.pack . errorBundlePretty) (Right . id)
          . parse pSym symName
 
-pPredicate :: Parser (Sym -> Sym)
-pPredicate = do
-  (SAny var) <- char '\\' *> pSAny
-  symbol "->"
-  property <- pSym
-  pure (\expr -> subst expr var property)
+-- pPredicate :: Parser (Sym -> Sym)
+-- pPredicate = do
+--   (SAny var) <- char '\\' *> pSAny
+--   symbol "->"
+--   property <- pSym
+--   pure (\expr -> subst expr var property)
 
 pCAddress :: Parser CAddress
-pCAddress = CAddress <$> lexeme L.decimal <?> "Concrete memory address"
+pCAddress = CAddress <$> lexeme L.decimal <?> "concrete memory address"
 
 pAddress :: Parser Address
-pAddress =
-  MkAddress <$> (Left  <$> pCAddress
-             <|> Right <$> pSym)
+pAddress = MkAddress <$>
+  choice [ Left  <$> pCAddress
+         , Right <$> pSym ]
 
 pInt32 :: Parser Concrete
 pInt32 = CInt32 <$>
@@ -63,8 +63,10 @@ pSConst :: Parser Sym
 pSConst = SConst <$> pConcrete
 
 pSAny :: Parser Sym
-pSAny = SAny . Text.pack <$> lexeme
-  ((:) <$> letterChar <*> many (alphaNumChar <|> char '_') <?> "variable")
+pSAny = do
+  _ <- char '$'
+  name <- lexeme ((:) <$> letterChar <*> many (alphaNumChar <|> char '_') <?> "variable")
+  pure (SAny . Text.pack $ name)
 
 pTerm :: Parser Sym
 pTerm = choice
@@ -78,8 +80,12 @@ pSym = makeExprParser pTerm operatorTable
 
 operatorTable :: [[Operator Parser Sym]]
 operatorTable =
-  [ [ prefix "not" SNot
+  [ [ prefix "&" SPointer
+    , prefix "not" SNot
     , prefix "abs" SAbs]
+  , [ binary "&&" SAnd
+    , binary "||" SOr
+    ]
   , [ binary "*" SMul
     , binary "/" SDiv
     , binary "%" SMod
@@ -91,9 +97,6 @@ operatorTable =
     , binary "<" SLt
     , binary ">" SGt
     ]
-  , [ binary "&&" SAnd
-    , binary "||" SOr
-    ]
   ]
 
 binary :: Text -> (Sym -> Sym -> Sym) -> Operator Parser Sym
@@ -101,6 +104,3 @@ binary  name f = InfixL  (f <$ symbol name)
 
 prefix :: Text -> (Sym -> Sym) -> Operator Parser Sym
 prefix name f = Prefix  (f <$ symbol name)
-
-parens :: Parser a -> Parser a
-parens = between (symbol "(") (symbol ")")

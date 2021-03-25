@@ -14,7 +14,7 @@ module ISA.Types.Context
   ( Context(..), SymbolicContext, emptyCtx
 
   -- substitute pointers from @_store@ into @bindings@
-  , substPointers
+  , substPointer, substPointers, unstar, unstarAll
 
   -- extract memory from @_bindings@
   , dumpMemory
@@ -25,6 +25,7 @@ import           Data.Aeson                 (FromJSON, ToJSON)
 import qualified Data.Map.Strict            as Map
 import           Data.Maybe
 import           Data.Text                  (Text)
+import           Debug.Trace
 import           GHC.Generics
 
 import           ISA.Types
@@ -78,6 +79,33 @@ isReachable ctx = case (_solution ctx) of
 -- | Access a specific key
 getBinding :: Key -> Context a -> Maybe a
 getBinding key ctx = Map.lookup key (_bindings ctx)
+
+unstar :: Context Sym -> Sym -> Maybe Sym
+unstar ctx = \case
+  SPointer a ->
+    case toCAddress a of
+      Left _  -> Nothing
+      Right c -> let z = Map.lookup (Addr (MkAddress (Left c))) (_bindings ctx)
+                 in z
+  n@(SAny _) -> Just n
+  n@(SConst _) -> Just n
+  -- n@(SKey _) -> Just n
+  (SAdd p q)   -> SAdd <$> (unstar ctx p) <*> (unstar ctx q)
+  (SSub p q)   -> SSub <$> (unstar ctx p) <*> (unstar ctx q)
+  (SMul p q)   -> SMul <$> (unstar ctx p) <*> (unstar ctx q)
+  (SDiv p q)   -> SDiv <$> (unstar ctx p) <*> (unstar ctx q)
+  (SMod p q)   -> SMod <$> (unstar ctx p) <*> (unstar ctx q)
+  (SAnd p q)   -> SAnd <$> (unstar ctx p) <*> (unstar ctx q)
+  (SOr  p q)   -> SOr  <$> (unstar ctx p) <*> (unstar ctx q)
+  (SEq  p q)   -> SEq  <$> (unstar ctx p) <*> (unstar ctx q)
+  (SGt  p q)   -> SGt  <$> (unstar ctx p) <*> (unstar ctx q)
+  (SLt  p q)   -> SLt  <$> (unstar ctx p) <*> (unstar ctx q)
+  (SAbs x  )   -> SAbs <$> (unstar ctx x)
+  (SNot x  )   -> SNot <$> (unstar ctx x)
+
+unstarAll :: Context Sym -> Context Sym
+unstarAll ctx =
+  ctx {_bindings = fmap (\v -> maybe 0 id $ unstar ctx v) (_bindings ctx)}
 
 -- | Alter a specific key
 putBinding :: Key -> a -> Context a -> Context a
