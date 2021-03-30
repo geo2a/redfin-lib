@@ -20,7 +20,7 @@ import qualified Data.Map.Strict             as Map
 import           ISA.Assembly
 import           ISA.Backend.Symbolic.Zipper
 import           ISA.Types
-import           ISA.Types.Context           hiding (Context)
+import           ISA.Types.Context
 import           ISA.Types.Key
 import           ISA.Types.Prop
 import           ISA.Types.Symbolic
@@ -110,7 +110,7 @@ mc_loop = do
 
     halt
 
-initCtx :: Context
+initCtx :: Context Sym
 initCtx = MkContext
   { _pathCondition = true
   , _constraints =
@@ -140,7 +140,7 @@ initCtx = MkContext
         s = SAny "s"
         v = SAny "v"
 
-showContext :: Context -> String
+showContext :: Context Sym -> String
 showContext ctx =
   unlines [ "Path constraint: " <> show (_pathCondition ctx)
   , showKey ctx IC

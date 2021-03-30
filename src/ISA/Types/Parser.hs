@@ -11,7 +11,7 @@
 -----------------------------------------------------------------------------
 
 module ISA.Types.Parser
-    (Parser, sc, lexeme, symbol, parens, curly) where
+    (Parser, sc, lexeme, symbol, parens, curly, brackets) where
 
 import           Data.Text                  (Text)
 import           Data.Void
@@ -39,3 +39,6 @@ parens = between (symbol "(") (symbol ")")
 
 curly :: Parser a -> Parser a
 curly = between (symbol "{") (symbol "}")
+
+brackets :: Parser a -> Parser a
+brackets = between (symbol "[") (symbol "]")

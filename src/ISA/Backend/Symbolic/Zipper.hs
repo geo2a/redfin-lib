@@ -27,10 +27,10 @@ import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import           GHC.Generics               (Generic)
 import           GHC.Stack
-import           Prelude                    hiding (log, not, read, readIO)
+import           Prelude                    hiding (init, log, not, read,
+                                             readIO)
 
-import           ISA.Types.Context          hiding (Context)
-import qualified ISA.Types.Context          as ISA.Types
+import           ISA.Types.Context
 import           ISA.Types.Key
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Address
@@ -38,17 +38,18 @@ import           ISA.Types.Tree             hiding (down, left, right, up)
 import qualified ISA.Types.Tree             as Tree
 import           ISA.Types.ZeroOneTwo
 
-type Context = ISA.Types.Context Sym
-
 -- | Trace of a symbolic simulation
 data Trace =
   MkTrace { _layout :: Tree Int ()
           -- ^ Binary tree of state identifiers
           , _focus  :: Loc Int ()
           -- ^ zipper for _layout
-          , _states :: IntMap Context
+          , _states :: IntMap (Context Sym)
           -- ^ the actual states
           } deriving Generic
+
+intialState :: Trace -> Maybe (Context Sym)
+intialState = IntMap.lookup 0 . _states
 
 instance Aeson.ToJSON Trace where
 instance Aeson.FromJSON Trace where
@@ -127,7 +128,7 @@ mkEngineState trace =
                 <*> pure (Just 100)
 
 -- | Execute an Engine computation from the given initial state
-execEngine :: Engine a -> Context -> IO Trace
+execEngine :: Engine a -> Context Sym -> IO Trace
 execEngine (MkEngine computation) initialContext = do
   let layout = Leaf 0 ()
       initStates = IntMap.fromList [(0, initialContext)]
@@ -138,7 +139,7 @@ execEngine (MkEngine computation) initialContext = do
 
 -- | Evaluate an Engine computation from the given initial state,
 --   returning the resulting mutable environment
-evalEngine :: Engine a -> Context -> IO EngineState
+evalEngine :: Engine a -> Context Sym -> IO EngineState
 evalEngine (MkEngine computation) initialContext = do
   let layout = Leaf 0 ()
       initStates = IntMap.fromList [(0, initialContext)]
@@ -186,7 +187,7 @@ down = do
     _             -> put $ Loc t cxt
 
 -- | Get the state focused by the trace zipper
-getFocused :: HasCallStack => Engine Context
+getFocused :: HasCallStack => Engine (Context Sym)
 getFocused = do
   trace <- liftIO . atomically . readTVar =<< _trace <$> ask
   focus <- get
@@ -196,7 +197,7 @@ getFocused = do
     Just x  -> pure x
 
 -- | Put a state a trace zipper's focus
-putFocused :: Context -> Engine ()
+putFocused :: Context Sym -> Engine ()
 putFocused ctx = do
   traceVar <- _trace <$> ask
   void . liftIO . atomically $ do
@@ -207,7 +208,7 @@ putFocused ctx = do
 -- | Add a branch or grow the trunk of the trace without moving
 --   zipper's focus, i.e. the focus will stay at the parent node of
 --   the newly added node/nodes
-growTrace :: ZeroOneTwo Context -> Engine ()
+growTrace :: ZeroOneTwo (Context Sym) -> Engine ()
 growTrace choice = do
   focus <- get
   env <- ask
@@ -227,7 +228,8 @@ growTrace choice = do
             }
     writeTVar (_statesCount env) (updateStatesCount size choice)
   where
-    updateLayout :: Int -> Loc Int () -> ZeroOneTwo (Int, Context) -> (Tree Int (), Loc Int ())
+    updateLayout :: Int -> Loc Int ()
+                 -> ZeroOneTwo (Int, Context Sym) -> (Tree Int (), Loc Int ())
     updateLayout father to = \case
       Zero -> let subtree = Tree.putTree (Leaf father ())
               in ( Tree.travel to (subtree *> Tree.top *> Tree.getTree)
@@ -244,14 +246,15 @@ growTrace choice = do
            , Tree.shift to subtree
            )
 
-    updateStates :: IntMap Context -> ZeroOneTwo (Int, Context) -> IntMap Context
+    updateStates :: IntMap (Context Sym)
+                 -> ZeroOneTwo (Int, Context Sym) -> IntMap (Context Sym)
     updateStates states = \case
       Zero  -> states
       One (k, ctx) -> IntMap.insert k ctx states
       Two (k1, ctx1) (k2, ctx2) -> IntMap.insert k2 ctx2
                                    (IntMap.insert k1 ctx1 states)
 
-    updateStatesCount :: Int -> ZeroOneTwo Context -> Int
+    updateStatesCount :: Int -> ZeroOneTwo (Context Sym) -> Int
     updateStatesCount s = \case
       Zero    -> s
       One _   -> s + 1

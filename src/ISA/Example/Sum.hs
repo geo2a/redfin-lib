@@ -13,7 +13,7 @@
 
 -----------------------------------------------------------------------------
 module ISA.Example.Sum
-  ( demo_sum
+  ( demo
   , sumArrayLowLevel
   , initCtx
   ) where
@@ -25,6 +25,7 @@ import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromJust)
 import qualified Data.Text                       as Text
 import           Prelude                         hiding (not)
+import           Text.Megaparsec
 
 import           ISA.Assembly
 -- import           ISA.Backend.Dependencies
@@ -33,9 +34,9 @@ import qualified ISA.Types.Context               as ISA.Types
 -- import           ISA.Semantics
 import           ISA.Backend.Graph
 -- import           ISA.Backend.Graph.BasicBlock
-import           ISA.Backend.Symbolic.Zipper     hiding (Context)
+import           ISA.Backend.Symbolic.Zipper
 import           ISA.Backend.Symbolic.Zipper.Run
-import           ISA.Example.Common
+-- import           ISA.Example.Common
 import           ISA.Types
 import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Decode
@@ -44,9 +45,11 @@ import           ISA.Types.Key
 import           ISA.Types.Prop
 import           ISA.Types.SBV
 import           ISA.Types.Symbolic
+import           ISA.Types.Symbolic.ACTL
+import           ISA.Types.Symbolic.ACTL.Model
 import           ISA.Types.Symbolic.Address
-import           ISA.Types.Symbolic.Property
-import           ISA.Types.Symbolic.SMT
+import           ISA.Types.Symbolic.SMT.Problem
+import           ISA.Types.Symbolic.SMT.Solving
 import           ISA.Types.Tree
 
 -- type Context = ISA.Types.Context (Data Sym)
@@ -149,34 +152,40 @@ initCtx = MkContext
   }
 
 
-correct = InLeafs $ not $
-          key (Reg R0) === (var "x1" + var "x2" + var "x3")
-      &&& key (Reg R1) === 0
-      &&& key (F Halted)
+-- correct = InLeafs $ not $
+--           key (Reg R0) === (var "x1" + var "x2" + var "x3")
+--       &&& key (Reg R1) === 0
+--       &&& key (F Halted)
 
-noOverflow =
-  either (error . Text.unpack) id $ parseTheorem "" "l ({R0}==0)"
+-- noOverflow =
+--   either (error . Text.unpack) id $ parseTheorem "" "l ({R0}==0)"
 
-ex =   either (error . Text.unpack) id $ parseTheorem "" "w ({R2}==$x3)"
-exl =   either (error . Text.unpack) id $ parseTheorem "" "l ({R2}==$x3)"
+ex =
+  ACTLAllF $
+  either (error . Text.unpack) id $ (parseAtom) "" "([R2].=={$x3})"
 
-ex2 =   either (error . Text.unpack) id $ parseTheorem "" "w (3==$a1)"
+ex1 = either (error . Text.unpack) id $ parseTheorem "" "G (![Overflow])"
 
-ex3 =   either (error . Text.unpack) id $ parseTheorem "" "l ({R2}.==(&$a3 + &$a2 + &$a1) &&& {R1}.==(0))"
+-- ex2 =   either (error . Text.unpack) id $ parseTheorem "" "w (3==$a1)"
 
+ex3 =
+  either (error . Text.unpack) id $ parseTheorem ""
+  "F (!([R1].=={0}) ||| ([R2] .== {&$a1 + &$a2 + &$a3}))"
 
 --  key (Reg R0) `gt` (-1)
 --  key (Reg R0) `gt` 0 ||| key (Reg R0) === 0
 
-demo_sum :: IO ()
-demo_sum = do
-  trace <- runModel 50 initCtx
+demo :: IO ()
+demo = do
+  trace <- runModel 20 initCtx
   -- mapM_ putStrLn (draw (_layout trace))
-  -- mapM_ (\s -> putStrLn . show $ (getBinding (Reg R0) s)) (_states trace)
+  -- mapM_ (\s -> putStrLn . show $ (getBinding (F Overflow) s)) (_states trace)
 
   -- let trivial = InLeafs $ const true
 --  r <- sat correct trace (ConstrainedBy (map snd $ _constraints initCtx))
-  r <- prove ex3 trace
+  -- r <- sat (evalACTL trace (negateACTL $ ex3))
+  r <- prove trace ex1
+
   print r
   -- -- case r of
   -- --   Conjunct [Literal (n, Satisfiable s)] -> print ( modelAssocs s)

@@ -1,14 +1,7 @@
 module ISA.Example.Common where
 
-import           Control.Monad.State.Strict
-import           Data.Bifunctor                  (first)
-import qualified Data.Map.Strict                 as Map
-import           Data.SBV                        (SMTConfig (..), Timing (..),
-                                                  z3)
-import           Data.Text                       (Text)
+import           Data.SBV                   (SMTConfig (..), Timing (..), z3)
 
-import           ISA.Assembly
-import           ISA.Backend.Symbolic.List.Trace
 import           ISA.Types
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Address

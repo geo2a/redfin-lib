@@ -24,13 +24,11 @@ import qualified Data.Set                        as Set
 
 
 import           ISA.Assembly
--- import           ISA.Backend.Dependencies
--- import           ISA.Semantics
 import           ISA.Backend.Symbolic.Zipper
 import           ISA.Backend.Symbolic.Zipper.Run
 import           ISA.Example.Common
 import           ISA.Types
-import           ISA.Types.Context               hiding (Context)
+import           ISA.Types.Context
 import qualified ISA.Types.Context               as ISA.Types
 import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Decode
@@ -39,7 +37,6 @@ import           ISA.Types.Key
 import           ISA.Types.Prop
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Parser
-import           ISA.Types.Symbolic.SMT
 import           ISA.Types.Tree
 
 addLowLevel :: Script
@@ -50,7 +47,7 @@ addLowLevel = do
     add r0 y
     halt
 
-showContext :: Context -> String
+showContext :: Context Sym -> String
 showContext ctx =
   unlines [ "Path constraint: " <> show (_pathCondition ctx)
           , "Conditions: \n" <> unlines (map show (_constraints ctx))
@@ -66,7 +63,7 @@ showContext ctx =
   show (_solution ctx)
   ++ "\n==================="
 
-initCtx :: Context
+initCtx :: Context Sym
 initCtx =
   MkContext { _pathCondition = true
             , _constraints = []

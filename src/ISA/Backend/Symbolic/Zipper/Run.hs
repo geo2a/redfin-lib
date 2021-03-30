@@ -13,34 +13,34 @@ module ISA.Backend.Symbolic.Zipper.Run (runModel, runModelImpl, continueModel) w
 
 import           Control.Applicative
 import           Control.Concurrent.STM
-import           Control.Monad.IO.Class       (MonadIO (..))
+import           Control.Monad.IO.Class             (MonadIO (..))
 import           Control.Monad.Reader
-import           Control.Monad.Reader.Class   ()
+import           Control.Monad.Reader.Class         ()
 import           Control.Monad.State.Class
-import           Data.Functor                 (void)
-import qualified Data.IntMap                  as IntMap
+import           Data.Functor                       (void)
+import qualified Data.IntMap                        as IntMap
 import           Data.Maybe
-import qualified Data.SBV.Trans               as SBV
-import qualified Data.SBV.Trans.Control       as SBV
-import qualified Data.Set                     as Set
-import           Prelude                      hiding (log, not)
+import qualified Data.SBV.Trans                     as SBV
+import qualified Data.SBV.Trans.Control             as SBV
+import qualified Data.Set                           as Set
+import           Prelude                            hiding (log, not)
 
 import           ISA.Backend.Dependencies
 import           ISA.Backend.Symbolic.Zipper
 import           ISA.Semantics
 import           ISA.Types
-import           ISA.Types.Context            hiding (Context)
+import           ISA.Types.Context
 import           ISA.Types.Instruction
 import           ISA.Types.Instruction.Decode
 import           ISA.Types.Key
 import           ISA.Types.Prop
 import           ISA.Types.SBV
-import qualified ISA.Types.SBV.SFunArray      as SFunArray
+import qualified ISA.Types.SBV.SFunArray            as SFunArray
 import           ISA.Types.Symbolic
 import           ISA.Types.Symbolic.Address
-import           ISA.Types.Symbolic.SMT
-import           ISA.Types.Tree               hiding (down, left, right, top,
-                                               up)
+import           ISA.Types.Symbolic.SMT.Translation
+import           ISA.Types.Tree                     hiding (down, left, right,
+                                                     top, up)
 import           ISA.Types.ZeroOneTwo
 
 -- | Fetching an instruction is a Monadic operation. It is possible
@@ -70,7 +70,7 @@ readInstructionRegister =  do
                            "symbolic instruction code encountered " <> show sym
 
 -- | Perform one step of symbolic execution
-step :: Engine (ZeroOneTwo Context)
+step :: Engine (ZeroOneTwo (Context Sym))
 step = do
   void $ fetchInstruction
   incrementInstructionCounter
@@ -88,7 +88,7 @@ step = do
     errorIR icode = error $ "Engine.step: " <>
                             "unknown instruction with code " <> show icode
 
-execute :: Engine () -> ZeroOneTwo Context -> Engine (ZeroOneTwo Context)
+execute :: Engine () -> ZeroOneTwo (Context Sym) -> Engine (ZeroOneTwo (Context Sym))
 execute todo = \case
   Zero -> getFocused >>= \end -> from end todo >> pure Zero
   One ctx -> do
@@ -108,17 +108,17 @@ execute todo = \case
       ((False, _)   , (False, _))    -> pure Zero
 
   where
-    from :: Context -> Engine a -> Engine Context
+    from :: Context Sym -> Engine a -> Engine (Context Sym)
     from ctx doSomething = putFocused ctx *> doSomething *> getFocused
 
     -- | Check satisfiability of a Context's path condition under its constraints
-    reach :: Context -> SBV.Symbolic (Bool, Context)
+    reach :: Context Sym -> SBV.Symbolic (Bool, Context Sym)
     reach ctx = do
       let freeVars = findFreeVars ctx
       vars <- createSym (Set.toList freeVars)
-      constrs <- toSMT (SFunArray.sListArray 0 [])
-                       vars (_pathCondition ctx
-                             :map snd (_constraints ctx))
+      let constrs =
+            toSMT (symbolicMemory vars (dumpMemory ctx))
+                  vars (foldr (&&&) true $ _pathCondition ctx:map snd (_constraints ctx))
       SBV.query $ do
         SBV.constrain constrs
         SBV.checkSat >>= \case
@@ -133,7 +133,7 @@ execute todo = \case
 
 -- | Decide how many children states there will be according to the dependencies
 --   of an instruction
-analyse :: Instruction Sym -> Engine (ZeroOneTwo Context)
+analyse :: Instruction Sym -> Engine (ZeroOneTwo (Context Sym))
 analyse i =
   let (Reads rs, Writes ws) = dependencies (instructionSemanticsS i)
   in if | F Halted `elem` ws -> pure Zero
@@ -144,7 +144,7 @@ analyse i =
 
 -- | Create zero, one or two successor states depending on the state of a flag;
 --   Stop by returning @Zero@ if the flag is not bound.
-branchOn :: Flag -> Context -> ZeroOneTwo Context
+branchOn :: Flag -> Context Sym -> ZeroOneTwo (Context Sym)
 branchOn f s = case f of
   Halted -> Zero
   Condition ->
@@ -159,7 +159,7 @@ branchOn f s = case f of
   Overflow -> One s
 
 -- | Run symbolic simulation for a number of steps
-runModel :: Int -> Context -> IO Trace
+runModel :: Int -> Context Sym -> IO Trace
 runModel steps init = execEngine (runModelImpl steps) init
 
 runModelImpl :: Int -> Engine ()
