@@ -14,14 +14,33 @@ module ISA.Types.Symbolic.Address
     , Addressable(..)
     ) where
 
-import           Data.Aeson         (FromJSON, ToJSON)
+import           Control.Applicative
+import           Data.Aeson
 import           Data.Int
 
 import           ISA.Types
 import           ISA.Types.Symbolic
 
 newtype Address = MkAddress (Either CAddress Sym)
-  deriving (Eq, Ord, ToJSON, FromJSON) via (Either CAddress Sym)
+  deriving (Eq, Ord) via (Either CAddress Sym)
+
+instance ToJSON Address where
+  toJSON (MkAddress addr)= case addr of
+    Left concrete  -> toJSON concrete
+    Right symbolic -> toJSON symbolic
+instance FromJSON Address where
+    parseJSON v =
+      MkAddress . Left <$> (parseJSON @CAddress v)
+      <|>
+      MkAddress . Right <$> (parseJSON @Sym v)
+
+    -- -- We do not expect a non-Object value here.
+    -- -- We could use empty to fail, but typeMismatch
+    -- -- gives a much more informative error message.
+    -- parseJSON invalid    =
+    --     prependFailure "parsing Coord failed, "
+    --         (typeMismatch "Object" invalid)
+
 
 instance Show Address where
   show = \case (MkAddress (Left (CAddress concrete))) -> show concrete

@@ -5,6 +5,7 @@ module ISA.Types.Key
     where
 
 import qualified Data.Aeson                 as Aeson
+import qualified Data.Aeson.Types           as Aeson
 import           Data.Text                  (Text)
 import qualified Data.Text                  as Text
 import           GHC.Generics               (Generic)
@@ -38,12 +39,17 @@ deriving instance Generic Key
 
 deriving instance Aeson.ToJSON Key
 deriving instance Aeson.FromJSON Key
-deriving instance Aeson.ToJSONKey Key
-
+-- deriving instance Aeson.ToJSONKey Key
+-- instance Aeson.ToJSONKey Key where
+--   toJSONKey = Aeson.genericToJSONKey Aeson.defaultJSONKeyOptions
+-- deriving instance Aeson.FromJSONKey Key
 instance Aeson.FromJSONKey Key where
   fromJSONKey = Aeson.FromJSONKeyTextParser $ \t -> case parseKey t of
     Right k  -> pure k
     Left err -> fail ("Invalid key: " <> Text.unpack err)
+instance Aeson.ToJSONKey Key where
+  toJSONKey = Aeson.toJSONKeyText (Text.pack . show)
+
 
 keyTag :: Key -> String
 keyTag = \case
@@ -73,7 +79,7 @@ pKey =  (Reg  <$> pReg)
     <|> (F    <$> pFlag)
     <|> ((IC <$ symbol "IC" <?> "instruction counter key label"))
     <|> ((IR <$ symbol "IR" <?> "instruction register key label"))
-    <|> ((Prog <$> pAddress <?> "program address key"))
+    <|> (Prog <$> (symbol "PROG" *> pAddress <?> "program address key"))
     <?> "key"
 
 pReg :: Parser Register
@@ -87,4 +93,5 @@ pReg =
 pFlag :: Parser Flag
 pFlag = (Halted <$ symbol "Halted")
     <|> (Overflow <$ symbol "Overflow")
+    <|> (Condition <$ symbol "Condition")
     <?> "flag"

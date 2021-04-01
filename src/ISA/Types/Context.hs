@@ -21,7 +21,7 @@ module ISA.Types.Context
 
   , getBinding, putBinding, showKey, isReachable) where
 
-import           Data.Aeson                 (FromJSON, ToJSON)
+import qualified Data.Aeson                 as Aeson
 import qualified Data.Map.Strict            as Map
 import           Data.Maybe
 import           Data.Text                  (Text)
@@ -50,7 +50,10 @@ data Context a = MkContext {
   -- | a response from a solver, usually regarding
   --   satisfiability of @_pathCondition s && conjoin (_constraints s)@
   , _solution      :: Maybe SMTResult }
-  deriving (Functor, Generic, ToJSON, FromJSON)
+  deriving (Functor, Generic)
+
+instance Aeson.FromJSON a => Aeson.FromJSON (Context a)
+instance Aeson.ToJSON a => Aeson.ToJSON (Context a)
 
 -- | Symbolic simulation is done with symbolic values
 type SymbolicContext = Context Sym

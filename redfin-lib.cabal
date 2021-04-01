@@ -63,6 +63,7 @@ library
   build-depends:
                 QuickCheck,
                 aeson >= 1.5.5.1,
+                bytestring,
                 algebraic-graphs >= 0.5,
                 async >= 2.2.2,
                 base >=4.7 && <5,

@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 {-# OPTIONS_GHC -Wno-unused-binds #-}
 {-# OPTIONS_GHC -Wno-unused-local-binds #-}
+{-# OPTIONS_GHC -Wno-missing-type-signatures #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : ISA.Example.Sum
@@ -8,9 +9,9 @@
 -- License    : MIT (see the file LICENSE)
 -- Maintainer : mail@gmail.com
 -- Stability  : experimental
-
+--
 -- Example program that finds the sum of numbers in an array
-
+--
 -----------------------------------------------------------------------------
 module ISA.Example.Sum
   ( demo
@@ -19,6 +20,8 @@ module ISA.Example.Sum
   ) where
 
 import           Control.Monad.IO.Class          (liftIO)
+import qualified Data.Aeson                      as Aeson
+import qualified Data.ByteString.Lazy            as BL
 import           Data.Int                        (Int32)
 import qualified Data.IntMap                     as IntMap
 import qualified Data.Map                        as Map
@@ -51,8 +54,6 @@ import           ISA.Types.Symbolic.Address
 import           ISA.Types.Symbolic.SMT.Problem
 import           ISA.Types.Symbolic.SMT.Solving
 import           ISA.Types.Tree
-
--- type Context = ISA.Types.Context (Data Sym)
 
 sumArrayLowLevel :: Script
 sumArrayLowLevel = do
@@ -97,26 +98,27 @@ showContext ctx =
   , showKey ctx (Addr 255)
   ]
 
-initCtx1 :: Context Int32
+initCtx1 :: Context Sym
 initCtx1 = MkContext
   { _pathCondition = true
   , _store = Map.empty
   , _constraints = []
-  , _bindings = Map.fromList $ [ (IC, (0 :: Int32))
+  , _bindings = Map.fromList $ [ (IC, 0)
 --                               , (IR, )
                                , (Reg R0, 0)
                                , (Reg R1, 0)
                                , (Reg R2, 0)
-                               , (Addr 0, 3)
+                               , (Addr 0, SAny "n")
+                              -- , (Addr 0, 3)
                                , (Addr 253, 0)
                                , (Addr 255, 1)
-                               , (Addr 1, 0)
-                               , (Addr 2, 0)
-                               , (Addr 3, 0)
+                               , (Addr 1, SAny "x1")
+                               , (Addr 2, SAny "x2")
+                               , (Addr 3, SAny "x3")
                                , (F Halted, false)
                                , (F Condition, false)
                                , (F Overflow, false)
-                               ] ++ mkProgram1 sumArrayLowLevel
+                               ] ++ mkProgram sumArrayLowLevel
   , _solution = Nothing
   }
 
@@ -159,10 +161,6 @@ initCtx = MkContext
 
 -- noOverflow =
 --   either (error . Text.unpack) id $ parseTheorem "" "l ({R0}==0)"
-
-ex =
-  ACTLAllF $
-  either (error . Text.unpack) id $ (parseAtom) "" "([R2].=={$x3})"
 
 ex1 = either (error . Text.unpack) id $ parseTheorem "" "G (![Overflow])"
 
