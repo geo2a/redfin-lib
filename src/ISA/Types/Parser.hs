@@ -1,7 +1,3 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 {- |
  Module     : ISA.Types.Parser
  Copyright  : (c) Georgy Lukyanov 2021
@@ -11,15 +7,24 @@
 
  A parser infrastructure via Megaparsec
 -}
-module ISA.Types.Parser (Parser, sc, lexeme, symbol, parens, curly, brackets) where
+module ISA.Types.Parser (
+    -- * parsing monad
+    Parser,
+
+    -- ** lexing
+    sc,
+    lexeme,
+    symbol,
+    parens,
+    curly,
+    brackets,
+) where
 
 import Data.Text (Text)
 import Data.Void
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
-
-import ISA.Types
 
 --------------------------------------------------------------------------------
 type Parser = Parsec Void Text

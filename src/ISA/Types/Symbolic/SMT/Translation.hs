@@ -1,7 +1,3 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 {- |
  Module     : ISA.Types.Symbolic.SMT.Translation
  Copyright  : (c) Georgy Lukyanov 2019
@@ -11,7 +7,12 @@
 
  Translation of symbolic expressions ('ISA.Types.Symbolic.Sym') to SMTlib via SBV
 -}
-module ISA.Types.Symbolic.SMT.Translation (findFreeVars, createSym, toSMT, symbolicMemory) where
+module ISA.Types.Symbolic.SMT.Translation (
+    findFreeVars,
+    createSym,
+    toSMT,
+    symbolicMemory,
+) where
 
 import Data.Bifunctor
 import Data.Int
@@ -30,7 +31,7 @@ import qualified ISA.Types.SBV.SFunArray as SFunArray
 import ISA.Types.Symbolic
 import ISA.Types.Symbolic.Address
 
--- | Find all free symbolic variables (SAny) in the context
+-- | Find all free symbolic variables 'SAny' in the context
 findFreeVars :: Context Sym -> Set Sym
 findFreeVars ctx =
     let fromBindings = mconcat . fmap gatherFree . Map.elems $ _bindings ctx

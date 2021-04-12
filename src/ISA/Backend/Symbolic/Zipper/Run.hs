@@ -15,11 +15,9 @@ module ISA.Backend.Symbolic.Zipper.Run (runModel, runModelImpl, continueModel) w
 
 import Control.Applicative
 import Control.Concurrent.STM
-import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Reader
 import Control.Monad.Reader.Class ()
 import Control.Monad.State.Class
-import Data.Functor (void)
 import qualified Data.IntMap as IntMap
 import Data.Maybe
 import qualified Data.SBV.Trans as SBV
@@ -37,7 +35,6 @@ import ISA.Types.Instruction.Decode
 import ISA.Types.Key
 import ISA.Types.Prop
 import ISA.Types.SBV
-import qualified ISA.Types.SBV.SFunArray as SFunArray
 import ISA.Types.Symbolic
 import ISA.Types.Symbolic.Address
 import ISA.Types.Symbolic.SMT.Translation

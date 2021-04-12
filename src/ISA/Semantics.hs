@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 {- |
@@ -16,8 +17,8 @@ module ISA.Semantics (
     willOverflowPure,
 ) where
 
-import Prelude hiding (Monad, abs, div, mod)
-import qualified Prelude (Monad, abs, div, mod)
+import Prelude hiding (Monad, abs, div, mod, (>>=))
+import qualified Prelude (abs, div, mod)
 
 import Control.Selective
 import FS
@@ -25,10 +26,7 @@ import ISA.Types
 import ISA.Types.Instruction
 import ISA.Types.Key
 import ISA.Types.Prop
-import ISA.Types.Symbolic
 import ISA.Types.Symbolic.Address
-
-type Monad f = (Selective f, Prelude.Monad f)
 
 -----------------------------------------------------------------------------
 -----------------------------------------------------------------------------

@@ -1,7 +1,3 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 {- |
  Module     : ISA.Types.Symbolic.SMT.Solving
  Copyright  : (c) Georgy Lukyanov 2019
@@ -14,7 +10,6 @@
 module ISA.Types.Symbolic.SMT.Solving (sat) where
 
 import Control.Concurrent.STM hiding (check)
-import Control.Exception hiding (Overflow)
 import Control.Monad.IO.Class
 import Control.Monad.State
 import Data.IntMap (IntMap)
@@ -34,12 +29,6 @@ import ISA.Types.Symbolic.SMT.Translation
 
 data SymExecStats = MkSymExecStats {_timing :: NominalDiffTime}
     deriving (Show)
-
-hasLocked :: String -> IO a -> IO a
-hasLocked msg action =
-    action
-        `catches` [ Handler $ \exc@BlockedIndefinitelyOnSTM -> putStrLn ("[STM]: " ++ msg) >> throwIO exc
-                  ]
 
 -- | Environment shared by concurrent solver tasks
 data Env = MkEnv

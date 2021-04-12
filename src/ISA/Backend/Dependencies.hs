@@ -1,24 +1,28 @@
-{-# LANGUAGE DataKinds #-}
-
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 {- |
  Module     : ISA.Backend.Dependencies
- Copyright  : (c) Georgy Lukyanov 2019
+ Copyright  : (c) Andrey Mokhov, Georgy Lukyanov 2019-2021
  License    : MIT (see the file LICENSE)
  Maintainer : mail@gmail.com
  Stability  : experimental
 
  Compute data dependencies of programs
 -}
-module ISA.Backend.Dependencies (Reads (..), Writes (..), dependencies, dependsOn) where
+module ISA.Backend.Dependencies (
+    -- * read-dependency
+    Reads (..),
+
+    -- * write dependency
+    Writes (..),
+
+    -- * compute dependencies
+    dependencies,
+    dependsOn,
+) where
 
 import Control.Selective
 import Data.Bifunctor
 import Data.Either (partitionEithers)
-import Data.List
+import Data.List (intersect)
 
 import FS
 

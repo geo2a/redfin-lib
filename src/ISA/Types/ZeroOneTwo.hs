@@ -1,3 +1,13 @@
+{- |
+ Module     : ISA.Types.ZeroOneTwo
+ Copyright  : (c) Georgy Lukyanov 2021
+ License    : MIT (see the file LICENSE)
+ Maintainer : mail@gmail.com
+ Stability  : experimental
+
+ A datatype holding either zero, one or two values of a type.
+ Useful for encoding choices in symbolic execution
+-}
 module ISA.Types.ZeroOneTwo (ZeroOneTwo (..)) where
 
 -- | Choice between no children, a single child node and a branch

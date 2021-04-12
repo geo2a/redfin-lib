@@ -1,10 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 {- |
  Module     : ISA.Types.Context
  Copyright  : (c) Georgy Lukyanov 2021
@@ -15,15 +11,17 @@
  A 'Context' is Map of bindings used in simulation
 -}
 module ISA.Types.Context (
+    -- * Simulator state
     Context (..),
-    SymbolicContext,
     emptyCtx,
-    -- substitute pointers from @_store@ into @bindings@
+
+    -- ** substitute pointers from @_store@ into @bindings@
     substPointer,
     substPointers,
     unstar,
     unstarAll,
-    -- extract memory from @_bindings@
+
+    -- ** extract memory from @_bindings@
     dumpMemory,
     getBinding,
     putBinding,
@@ -35,10 +33,8 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Text (Text)
-import Debug.Trace
 import GHC.Generics
 
-import ISA.Types
 import ISA.Types.Key
 import ISA.Types.Prop
 import ISA.Types.SBV
@@ -46,7 +42,8 @@ import ISA.Types.Symbolic
 import ISA.Types.Symbolic.Address
 
 {- | A record type for state of the (symbolically) simulated computation.
-   The type variable may be instantiated with 'Sym' for symbolic simulation, see 'ISA.Types.SymbolicContext'
+     The type variable may be instantiated with 'Sym' for symbolic simulation,
+     see 'ISA.Types.SymbolicContext'
 -}
 data Context a = MkContext
     { -- | keys (like register names, memory cells) mapped to their (symbolic) values
@@ -66,9 +63,6 @@ data Context a = MkContext
 
 instance Aeson.FromJSON a => Aeson.FromJSON (Context a)
 instance Aeson.ToJSON a => Aeson.ToJSON (Context a)
-
--- | Symbolic simulation is done with symbolic values
-type SymbolicContext = Context Sym
 
 -- | An empty context
 emptyCtx :: Boolean a => Context a
@@ -128,9 +122,6 @@ unstarAll ctx =
 -- | Alter a specific key
 putBinding :: Key -> a -> Context a -> Context a
 putBinding key v ctx = ctx{_bindings = Map.insert key v (_bindings ctx)}
-
-getVar :: Text -> Context a -> Maybe a
-getVar key ctx = Map.lookup key (_store ctx)
 
 substPointers :: Context Sym -> Context Sym
 substPointers ctx =

@@ -3,10 +3,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 {- |
  Module     : ISA.Types.Symbolic
  Copyright  : (c) Georgy Lukyanov 2019
@@ -17,13 +13,21 @@
  Untyped symbolic expressions syntax
 -}
 module ISA.Types.Symbolic (
+    -- * Concrete values
     Concrete (..),
+
+    -- * Symbolic expressions
     Sym (..),
     conjoin,
     disjoin,
+
+    -- ** substitute an expression for a variable
     subst,
+
+    -- ** simplify an expression
     simplify,
-    -- try to concertise symbolic values
+
+    -- ** try to concertise symbolic values
     getValue,
     tryFoldConstant,
     tryReduce,
@@ -41,23 +45,16 @@ import Data.Aeson (
  )
 import Data.Foldable
 import Data.Int (Int32, Int8)
-import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Typeable
 import Data.Word (Word16)
-import Debug.Trace
 import GHC.Generics
 import GHC.Stack
 import Prelude hiding (not)
 
 import ISA.Types
-
--- import           ISA.Types.Key
 import ISA.Types.Prop
-
--- import           ISA.Types.Symbolic
--- import           ISA.Types.Symbolic.Address
 
 -----------------------------------------------------------------------------
 
@@ -178,30 +175,6 @@ instance ToJSON Sym where
     toEncoding = genericToEncoding defaultOptions
 instance FromJSON Sym
 
-foldSym :: Monoid a => (Sym -> a) -> Sym -> a
-foldSym f = \case
-    s@(SConst _) -> (f s)
-    s@(SAny _) -> (f s)
-    s@(SPointer _) -> (f s)
-    (SAdd x y) -> (f x) <> (f y)
-    (SSub x y) -> (f x) <> (f y)
-    (SMul x y) -> (f x) <> (f y)
-    (SDiv x y) -> (f x) <> (f y)
-    (SMod x y) -> (f x) <> (f y)
-    (SAbs x) -> (f x)
-    (SEq x y) -> (f x) <> (f y)
-    (SGt x y) -> (f x) <> (f y)
-    (SLt x y) -> (f x) <> (f y)
-    (SAnd x y) -> (f x) <> (f y)
-    (SOr x y) -> (f x) <> (f y)
-    (SNot x) -> (f x)
-
--- | Check if the symbolic expression is actually concrete
-isConcrete :: Sym -> Bool
-isConcrete = \case
-    SConst _ -> True
-    _ -> False
-
 instance Show Sym where
     show (SAdd x y) = "(" <> show x <> " + " <> show y <> ")"
     show (SSub x y) = "(" <> show x <> " - " <> show y <> ")"
@@ -227,8 +200,6 @@ instance Num Sym where
     signum _ = error "Sym.Num: signum is not defined"
     fromInteger x = SConst (CInt32 $ fromInteger x)
     negate _ = error "Sym.Num: negate is not defined"
-
--- negate x = SSub 0 x
 
 instance Enum Sym where
     toEnum x = SConst (CInt32 (fromIntegral x))
@@ -263,7 +234,7 @@ instance Boolean Sym where
     true = SConst (CBool True)
     false = SConst (CBool False)
     fromBool b = SConst (CBool b)
-    -- toBool _ = error "Hi from Sym.toBool"
+
     toBool x = case getValue x of
         Nothing -> True
         Just (CBool b) -> b
@@ -317,7 +288,7 @@ getValue :: Sym -> Maybe Concrete
 getValue = \case
     (SAny _) -> Nothing
     (SConst x) -> Just x
-    (SPointer p) -> Nothing
+    (SPointer _) -> Nothing
     (SAdd p q) -> (+) <$> getValue p <*> getValue q
     (SSub p q) -> (-) <$> getValue p <*> getValue q
     (SMul p q) -> (*) <$> getValue p <*> getValue q

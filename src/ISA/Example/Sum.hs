@@ -1,11 +1,5 @@
-{-# OPTIONS_GHC -Wno-missing-type-signatures #-}
-{-# OPTIONS_GHC -Wno-unused-binds #-}
-{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# OPTIONS_GHC -Wno-unused-local-binds #-}
-
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
 
 {- |
  Module     : ISA.Example.Sum
@@ -22,45 +16,19 @@ module ISA.Example.Sum (
     initCtx,
 ) where
 
-import Control.Monad.IO.Class (liftIO)
-import qualified Data.Aeson as Aeson
-import qualified Data.ByteString.Lazy as BL
-import Data.Int (Int32)
-import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
-import Data.Maybe (fromJust)
 import qualified Data.Text as Text
-import Text.Megaparsec
 import Prelude hiding (not)
 
 import ISA.Assembly
-
--- import           ISA.Backend.Dependencies
-import ISA.Types.Context
-import qualified ISA.Types.Context as ISA.Types
-
--- import           ISA.Semantics
-import ISA.Backend.Graph
-
--- import           ISA.Backend.Graph.BasicBlock
-import ISA.Backend.Symbolic.Zipper
 import ISA.Backend.Symbolic.Zipper.Run
-
--- import           ISA.Example.Common
 import ISA.Types
-import ISA.Types.Instruction
-import ISA.Types.Instruction.Decode
-import ISA.Types.Instruction.Encode
+import ISA.Types.Context
 import ISA.Types.Key
 import ISA.Types.Prop
-import ISA.Types.SBV
 import ISA.Types.Symbolic
 import ISA.Types.Symbolic.ACTL
 import ISA.Types.Symbolic.ACTL.Model
-import ISA.Types.Symbolic.Address
-import ISA.Types.Symbolic.SMT.Problem
-import ISA.Types.Symbolic.SMT.Solving
-import ISA.Types.Tree
 
 sumArrayLowLevel :: Script
 sumArrayLowLevel = do
@@ -88,51 +56,6 @@ sumArrayLowLevel = do
     goto "loop"
     "end" @@ ld r0 sum
     halt
-
-showContext :: Show a => Context a -> String
-showContext ctx =
-    unlines
-        [ "Path constraint: " <> show (_pathCondition ctx)
-        , showKey ctx IC
-        , showKey ctx IR
-        , showKey ctx (F Condition)
-        , showKey ctx (F Halted)
-        , showKey ctx (F Overflow)
-        , showKey ctx (Reg R0)
-        , showKey ctx (Reg R1)
-        , showKey ctx (Reg R2)
-        , showKey ctx (Addr 0)
-        , showKey ctx (Addr 253)
-        , showKey ctx (Addr 255)
-        ]
-
-initCtx1 :: Context Sym
-initCtx1 =
-    MkContext
-        { _pathCondition = true
-        , _store = Map.empty
-        , _constraints = []
-        , _bindings =
-            Map.fromList $
-                [ (IC, 0)
-                , --                               , (IR, )
-                  (Reg R0, 0)
-                , (Reg R1, 0)
-                , (Reg R2, 0)
-                , (Addr 0, SAny "n")
-                , -- , (Addr 0, 3)
-                  (Addr 253, 0)
-                , (Addr 255, 1)
-                , (Addr 1, SAny "x1")
-                , (Addr 2, SAny "x2")
-                , (Addr 3, SAny "x3")
-                , (F Halted, false)
-                , (F Condition, false)
-                , (F Overflow, false)
-                ]
-                    ++ mkProgram sumArrayLowLevel
-        , _solution = Nothing
-        }
 
 initCtx :: Context Sym
 initCtx =
@@ -181,11 +104,11 @@ ex1 = either (error . Text.unpack) id $ parseTheorem "" "G (![Overflow])"
 
 -- ex2 =   either (error . Text.unpack) id $ parseTheorem "" "w (3==$a1)"
 
-ex3 =
-    either (error . Text.unpack) id $
-        parseTheorem
-            ""
-            "F (!([R1].=={0}) ||| ([R2] .== {&$a1 + &$a2 + &$a3}))"
+-- ex3 =
+--     either (error . Text.unpack) id $
+--         parseTheorem
+--             ""
+--             "F (!([R1].=={0}) ||| ([R2] .== {&$a1 + &$a2 + &$a3}))"
 
 --  key (Reg R0) `gt` (-1)
 --  key (Reg R0) `gt` 0 ||| key (Reg R0) === 0

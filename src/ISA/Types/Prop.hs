@@ -1,7 +1,3 @@
-----------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 {- |
  Module     : ISA.Types.Prop
  Copyright  : (c) Georgy Lukyanov 2021
@@ -9,7 +5,7 @@
  Maintainer : mail@gmail.com
  Stability  : experimental
 
- Boolean formulas that may be symbolic
+ Boolean typeclass
 -}
 module ISA.Types.Prop (
     -- ** Booleans

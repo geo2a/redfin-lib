@@ -1,6 +1,5 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -Wno-unused-local-binds #-}
 
 {- |
  Module     : ISA.Example.MotorControl
@@ -8,18 +7,14 @@
  License    : MIT (see the file LICENSE)
  Maintainer : mail@gmail.com
  Stability  : experimental
-
- Module desription
 -}
 module ISA.Example.MotorControl (mc_loop, initCtx) where
 
 import Prelude hiding (div, mod)
 
--- import qualified Data.Tree as Tree
 import qualified Data.Map.Strict as Map
 
 import ISA.Assembly
-import ISA.Backend.Symbolic.Zipper
 import ISA.Types
 import ISA.Types.Context
 import ISA.Types.Key
@@ -155,131 +150,3 @@ initCtx =
     dist = SAny "dist"
     s = SAny "s"
     v = SAny "v"
-
-showContext :: Context Sym -> String
-showContext ctx =
-    unlines
-        [ "Path constraint: " <> show (_pathCondition ctx)
-        , showKey ctx IC
-        , showKey ctx IR
-        , showKey ctx (F Condition)
-        , showKey ctx (F Halted)
-        , showKey ctx (Reg R0)
-        , showKey ctx (Reg R1)
-        , showKey ctx (Reg R2)
-        , showKey ctx (Addr 3)
-        , showKey ctx (Addr 4)
-        ]
-
----------------- Loop Body Analysis --------------------------------------------
-
-{- | To check properties of programs, we take the following approach:
-   (1) Obtain a binary tree-shaped trace by /bounded/ symbolic execution
-   (2) Split the trace in linear paths (we do not share common prefixes now)
-   (3) Analyse every path separately:
-       1. Extract the interesting parts of the state from the /last/ node in
-           the path, i.e. symbolic expressions stored in
-           registers/memory/flags
-       2. Construct a symbolic expression representing the /property to check/,
-           which would involve the expression obtained in the previous step
-       3. Extract the /path constraints/ from the /last/ node in the path and
-           conjunct them.
-       4. Formulate the /preconditions/ of the program and conjunct them
-       5. To verify the property in the given path, check the following
-           formula for satisfiability:
-             preconditions /\ path constraints /\ ¬ property to check
-   (4) The property holds if, for every path, the solver returns
-       @Unsatisfiable@, i.e. there are no assignments of the variables which
-       satisfy the /negation/ of the property to check, considering the
-       preconditions and path constraints.
- motorControlBodyExample :: Int -> IO ()
- motorControlBodyExample steps = do
-     let a_max = SAny "a_max"
-         v_max = SAny "v_max"
-         dist  = SAny "dist"
-     -- ^ @a_max@, @v_max@ and @dist@ are the parameters of the algorithm.
-     -- To verify the loop invariant, we will need to check it for every
-     -- permitted value of @a_max@, @v_max@ and @dist@
-         s     = SAny "s"
-         v     = SAny "v"
-     -- ^ @s@ and @v@ are the internal state of the loop:
-     --   the distance travelled and the current velocity.
-     --   We universally quantify over @s@ and @v@ and thus checking the loop
-     --   invariant for every possible iterations of the loop.
-         mem = initialiseMemory [ (0, a_max)
-                                , (1, v_max)
-                                , (2, dist)
-                                , (3, s)
-                                , (4, v)
-                                ]
-         initialState = boot (assemble mc_loop) mem
--}
-
---     -- Now we perform symbolic simulation with @runModel@ and obtain
---     -- a binary tree-shaped trace.
---     let trace = runModel steps initialState
---     -- and split the tree on paths
---     -- (at the moment, we do not share the common prefixes)
---         ps = paths (unTrace trace)
---     putStrLn $ "Non-trivial paths: " <> show (length ps)
---     -- ps' <- filterM (\p -> not <$> isDead preconditions p) ps
---     -- putStrLn $ "Reachable paths: " <> show (length ps')
---     -- putStrLn $ "Reachable paths: "   <> show (length ps')
---     putStrLn "--------------------------------------------------"
-
---     -- The following command will pretty-print the trace. Handle with care, and
---     -- use only with small amounts of @steps@, otherwise it's not likely to feet
---     -- in the screen space.
---     -- putStrLn $ renderTrace trace
-
---     -- Check the property for every path
---     mapM_ (processPath) (zip [1..] ps)
---     where
---         -- Formulate the preconditions that must hold at the start of every
---         -- iteration of the loop
---         preconditions :: State -> Sym Bool
---         preconditions initState =
---             let a_max = (Map.!) (memory initState) 0
---                 v_max = (Map.!) (memory initState) 1
---                 dist  = (Map.!) (memory initState) 2
---                 s     = (Map.!) (memory initState) 3
---                 v     = (Map.!) (memory initState) 4
---             in
---             -- @v@ must be in range [0, v_max]
---                 ((v `SGt` (SConst $ -1)) `SAnd` (v `SLt` (SAdd v_max (SConst 1))))
---                 `SAnd`
---                 -- @s@ must be in range [0, dist]
---                 ((s `SGt` (SConst $ -1)) `SAnd` (s `SLt` (SAdd dist (SConst 1))))
---                 `SAnd`
---                 -- @a_max@ must be <= v_max
---                 (SLt a_max (SAdd v_max (SConst 1)))
---                 `SAnd`
---                 (v_max `SGt` (SConst 0) `SAnd` (v_max `SLt` (SConst $ 30)))
---                 `SAnd`
---                 (a_max `SGt` (SConst 0) `SAnd` (a_max `SLt` (SConst $ 30)))
-
---         -- | Check that @v@ doesn't exceed @v_max@ at a certain state
---         invariant :: State -> Sym Bool
---         invariant state =
---             let v     = (Map.!) (memory state) 4
---                 v_max = (Map.!) (memory state) 1
---                 v_next = (Map.!) (memory state) 8
---             in SLt v (SAdd v_max (SConst 1))
-
---         processPath :: (Int, Path (Node State)) -> IO ()
---         processPath (pathId, path) = do
---             dead <- isDead preconditions path
---             if dead then pure () -- putStrLn "dead"
---             else do
---                 putStrLn $ "Path id: "       <> show      pathId
---                 putStrLn $ "Nodes in path: " <> show (length path)
---                 s <- solvePath path preconditions invariant (const (SConst True))
---                 print s
---                 -- s <- solvePath path
---                 -- let sbvVC = SMT.toSMT [symVC]
---                 -- satStart  <- getCPUTime
---                 -- satResult <- SBV.satWith SMT.prover sbvVC
---                 -- satFinish <- getCPUTime
---                 -- putStrLn $ "Find VC : "      <> show symVC
---                 -- putStrLn $ show satResult
---             putStrLn $ "--------------------------------------------"

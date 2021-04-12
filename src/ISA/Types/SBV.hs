@@ -1,9 +1,14 @@
-{-# OPTIONS_GHC -Wno-orphans #-}
+{- |
+ Module     : ISA.Types.SBV
+ Copyright  : (c) Levent Erkok, Georgy Lukyanov 2017-2021
+ License    : MIT (see the file LICENSE)
+ Maintainer : mail@gmail.com
+ Stability  : experimental
 
--- | Simplified datatypes from SBV and missing instances
+ Simplified datatypes from SBV and missing instances
+-}
 module ISA.Types.SBV where
 
-import Control.Selective
 import Data.Aeson (
     FromJSON,
     ToJSON,
@@ -14,9 +19,6 @@ import Data.Aeson (
 import Data.Int (Int32)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import qualified Data.SBV as SBV
-import qualified Data.SBV.Control as SBV
-import qualified Data.SBV.Internals as SBV
 import Data.Text (Text)
 import GHC.Generics
 
@@ -37,6 +39,10 @@ data SMTResult
     | Satisfiable SMTModel
     deriving (Generic, Show)
 
+instance ToJSON SMTResult where
+    toEncoding = genericToEncoding defaultOptions
+instance FromJSON SMTResult
+
 isUnsat :: SMTResult -> Bool
 isUnsat = \case
     Unsatisfiable -> True
@@ -52,38 +58,3 @@ getModel :: SMTResult -> Maybe SMTModel
 getModel = \case
     Unsatisfiable -> Nothing
     Satisfiable m -> Just m
-
-instance ToJSON SMTResult where
-    toEncoding = genericToEncoding defaultOptions
-instance FromJSON SMTResult
-
-deriving instance Generic SBV.AlgRealPoly
-instance ToJSON SBV.AlgRealPoly where
-    toEncoding = genericToEncoding defaultOptions
-instance FromJSON SBV.AlgRealPoly
-deriving instance Generic (SBV.RealPoint Rational)
-instance ToJSON (SBV.RealPoint Rational) where
-    toEncoding = genericToEncoding defaultOptions
-instance FromJSON (SBV.RealPoint Rational)
-deriving instance Generic SBV.AlgReal
-instance ToJSON SBV.AlgReal where
-    toEncoding = genericToEncoding defaultOptions
-instance FromJSON SBV.AlgReal
-deriving instance Generic (SBV.RCSet SBV.CVal)
-instance ToJSON (SBV.RCSet SBV.CVal) where
-    toEncoding = genericToEncoding defaultOptions
-instance FromJSON (SBV.RCSet SBV.CVal)
-deriving instance Generic SBV.CVal
-instance ToJSON SBV.CVal where
-    toEncoding = genericToEncoding defaultOptions
-instance FromJSON SBV.CVal
-deriving instance Generic SBV.Kind
-instance ToJSON SBV.Kind where
-    toEncoding = genericToEncoding defaultOptions
-instance FromJSON SBV.Kind
-deriving instance Generic SBV.CV
-instance ToJSON SBV.CV where
-    toEncoding = genericToEncoding defaultOptions
-instance FromJSON SBV.CV
-
---------------------------------------------------------------------------------

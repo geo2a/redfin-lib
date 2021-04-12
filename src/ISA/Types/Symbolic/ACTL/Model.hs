@@ -1,10 +1,6 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 {- |
  Module     : ISA.Types.Symbolic.ACTL.Model
- Copyright  : (c) Georgy Lukyanov 2019
+ Copyright  : (c) Georgy Lukyanov 2021
  License    : MIT (see the file LICENSE)
  Maintainer : mail@gmail.com
  Stability  : experimental
@@ -14,7 +10,6 @@
 module ISA.Types.Symbolic.ACTL.Model where
 
 import qualified Data.Aeson as Aeson
-import Data.Bifunctor
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Map as Map

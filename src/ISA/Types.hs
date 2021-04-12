@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 {- |
  Module     : ISA.Types
@@ -252,9 +253,3 @@ blastLE x = map (testBit x) [0 .. finiteBitSize x - 1]
 
 pad :: Int -> [Bool]
 pad k = replicate k False
-
--- extractMemoryCAddress :: [Bool] -> [Bool]
--- extractMemoryCAddress = (++ pad 24) . take 8 . drop 8
-
-extractMemoryCAddress :: [Bool] -> [Bool]
-extractMemoryCAddress = take 8 . drop 8

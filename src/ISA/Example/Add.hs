@@ -1,12 +1,5 @@
-{-# OPTIONS_GHC -Wno-unused-binds #-}
-{-# OPTIONS_GHC -Wno-unused-imports #-}
-
------------------------------------------------------------------------------
-
--- A really basic example of a program that adds two numbers to
--- demonstrate integer overflow detection and functional verification
-
------------------------------------------------------------------------------
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -Wno-unused-local-binds #-}
 
 {- |
  Module     : ISA.Example.Add
@@ -15,30 +8,18 @@
  Maintainer : mail@gmail.com
  Stability  : experimental
 -}
-module ISA.Example.Add (addLowLevel, initCtx) where
+module ISA.Example.Add (demo, addLowLevel, initCtx) where
 
-import Control.Monad.State.Strict
-import Data.Bifunctor
-import Data.Int (Int32)
-import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
-import Data.Maybe (fromJust)
-import qualified Data.Set as Set
 
 import ISA.Assembly
 import ISA.Backend.Symbolic.Zipper
 import ISA.Backend.Symbolic.Zipper.Run
-import ISA.Example.Common
 import ISA.Types
 import ISA.Types.Context
-import qualified ISA.Types.Context as ISA.Types
-import ISA.Types.Instruction
-import ISA.Types.Instruction.Decode
-import ISA.Types.Instruction.Encode
 import ISA.Types.Key
 import ISA.Types.Prop
 import ISA.Types.Symbolic
-import ISA.Types.Symbolic.Parser
 import ISA.Types.Tree
 
 addLowLevel :: Script
@@ -49,31 +30,12 @@ addLowLevel = do
     add r0 y
     halt
 
-showContext :: Context Sym -> String
-showContext ctx =
-    unlines
-        [ "Path constraint: " <> show (_pathCondition ctx)
-        , "Conditions: \n" <> unlines (map show (_constraints ctx))
-        , showKey ctx IC
-        , showKey ctx IR
-        , showKey ctx (F Condition)
-        , showKey ctx (F Halted)
-        , showKey ctx (F Overflow)
-        , showKey ctx (Reg R0)
-        , showKey ctx (Addr 0)
-        , showKey ctx (Addr 1)
-        ]
-        ++ show (_solution ctx)
-        ++ "\n==================="
-
 initCtx :: Context Sym
 initCtx =
     MkContext
         { _pathCondition = true
         , _constraints = []
-        , -- ((SGt (SAny "x") 0) &&& (SLt (SAny "x") 100))
-          --              &&& ((SGt (SAny "y") 0) &&& (SLt (SAny "y") 100))
-          _bindings =
+        , _bindings =
             Map.fromList $
                 [ (IC, 0)
                 , (Reg R0, 0)
@@ -84,8 +46,8 @@ initCtx =
         , _store = Map.empty
         , _solution = Nothing
         }
-demo_add :: IO ()
-demo_add = do
+demo :: IO ()
+demo = do
     tr <- runModel 10 initCtx
     mapM_ putStrLn (draw (_layout tr))
     mapM_ (putStrLn . show) (_states tr)
@@ -107,6 +69,4 @@ demo_add = do
     --                        -- , (SAny "y" `SGt` 0) &&& (SAny "y" `SLt` 1000)
     --                        ]
     -- print ans
-    pure ()
-
     pure ()

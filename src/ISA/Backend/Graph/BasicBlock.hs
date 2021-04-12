@@ -1,9 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
--- module ISA.Backend.Graph.BasicBlock (Block(..), basicBlocks, validateBlock) where
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 {- |
  Module     : ISA.Backend.Graph.BasicBlock
@@ -20,8 +16,6 @@
 -}
 module ISA.Backend.Graph.BasicBlock where
 
-import qualified Debug.Trace as Debug
-
 import Control.Monad
 import Control.Selective
 import Data.Functor
@@ -32,7 +26,6 @@ import Data.Maybe
 import Data.Ord
 import Polysemy
 import Polysemy.Error
-import Polysemy.State
 import Prelude hiding (not)
 
 import ISA.Assembly
@@ -119,7 +112,7 @@ basicBlocksImpl init src = simulate [] init $ do
     -- instruction
     forM bodyRanges $ \(entry, exit) -> do
         -- get the last instruction of the block from the source
-        i <-
+        _ <-
             maybe (throw $ missing (Prog (literal entry))) pure $
                 List.lookup entry src
         -- lookup the instructions of the body in the source
@@ -137,7 +130,6 @@ basicBlocksImpl init src = simulate [] init $ do
 -}
 computeTargets ::
     ( Addressable a
-    , Num a
     , Show a
     , Monoid a
     , Integral a
@@ -160,7 +152,7 @@ computeTargets (iAddr, i) = do
                 case List.find (== F Condition) reads of
                     Nothing -> pure $ One (fromAddress target, true)
                     Just _ -> do
-                        c <- simulateRead (F Condition)
+                        _ <- simulateRead (F Condition)
                         case i of
                             (Instruction (JumpCt _)) ->
                                 pure $ Two ((iAddr + 1), false) (fromAddress target, true)

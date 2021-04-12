@@ -1,13 +1,25 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
+{- |
+ Module     : ISA.Types.Tree
+ Copyright  : (c) Georgy Lukyanov 2021
+ License    : MIT (see the file LICENSE)
+ Maintainer : mail@gmail.com
+ Stability  : experimental
+
+ Binary tree with keys in nodes, tailored to represent symbolic execution trees
+-}
 module ISA.Types.Tree (
+    -- * Tree datatype
     Tree (..),
     insert1,
     insert2,
     keys,
     leafs,
     draw,
+
+    -- * Zipper
     Cxt (..),
     Loc (..),
     locKey,
@@ -170,11 +182,6 @@ down = do
     case t of
         Trunk n child -> put $ Loc child (D n cxt)
         _ -> put $ Loc t cxt
-
-modifyTree :: (Tree key a -> Tree key a) -> Travel (Loc key a) (Tree key a)
-modifyTree f = modify editStruct >> liftM struct get
-  where
-    editStruct (Loc s c) = Loc (f s) c
 
 putTree :: Tree key a -> Travel (Loc key a) ()
 putTree t = do

@@ -1,7 +1,3 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 {- |
  Module     : ISA.Instruction
  Copyright  : (c) Georgy Lukyanov 2019
@@ -16,12 +12,11 @@ module ISA.Types.Instruction (
     mkI,
     InstructionImpl (..),
     instrEq,
-    Unconstrained,
 ) where
 
 import Control.Selective
 import Data.Int ()
-import Data.Kind (Constraint)
+import Data.Kind (Constraint, Type)
 import Data.Word ()
 import Prelude hiding (Read, abs, div, mod, readIO)
 
@@ -31,10 +26,12 @@ import ISA.Types
 ---------------- Instructions --------------------------------------------------
 --------------------------------------------------------------------------------
 
-class Unconstrained (a :: * -> *)
-instance Unconstrained a
-
-data InstructionImpl (control :: (* -> *) -> Constraint) (value :: * -> Constraint) a where
+data
+    InstructionImpl
+        (control :: (Type -> Type) -> Constraint)
+        (value :: Type -> Constraint)
+        a
+    where
     Halt :: InstructionImpl Applicative value a
     Load :: Register -> CAddress -> InstructionImpl Functor value a
     Set :: value a => Register -> Imm a -> InstructionImpl Functor value a
@@ -83,33 +80,6 @@ data Instruction a = forall c v. v a => Instruction (InstructionImpl c v a)
 
 instance Eq a => Eq (Instruction a) where
     (Instruction i) == (Instruction j) = i `instrEq` j
-
-mapInstructionImpl ::
-    forall c v a b.
-    (v a, v b) =>
-    (a -> b) ->
-    InstructionImpl c v a ->
-    InstructionImpl c v b
-mapInstructionImpl f = \case
-    Halt -> Halt
-    Load r a -> Load r a
-    Set r (Imm i) -> Set r (Imm (f i))
-    Store r a -> Store r a
-    Add r a -> Add r a
-    AddI r (Imm i) -> AddI r (Imm (f i))
-    Sub r a -> Sub r a
-    SubI r (Imm i) -> SubI r (Imm (f i))
-    Mul r a -> Mul r a
-    Div r a -> Div r a
-    Mod r a -> Mod r a
-    Abs r -> Abs r
-    Jump (Imm i) -> Jump (Imm (f i))
-    LoadMI r a -> LoadMI r a
-    CmpEq r a -> CmpEq r a
-    CmpGt r a -> CmpGt r a
-    CmpLt r a -> CmpLt r a
-    JumpCt (Imm i) -> JumpCt (Imm (f i))
-    JumpCf (Imm i) -> JumpCf (Imm (f i))
 
 instrEq :: Eq a => InstructionImpl c1 v1 a -> InstructionImpl c2 v2 a -> Bool
 instrEq i j = case (i, j) of

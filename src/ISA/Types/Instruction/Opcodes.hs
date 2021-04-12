@@ -1,12 +1,32 @@
 {-# LANGUAGE GADTs #-}
 
-module ISA.Types.Instruction.Opcodes (Opcode (..), asBools, opcode, InstructionTag (..), tag) where
+{- |
+ Module     : ISA.Types.Instruction.Opcodes
+ Copyright  : (c) Georgy Lukyanov 2019
+ License    : MIT (see the file LICENSE)
+ Maintainer : mail@gmail.com
+ Stability  : experimental
+
+ Opcodes of instructions and related types
+-}
+module ISA.Types.Instruction.Opcodes (
+    -- * Binary representation of an instruction tag
+    Opcode (..),
+    asBools,
+
+    -- * extract opcode from an instruction code
+    opcode,
+
+    -- * numeration type of all opcodes
+    InstructionTag (..),
+    tag,
+) where
 
 import Control.Monad (replicateM)
 
 import ISA.Types.Instruction
 
--- | A binary representation of an instruction tag
+-- | Binary representation of an instruction tag
 newtype Opcode = MkOpcode [Bool]
     deriving (Eq)
 

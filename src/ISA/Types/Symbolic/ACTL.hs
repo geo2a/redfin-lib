@@ -80,11 +80,6 @@ instance Aeson.ToJSON Atom where
 instance Aeson.FromJSON Atom
 
 --------------------------------------------------------------------------------
-parseAtom :: String -> Text -> Either Text Atom
-parseAtom name =
-    either (Left . Text.pack . errorBundlePretty) (Right . id)
-        . parse pAtom name
-
 pTerm :: Parser Atom
 pTerm =
     choice
