@@ -1,36 +1,47 @@
 -----------------------------------------------------------------------------
--- |
--- Module     : ISA.Example.MotorControl
--- Copyright  : (c) Georgy Lukyanov 2019
--- License    : MIT (see the file LICENSE)
--- Maintainer : mail@gmail.com
--- Stability  : experimental
---
--- Module desription
---
+
 -----------------------------------------------------------------------------
 
-module ISA.Example.MotorControl
-    (mc_loop, initCtx) where
+{- |
+ Module     : ISA.Example.MotorControl
+ Copyright  : (c) Georgy Lukyanov 2019
+ License    : MIT (see the file LICENSE)
+ Maintainer : mail@gmail.com
+ Stability  : experimental
 
-import           Prelude                     hiding (div, mod)
+ Module desription
+-}
+module ISA.Example.MotorControl (mc_loop, initCtx) where
+
+import Prelude hiding (div, mod)
+
 -- import qualified Data.Tree as Tree
-import qualified Data.Map.Strict             as Map
+import qualified Data.Map.Strict as Map
 
-import           ISA.Assembly
-import           ISA.Backend.Symbolic.Zipper
-import           ISA.Types
-import           ISA.Types.Context
-import           ISA.Types.Key
-import           ISA.Types.Prop
-import           ISA.Types.Symbolic
+import ISA.Assembly
+import ISA.Backend.Symbolic.Zipper
+import ISA.Types
+import ISA.Types.Context
+import ISA.Types.Key
+import ISA.Types.Prop
+import ISA.Types.Symbolic
 
 -- | The loop body of a stepper motor control program.
 mc_loop :: Script
 mc_loop = do
-    let { a_max = 0; v_max = 1; dist = 2; s = 3; v = 4; s_decel = 5;
-          decel_steps = 6; temp = 7; v_next = 8;
-          r0 = R0; r1 = R1; r2 = R2; r3 = R3 }
+    let a_max = 0
+        v_max = 1
+        dist = 2
+        s = 3
+        v = 4
+        s_decel = 5
+        decel_steps = 6
+        temp = 7
+        v_next = 8
+        r0 = R0
+        r1 = R1
+        r2 = R2
+        r3 = R3
     ld r0 v
     div r0 a_max
     st r0 decel_steps
@@ -53,34 +64,34 @@ mc_loop = do
 
     -- compute v_next
     ld r0 v
-    add r0 a_max                        -- v_next = v + a_max
-    cmplt r0 dist                       -- v_next < dist ?
+    add r0 a_max -- v_next = v + a_max
+    cmplt r0 dist -- v_next < dist ?
     goto_ct "keep_v_next1"
-    ld r0 dist                          -- overwrite v_next with dist
-    "keep_v_next1" @@ cmplt r0 v_max    -- v_next < v_max ?
+    ld r0 dist -- overwrite v_next with dist
+    "keep_v_next1" @@ cmplt r0 v_max -- v_next < v_max ?
     goto_ct "keep_v_next2"
-    ld r0 v_max                         -- overwrite v_next with v_max
-    "keep_v_next2" @@ st r0 v_next      -- store v_next value
+    ld r0 v_max -- overwrite v_next with v_max
+    "keep_v_next2" @@ st r0 v_next -- store v_next value
 
     -- set speed according to final distance
     add r0 s_decel
     add r0 s
-    cmpgt r0 dist                       -- s + s_decel + v_next > dist ?
+    cmpgt r0 dist -- s + s_decel + v_next > dist ?
     goto_ct "keep_speed"
-    ld r1 v_next                        -- accelerate
+    ld r1 v_next -- accelerate
     goto "set_v"
     "keep_speed" @@ ld r0 s
     add r0 s_decel
     add r0 v
-    cmpgt r0 dist                       -- s + s_decel + v > dist ?
+    cmpgt r0 dist -- s + s_decel + v > dist ?
     goto_ct "decelerate"
     ld r1 v
     goto "set_v"
     "decelerate" @@ ld r0 v
     ld r1 decel_steps
-    mul r1 a_max                       -- n * a_max
+    mul r1 a_max -- n * a_max
     st r1 temp
-    cmpgt r0 temp                      -- v > n * a_max ?
+    cmpgt r0 temp -- v > n * a_max ?
     goto_ct "set_v"
     ld r1 v
     sub r1 a_max
@@ -89,16 +100,16 @@ mc_loop = do
     -- speed check
     ld_i r0 0
     st r0 temp
-    cmpeq r1 temp                     -- v == 0?
-    goto_cf "inc_s"                   -- speed is non-zero: continue
+    cmpeq r1 temp -- v == 0?
+    goto_cf "inc_s" -- speed is non-zero: continue
 
     -- in case speed is 0, check distance covered:
     ld r0 s
     cmpeq r0 dist
     goto_cf "reaccelerate"
-    halt                              -- we have reached our destination
+    halt -- we have reached our destination
     "reaccelerate" @@ ld r0 dist
-    sub r0 s                          -- dist - s
+    sub r0 s -- dist - s
     cmplt r0 a_max
     goto_ct "set_v2"
     ld r0 a_max
@@ -111,90 +122,98 @@ mc_loop = do
     halt
 
 initCtx :: Context Sym
-initCtx = MkContext
-  { _pathCondition = true
-  , _constraints =
-    [ ("0 < a_max < 10",  (SGt a_max 0) &&& (SLt a_max 100))
-    , ("0 < v_max < 100", (SGt v_max 0) &&& (SLt v_max 100))
-    , ("0 < dist < 1000", (SGt dist 0) &&& (SLt dist 100))
-    , ("0 < s < 100",     (SGt s 0) &&& (SLt s 100))
-    , ("0 < v < v_max",   (SGt v 0) &&& (SLt v v_max))
-    ]
-  , _bindings = Map.fromList $ [ (IC, 0)
-                               , (IR, 0)
-                               , (F Condition, false)
-                               , (F Halted, false)
-                               , (F Overflow, false)
-                               , (Addr 0, SAny "a_max")
-                               , (Addr 1, SAny "v_max")
-                               , (Addr 2, SAny "dist")
-                               , (Addr 3, SAny "s")
-                               , (Addr 4, SAny "v")
-                               ] ++ mkProgram mc_loop
-  , _store = Map.empty
-  , _solution = Nothing
-  }
-  where a_max = SAny "a_max"
-        v_max = SAny "v_max"
-        dist = SAny "dist"
-        s = SAny "s"
-        v = SAny "v"
+initCtx =
+    MkContext
+        { _pathCondition = true
+        , _constraints =
+            [ ("0 < a_max < 10", (SGt a_max 0) &&& (SLt a_max 100))
+            , ("0 < v_max < 100", (SGt v_max 0) &&& (SLt v_max 100))
+            , ("0 < dist < 1000", (SGt dist 0) &&& (SLt dist 100))
+            , ("0 < s < 100", (SGt s 0) &&& (SLt s 100))
+            , ("0 < v < v_max", (SGt v 0) &&& (SLt v v_max))
+            ]
+        , _bindings =
+            Map.fromList $
+                [ (IC, 0)
+                , (IR, 0)
+                , (F Condition, false)
+                , (F Halted, false)
+                , (F Overflow, false)
+                , (Addr 0, SAny "a_max")
+                , (Addr 1, SAny "v_max")
+                , (Addr 2, SAny "dist")
+                , (Addr 3, SAny "s")
+                , (Addr 4, SAny "v")
+                ]
+                    ++ mkProgram mc_loop
+        , _store = Map.empty
+        , _solution = Nothing
+        }
+  where
+    a_max = SAny "a_max"
+    v_max = SAny "v_max"
+    dist = SAny "dist"
+    s = SAny "s"
+    v = SAny "v"
 
 showContext :: Context Sym -> String
 showContext ctx =
-  unlines [ "Path constraint: " <> show (_pathCondition ctx)
-  , showKey ctx IC
-  , showKey ctx IR
-  , showKey ctx (F Condition)
-  , showKey ctx (F Halted)
-  , showKey ctx (Reg R0)
-  , showKey ctx (Reg R1)
-  , showKey ctx (Reg R2)
-  , showKey ctx (Addr 3)
-  , showKey ctx (Addr 4)
-  ]
+    unlines
+        [ "Path constraint: " <> show (_pathCondition ctx)
+        , showKey ctx IC
+        , showKey ctx IR
+        , showKey ctx (F Condition)
+        , showKey ctx (F Halted)
+        , showKey ctx (Reg R0)
+        , showKey ctx (Reg R1)
+        , showKey ctx (Reg R2)
+        , showKey ctx (Addr 3)
+        , showKey ctx (Addr 4)
+        ]
 
 ---------------- Loop Body Analysis --------------------------------------------
--- | To check properties of programs, we take the following approach:
---   (1) Obtain a binary tree-shaped trace by /bounded/ symbolic execution
---   (2) Split the trace in linear paths (we do not share common prefixes now)
---   (3) Analyse every path separately:
---       1. Extract the interesting parts of the state from the /last/ node in
---           the path, i.e. symbolic expressions stored in
---           registers/memory/flags
---       2. Construct a symbolic expression representing the /property to check/,
---           which would involve the expression obtained in the previous step
---       3. Extract the /path constraints/ from the /last/ node in the path and
---           conjunct them.
---       4. Formulate the /preconditions/ of the program and conjunct them
---       5. To verify the property in the given path, check the following
---           formula for satisfiability:
---             preconditions /\ path constraints /\ ¬ property to check
---   (4) The property holds if, for every path, the solver returns
---       @Unsatisfiable@, i.e. there are no assignments of the variables which
---       satisfy the /negation/ of the property to check, considering the
---       preconditions and path constraints.
--- motorControlBodyExample :: Int -> IO ()
--- motorControlBodyExample steps = do
---     let a_max = SAny "a_max"
---         v_max = SAny "v_max"
---         dist  = SAny "dist"
---     -- ^ @a_max@, @v_max@ and @dist@ are the parameters of the algorithm.
---     -- To verify the loop invariant, we will need to check it for every
---     -- permitted value of @a_max@, @v_max@ and @dist@
---         s     = SAny "s"
---         v     = SAny "v"
---     -- ^ @s@ and @v@ are the internal state of the loop:
---     --   the distance travelled and the current velocity.
---     --   We universally quantify over @s@ and @v@ and thus checking the loop
---     --   invariant for every possible iterations of the loop.
---         mem = initialiseMemory [ (0, a_max)
---                                , (1, v_max)
---                                , (2, dist)
---                                , (3, s)
---                                , (4, v)
---                                ]
---         initialState = boot (assemble mc_loop) mem
+
+{- | To check properties of programs, we take the following approach:
+   (1) Obtain a binary tree-shaped trace by /bounded/ symbolic execution
+   (2) Split the trace in linear paths (we do not share common prefixes now)
+   (3) Analyse every path separately:
+       1. Extract the interesting parts of the state from the /last/ node in
+           the path, i.e. symbolic expressions stored in
+           registers/memory/flags
+       2. Construct a symbolic expression representing the /property to check/,
+           which would involve the expression obtained in the previous step
+       3. Extract the /path constraints/ from the /last/ node in the path and
+           conjunct them.
+       4. Formulate the /preconditions/ of the program and conjunct them
+       5. To verify the property in the given path, check the following
+           formula for satisfiability:
+             preconditions /\ path constraints /\ ¬ property to check
+   (4) The property holds if, for every path, the solver returns
+       @Unsatisfiable@, i.e. there are no assignments of the variables which
+       satisfy the /negation/ of the property to check, considering the
+       preconditions and path constraints.
+ motorControlBodyExample :: Int -> IO ()
+ motorControlBodyExample steps = do
+     let a_max = SAny "a_max"
+         v_max = SAny "v_max"
+         dist  = SAny "dist"
+     -- ^ @a_max@, @v_max@ and @dist@ are the parameters of the algorithm.
+     -- To verify the loop invariant, we will need to check it for every
+     -- permitted value of @a_max@, @v_max@ and @dist@
+         s     = SAny "s"
+         v     = SAny "v"
+     -- ^ @s@ and @v@ are the internal state of the loop:
+     --   the distance travelled and the current velocity.
+     --   We universally quantify over @s@ and @v@ and thus checking the loop
+     --   invariant for every possible iterations of the loop.
+         mem = initialiseMemory [ (0, a_max)
+                                , (1, v_max)
+                                , (2, dist)
+                                , (3, s)
+                                , (4, v)
+                                ]
+         initialState = boot (assemble mc_loop) mem
+-}
 
 --     -- Now we perform symbolic simulation with @runModel@ and obtain
 --     -- a binary tree-shaped trace.
