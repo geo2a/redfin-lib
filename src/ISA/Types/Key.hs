@@ -99,4 +99,5 @@ pFlag =
     (Halted <$ symbol "Halted")
         <|> (Overflow <$ symbol "Overflow")
         <|> (Condition <$ symbol "Condition")
+        <|> (DivisionByZero <$ symbol "DivisionByZero")
         <?> "flag"

@@ -95,6 +95,7 @@ data Flag
     = Halted
     | Condition
     | Overflow
+    | DivisionByZero
     deriving (Show, Read, Eq, Ord, Generic)
 
 instance ToJSON Flag where
