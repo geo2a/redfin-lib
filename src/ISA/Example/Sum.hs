@@ -31,6 +31,7 @@ import ISA.Types.Key
 import ISA.Types.Symbolic
 import ISA.Types.Symbolic.ACTL
 import ISA.Types.Symbolic.ACTL.Model
+import ISA.Types.Symbolic.Address
 
 sumArrayLowLevel :: Script
 sumArrayLowLevel = do
@@ -59,85 +60,58 @@ sumArrayLowLevel = do
     "end" @@ ld r0 sum
     halt
 
+array :: CAddress -> Int -> (Sym -> Sym) -> ([(Key, Sym)], [(Text.Text, Sym)])
+array start size varConstraint =
+    let addrs = [start .. start + fromIntegral size]
+        vars = map SAny . map ("x" <>) . map (Text.pack . show) $ addrs
+        constraints = map varConstraint vars
+     in ( zip (map (Addr . literal) addrs) vars
+        , zip (map (Text.pack . show) constraints) constraints
+        )
+
 initCtx :: Context Sym
 initCtx =
-    MkContext
-        { _pathCondition = true
-        , _store = Map.empty
-        , _constraints =
-            [ ("0 < x1 < 100", (SGt (SAny "x1") 0) &&& (SLt (SAny "x1") 100))
-            , ("0 < x2 < 100", (SGt (SAny "x2") 0) &&& (SLt (SAny "x2") 100))
-            , ("0 < x3 < 100", (SGt (SAny "x3") 0) &&& (SLt (SAny "x3") 100))
-            , ("n", (SGt (SAny "n") (0 -1)) &&& (SLt (SAny "n") 4))
-            -- , ("n", (SLt (SAny "n") 4))
-            -- , ("n", (SLt (SAny "n") 4))
-            ]
-        , _bindings =
-            Map.fromList $
-                [ (IC, 0)
-                , --                               , (IR, )
-                  (Reg R0, 0)
-                , (Reg R1, 0)
-                , (Reg R2, 0)
-                , (Addr 0, SAny "n")
-                , -- , (Addr 0, 3)
-                  (Addr 253, 0)
-                , (Addr 255, 1)
-                , (Addr 1, SAny "x1")
-                , (Addr 2, SAny "x2")
-                , (Addr 3, SAny "x3")
-                , (F Halted, false)
-                , (F Condition, false)
-                , (F Overflow, false)
-                ]
-                    ++ mkProgram sumArrayLowLevel
-        , _solution = Nothing
-        }
+    let (vars, constrs) = array 1 n (\x -> (SGt x 0) &&& (SLt x 10000))
+        n = 10
+     in MkContext
+            { _pathCondition = true
+            , _store = Map.empty
+            , _constraints =
+                constrs
+                    ++ [ ("n", (SGt (SAny "n") (0 -1)) &&& (SLt (SAny "n") (SConst (CInt32 $ fromIntegral n))))
+                    -- , ("n", (SLt (SAny "n") 4))
+                    -- , ("n", (SLt (SAny "n") 4))
+                       ]
+            , _bindings =
+                Map.fromList $
+                    [ (IC, 0)
+                    , (Reg R0, 0)
+                    , (Reg R1, 0)
+                    , (Reg R2, 0)
+                    , (Addr 0, SAny "n")
+                    , (Addr 253, 0)
+                    , (Addr 255, 1)
+                    ]
+                        ++ vars
+                        ++ [ (F Halted, false)
+                           , (F Condition, false)
+                           , (F Overflow, false)
+                           ]
+                        ++ mkProgram sumArrayLowLevel
+            , _solution = Nothing
+            }
 
--- correct = InLeafs $ not $
---           key (Reg R0) === (var "x1" + var "x2" + var "x3")
---       &&& key (Reg R1) === 0
---       &&& key (F Halted)
+----- Properties
+all_finally_halted = either undefined id (parseTheorem "" "F ([Halted])")
 
--- noOverflow =
---   either (error . Text.unpack) id $ parseTheorem "" "l ({R0}==0)"
+all_globally_no_overflow = either undefined id (parseTheorem "" "G (![Overflow])")
 
-ex1 = either (error . Text.unpack) id $ parseTheorem "" "G (![Overflow])"
-
--- ex2 =   either (error . Text.unpack) id $ parseTheorem "" "w (3==$a1)"
-
--- ex3 =
---     either (error . Text.unpack) id $
---         parseTheorem
---             ""
---             "F (!([R1].=={0}) ||| ([R2] .== {&$a1 + &$a2 + &$a3}))"
-
---  key (Reg R0) `gt` (-1)
---  key (Reg R0) `gt` 0 ||| key (Reg R0) === 0
-
+----- Demo
 demo :: IO ()
 demo = do
-    trace <- runModel 20 initCtx
-    -- mapM_ putStrLn (draw (_layout trace))
-    -- mapM_ (\s -> putStrLn . show $ (getBinding (F Overflow) s)) (_states trace)
-
-    -- let trivial = InLeafs $ const true
-    --  r <- sat correct trace (ConstrainedBy (map snd $ _constraints initCtx))
-    -- r <- sat (evalACTL trace (negateACTL $ ex3))
-    r <- prove trace ex1
-
-    print r
-    -- -- case r of
-    -- --   Conjunct [Literal (n, Satisfiable s)] -> print ( modelAssocs s)
-    -- print (getBinding (F Halted) $ fromJust $ IntMap.lookup 23 (_states trace))
-    -- print (getBinding (F Halted) $ fromJust $ IntMap.lookup 29 (_states trace))
-    -- print (getBinding (Reg R0) $ fromJust $ IntMap.lookup 29 (_states trace))
-    -- print (getBinding (Reg R1) $ fromJust $ IntMap.lookup 29 (_states trace))
-
-    -- let ctx  = fromJust $ IntMap.lookup 29 (_states trace)
-    -- let o = fromJust (getBinding (F Overflow) $
-    --                   substPointer "n" 3 $
-    --                   ctx)
-    -- print (simplify (Just 100) <$> (unstar ctx o))
-
+    trace <- runModel 100 initCtx
+    r1 <- prove trace all_finally_halted
+    print r1
+    r2 <- prove trace all_globally_no_overflow
+    print r2
     pure ()
