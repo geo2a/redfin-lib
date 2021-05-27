@@ -23,7 +23,7 @@ import ISA.Types.Context
 import ISA.Types.SBV
 import ISA.Types.Symbolic
 import ISA.Types.Symbolic.ACTL
-import ISA.Types.Symbolic.Address
+nimport ISA.Types.Symbolic.Address
 import ISA.Types.Symbolic.SMT.Problem
 import ISA.Types.Symbolic.SMT.Solving
 import ISA.Types.Symbolic.SMT.Translation
@@ -92,12 +92,17 @@ evalAtom atom ctx = go true atom
   It is either proved or provides a counter example path
 -}
 data Proof
-    = Proved ACTL
-    | Falsifiable ACTL [(Int, SMTResult)]
+    = Proved ACTL Solution
+    | Falsifiable ACTL [(Int, (Sym, SMTResult))] Solution
+
+solution :: Proof -> Solution
+solution = \case 
+  Proved _ x -> x
+  Falsifiable _ _ x -> x
 
 instance Show Proof where
-    show (Proved _) = "Q.E.D."
-    show (Falsifiable _ contra) =
+    show (Proved _ _) = "Q.E.D."
+    show (Falsifiable _ contra _) =
         "Falsifiable! Counterexample states: " <> show (map fst contra)
 
 deriving instance GHC.Generic Proof
@@ -107,7 +112,7 @@ instance Aeson.FromJSON Proof
 
 prove :: Trace -> ACTL -> IO Proof
 prove trace prop = do
-    sat (evalACTL trace $ negateACTL prop) >>= \xs ->
-        case filter (isSat . snd) $ IntMap.toList xs of
-            [] -> pure $ Proved prop
-            contra -> pure $ Falsifiable prop contra
+    sat (evalACTL trace $ negateACTL prop) >>= \solution ->
+        case filter (isSat . snd . snd) $ IntMap.toList (_queries solution) of
+            [] -> pure $ Proved prop solution
+            contra -> pure $ Falsifiable prop contra solution

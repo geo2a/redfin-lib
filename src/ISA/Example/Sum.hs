@@ -112,6 +112,7 @@ demo = do
     trace <- runModel 100 initCtx
     r1 <- prove trace all_finally_halted
     print r1
+    -- print (solution r1)
     r2 <- prove trace all_globally_no_overflow
     print r2
     pure ()

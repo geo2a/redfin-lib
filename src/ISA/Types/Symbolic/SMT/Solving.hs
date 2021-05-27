@@ -19,7 +19,7 @@ import qualified Data.SBV.Internals as SBV
 import qualified Data.SBV.Trans as SBV
 import qualified Data.SBV.Trans.Control as SBV
 import Data.Text (Text)
-import Data.Time.Clock (NominalDiffTime)
+import Data.Time.Clock 
 
 import ISA.Types.SBV
 import ISA.Types.Symbolic
@@ -27,13 +27,14 @@ import ISA.Types.Symbolic.Address
 import ISA.Types.Symbolic.SMT.Problem hiding (_vars)
 import ISA.Types.Symbolic.SMT.Translation
 
-data SymExecStats = MkSymExecStats {_timing :: NominalDiffTime}
-    deriving (Show)
+-- data SymExecStats = MkSymExecStats {_timing :: NominalDiffTime}
+--     deriving (Show)
+
 
 -- | Environment shared by concurrent solver tasks
 data Env = MkEnv
     { _vars :: TVar (Map Text SBV.SInt32)
-    , _results :: IntMap (TMVar SMTResult)
+    , _results :: IntMap (TMVar (Sym, SMTResult))
     }
 
 {- | Prepare the shared solving environment
@@ -60,19 +61,17 @@ atomicQuery env (MkAtomic (n, (mem, expr))) = do
             SBV.constrain c
             SBV.checkSat >>= \case
                 SBV.Unk ->
-                    liftIO . atomically $ do
-                        putTMVar resultBox $ Unsatisfiable
-                _ ->
-                    SBV.getSMTResult >>= \case
+                  error "solver said unknown"
+                _ -> do
+                  SBV.getSMTResult >>= \case
                         (SBV.Satisfiable _ _) -> do
                             values <- traverse SBV.getValue vars
                             liftIO . atomically $ do
-                                putTMVar resultBox $ Satisfiable . MkSMTModel $ values
+                                putTMVar resultBox $ (expr, Satisfiable (MkSMTModel values))
                         (SBV.Unsatisfiable _ _) -> do
                             liftIO . atomically $ do
-                                putTMVar resultBox $ Unsatisfiable
-                        _ -> liftIO . atomically $ do
-                            putTMVar resultBox $ Unsatisfiable
+                                putTMVar resultBox $ (expr, Unsatisfiable)
+                        _ -> error "unsupported solver response"
 
 {- | From a solving schedule, produce a list of queries for the solver and a
    schedule of results.
@@ -85,15 +84,17 @@ produce env = go []
         Conjunct xs -> concatMap (go acc) xs
 
 -- | Take all 'TMVar's in the schedule --- awaiting the results
-consume :: Env -> STM (IntMap SMTResult)
+consume :: Env -> STM (IntMap (Sym, SMTResult))
 consume env = traverse takeTMVar (_results env)
 
 {- | Check satisfiability of a 'Problem'
    Return an empty list if all nodes are unsats and the satisfiable nodes otherwise
 -}
-sat :: Problem Sym ([(Address, Sym)], Sym) -> IO (IntMap SMTResult)
+sat :: Problem Sym ([(Address, Sym)], Sym) -> IO Solution
 sat (MkProblem symVars task) = do
-    let stateIds = map fst . flatten $ task
+    let tasks = flatten $ task
+        stateIds = map fst tasks
+        exprs = map (snd . snd) tasks
     vars <- liftIO $ newTVarIO mempty
     resultBoxes <-
         liftIO $
@@ -103,6 +104,19 @@ sat (MkProblem symVars task) = do
                 stateIds
     let env = MkEnv vars resultBoxes
     let qs = produce env task
-    _ <- SBV.satConcurrentWithAll SBV.z3 qs (prepare symVars env)
+    startTime <- getCurrentTime
+    sbvOutput <- SBV.satConcurrentWithAll solver qs (prepare symVars env)
     solutions <- atomically (consume env)
-    pure solutions
+    finishTime <- getCurrentTime
+    let stats = mkStats (map (\(_, x, _) -> x) sbvOutput)
+    print (stats {_totalTime = diffUTCTime finishTime startTime})
+    pure (MkSolution solutions stats)
+
+solver :: SBV.SMTConfig
+solver =
+    SBV.z3
+        { SBV.verbose = False
+        -- , SBV.redirectVerbose = Just "logs.smt2"
+        , SBV.printBase = 10
+        }
+
