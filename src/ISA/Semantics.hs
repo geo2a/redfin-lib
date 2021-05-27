@@ -14,7 +14,6 @@
 module ISA.Semantics (
     instructionSemanticsS,
     instructionSemanticsM,
-    willOverflowPure,
 ) where
 
 import Prelude hiding (Monad, abs, div, mod, (>>=))
@@ -22,10 +21,11 @@ import qualified Prelude (abs, div, mod)
 
 import Control.Selective
 import FS
+import ISA.Semantics.Overflow
 import ISA.Types
+import ISA.Types.Boolean
 import ISA.Types.Instruction
 import ISA.Types.Key
-import ISA.Types.Prop
 import ISA.Types.Symbolic.Address
 
 -----------------------------------------------------------------------------
@@ -61,98 +61,72 @@ store :: Register -> Address -> FS Key Functor '[] a
 store reg addr read write =
     write (Addr addr) (read (Reg reg))
 
--- | A pure check for integer overflow during addition.
-willOverflowPure :: (Num a, Bounded a, Boolean a, TryOrd a) => a -> a -> a
-willOverflowPure x y =
-    let o1 = gt y 0
-        o2 = gt x ((-) maxBound y)
-        o3 = lt y 0
-        o4 = lt x ((-) minBound y)
-     in (|||)
-            ((&&&) o1 o2)
-            ((&&&) o3 o4)
+arithm ::
+    (Num a, Bounded a, Boolean a, BOrd a) =>
+    (a -> a -> a) ->
+    (a -> a -> a) ->
+    Register ->
+    Either Address (Imm a) ->
+    FS Key Applicative '[Monoid, Num, Bounded, Boolean, BOrd] a
+arithm op overflows src1 src2 read write =
+    let arg1 = read (Reg src1)
+        arg2 = either (read . Addr) (\(Imm x) -> pure x) src2
+        o = overflows <$> arg1 <*> arg2
+        result = op <$> arg1 <*> arg2
+     in write (F Overflow) o *> write (Reg src1) result
 
-add :: Register -> Address -> FS Key Selective '[Monoid, Num, Bounded, Boolean, TryOrd] a
-add reg addr read write =
-    let arg1 = read (Reg reg)
-        arg2 = read (Addr addr)
-        o = willOverflowPure <$> arg1 <*> arg2
-        result = (+) <$> arg1 <*> arg2
-     in -- when @result@ is zero we set @Zero@ flag to @true@
+add :: Register -> Address -> FS Key Applicative '[Monoid, Num, Bounded, Boolean, BOrd] a
+add reg addr = arithm (+) addOverflows reg (Left addr)
 
-        write (F Overflow) o
-            *>
-            -- select o (const (pure mempty)) (pure id) *>
-            write (Reg reg) result
+addI :: Register -> Imm a -> FS Key Applicative '[Monoid, Num, Bounded, Boolean, BOrd] a
+addI reg imm = arithm (+) addOverflows reg (Right imm)
 
-addI :: Register -> Imm a -> FS Key Selective '[Num] a
-addI reg (Imm imm) read write =
-    let arg1 = read (Reg reg)
-        arg2 = pure imm
-        result = (+) <$> arg1 <*> arg2
-     in write (Reg reg) result
+sub :: Register -> Address -> FS Key Applicative '[Monoid, Num, Bounded, Boolean, BOrd] a
+sub reg addr = arithm (-) subOverflows reg (Left addr)
 
-sub :: Register -> Address -> FS Key Selective '[Num] a
-sub reg addr read write =
-    let arg1 = read (Reg reg)
-        arg2 = read (Addr addr)
-        result = (-) <$> arg1 <*> arg2
-     in write (Reg reg) result
+subI :: Register -> Imm a -> FS Key Applicative '[Monoid, Num, Bounded, Boolean, BOrd] a
+subI reg imm = arithm (-) subOverflows reg (Right imm)
 
-subI :: Register -> Imm a -> FS Key Selective '[Num] a
-subI reg (Imm imm) read write =
-    let arg1 = read (Reg reg)
-        arg2 = pure imm
-        result = (-) <$> arg1 <*> arg2
-     in write (Reg reg) result
+mul :: Register -> Address -> FS Key Applicative '[Monoid, Integral, Bounded, Boolean, BOrd] a
+mul reg addr = arithm (*) mulOverflows reg (Left addr)
 
-mul :: Register -> Address -> FS Key Selective '[Num] a
-mul reg addr read write =
-    let arg1 = read (Reg reg)
-        arg2 = read (Addr addr)
-        result = (*) <$> arg1 <*> arg2
-     in write (Reg reg) result
-
-div :: Register -> Address -> FS Key Selective '[Integral] a
+div :: Register -> Address -> FS Key Applicative '[Monoid, Integral, Bounded, Boolean, BOrd] a
 div reg addr read write =
     let arg1 = read (Reg reg)
         arg2 = read (Addr addr)
+        o = divOverflows <$> arg1 <*> arg2
+        z = (===) <$> arg2 <*> pure 0
         result = (Prelude.div) <$> arg1 <*> arg2
-     in write (Reg reg) result
+     in write (F Overflow) o *> write (F DivisionByZero) z *> write (Reg reg) result
 
-mod :: Register -> Address -> FS Key Selective '[Integral] a
+mod :: Register -> Address -> FS Key Applicative '[Monoid, Integral, Bounded, Boolean, BOrd] a
 mod reg addr read write =
     let arg1 = read (Reg reg)
         arg2 = read (Addr addr)
+        o = modOverflows <$> arg1 <*> arg2
+        z = (===) <$> arg2 <*> pure 0
         result = (Prelude.mod) <$> arg1 <*> arg2
-     in write (Reg reg) result
+     in write (F Overflow) o *> write (F DivisionByZero) z *> write (Reg reg) result
 
-abs :: Register -> FS Key Functor '[Num] a
+abs :: Register -> FS Key Applicative '[Monoid, Num, Bounded, Boolean, BOrd] a
 abs reg read write =
     let arg = read (Reg reg)
+        o = absOverflows <$> arg
         result = (Prelude.abs) <$> arg
-     in write (Reg reg) result
+     in write (F Overflow) o *> write (Reg reg) result
 
 -- | Compare the values in the register and memory cell
-cmpEq :: Register -> Address -> FS Key Selective '[Boolean, TryEq, Monoid] a
+cmpEq :: Register -> Address -> FS Key Selective '[Boolean, BEq, Monoid] a
 cmpEq reg addr = \read write ->
     write (F Condition) ((===) <$> read (Reg reg) <*> read (Addr addr))
 
-cmpGt :: Register -> Address -> FS Key Selective '[Boolean, TryOrd, Monoid] a
+cmpGt :: Register -> Address -> FS Key Selective '[Boolean, BOrd, Monoid] a
 cmpGt reg addr = \read write ->
     write (F Condition) (gt <$> read (Reg reg) <*> read (Addr addr))
 
--- ifS ((>) <$> read (Reg reg) <*> read (Addr addr))
---      (write (F Condition) (pure true))
---      (write (F Condition) (pure false))
-
-cmpLt :: Register -> Address -> FS Key Selective '[Boolean, TryOrd] a
+cmpLt :: Register -> Address -> FS Key Selective '[Boolean, BOrd] a
 cmpLt reg addr = \read write ->
     write (F Condition) (lt <$> read (Reg reg) <*> read (Addr addr))
-
--- ifS ((<) <$> read (Reg reg) <*> read (Addr addr))
---     (write (F Condition) (pure true))
---     (write (F Condition) (pure false))
 
 -- | Perform jump if flag @Condition@ is set
 jumpCt :: Imm a -> FS Key Selective '[Boolean, Num] a
@@ -162,12 +136,6 @@ jumpCt (Imm offset) read write =
         (write IC ((+) <$> pure offset <*> read IC))
         (pure 0)
 
--- (jump (Imm 0) read write)
--- (jump (Imm offset) read write)
--- select (e <$> read (F Condition))
---        (const <$> jump (Imm offset) read write)
--- (const <$> (write  IC ((+) <$> pure offset <*> read IC)))
-
 -- | Perform jump if flag @Condition@ is set
 jumpCf :: Imm a -> FS Key Selective '[Boolean, Num] a
 jumpCf (Imm offset) read write =
@@ -175,12 +143,6 @@ jumpCf (Imm offset) read write =
         (toBool <$> read (F Condition))
         (pure 0)
         (write IC ((+) <$> pure offset <*> read IC))
-
--- (jump (Imm offset) read write)
--- (jump (Imm 0) read write)
--- select (e . ISA.Types.not <$> read (F Condition))
---        (const <$> jump (Imm offset) read write)
--- (const <$> (write IC ((+) <$> pure offset <*> read IC)))
 
 -- | Perform unconditional jump
 jump :: Imm a -> FS Key Applicative '[Num] a
@@ -196,7 +158,7 @@ jump (Imm offset) read write =
 
 instructionSemanticsS ::
     Instruction a ->
-    FS Key Selective '[Monoid, Integral, Bounded, Boolean, TryOrd] a
+    FS Key Selective '[Monoid, Integral, Bounded, Boolean, BOrd] a
 instructionSemanticsS (Instruction i) r w = case i of
     Halt -> halt r w
     Load reg addr -> load reg (literal addr) r w
@@ -222,7 +184,7 @@ instructionSemanticsS (Instruction i) r w = case i of
 
 instructionSemanticsM ::
     Instruction a ->
-    FS Key Monad '[Show, Addressable, Monoid, Integral, Bounded, Boolean, TryEq, TryOrd] a
+    FS Key Monad '[Show, Addressable, Monoid, Integral, Bounded, Boolean, BEq, BOrd] a
 instructionSemanticsM (Instruction i) r w = case i of
     LoadMI reg addr -> loadMI reg (literal addr) r w
     _ -> instructionSemanticsS (Instruction i) r w

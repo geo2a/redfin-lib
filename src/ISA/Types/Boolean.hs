@@ -1,19 +1,21 @@
+{-# LANGUAGE QuantifiedConstraints #-}
+
 {- |
- Module     : ISA.Types.Prop
+ Module     : ISA.Types.Boolean
  Copyright  : (c) Georgy Lukyanov 2021
  License    : MIT (see the file LICENSE)
  Maintainer : mail@gmail.com
  Stability  : experimental
 
- Boolean typeclass
+ Boolean, equality and order type classes
 -}
-module ISA.Types.Prop (
+module ISA.Types.Boolean (
     -- ** Booleans
     Boolean (..),
 
     -- ** equality and order checks that may fail
-    TryEq (..),
-    TryOrd (..),
+    BEq (..),
+    BOrd (..),
 ) where
 
 import Prelude hiding (not)
@@ -42,11 +44,11 @@ instance Boolean Bool where
     x ||| y = x || y
     x &&& y = x && y
 
-class TryEq a where
+class BEq a where
     infix 4 ===
     (===) :: a -> a -> a
 
-class TryEq a => TryOrd a where
+class BEq a => BOrd a where
     infix 4 `lt`
     lt :: a -> a -> a
     infix 4 `gt`

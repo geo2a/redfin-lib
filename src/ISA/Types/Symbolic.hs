@@ -1,7 +1,9 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {- |
  Module     : ISA.Types.Symbolic
@@ -54,7 +56,7 @@ import GHC.Stack
 import Prelude hiding (not)
 
 import ISA.Types
-import ISA.Types.Prop
+import ISA.Types.Boolean
 
 -----------------------------------------------------------------------------
 
@@ -154,6 +156,7 @@ data Sym where
     -- | a tentative variant of points-to with arbitrary lvalue
     -- which actually will be either a concrete address or a variable
     SPointer :: Sym -> Sym
+    SIte :: Sym -> Sym -> Sym -> Sym
     SAdd :: Sym -> Sym -> Sym
     SSub :: Sym -> Sym -> Sym
     SMul :: Sym -> Sym -> Sym
@@ -187,6 +190,7 @@ instance Show Sym where
     show (SOr x y) = "(" <> show x <> " || " <> show y <> ")"
     show (SAny n) = "$" <> Text.unpack n
     show (SPointer x) = "(&" <> show x <> ")"
+    show (SIte i t e) = "ite(" <> show i <> ", " <> show t <> ", " <> show e <> ")"
     show (SEq x y) = "(" <> show x <> " == " <> show y <> ")"
     show (SGt x y) = "(" <> show x <> " > " <> show y <> ")"
     show (SLt x y) = "(" <> show x <> " < " <> show y <> ")"
@@ -247,10 +251,10 @@ instance Boolean Sym where
     x ||| y = SOr x y
     x &&& y = SAnd x y
 
-instance TryEq Sym where
+instance BEq Sym where
     x === y = (SEq x y)
 
-instance TryOrd Sym where
+instance BOrd Sym where
     lt x y = (SLt x y)
     gt x y = (SGt x y)
 
@@ -268,6 +272,7 @@ subst expr name = \case
     n@(SAny var) -> if var == name then expr else n
     n@(SConst _) -> n
     (SPointer p) -> SPointer (subst expr name p)
+    (SIte i t e) -> SIte (subst expr name i) (subst expr name t) (subst expr name e)
     (SAdd p q) -> SAdd (subst expr name p) (subst expr name q)
     (SSub p q) -> SSub (subst expr name p) (subst expr name q)
     (SMul p q) -> SMul (subst expr name p) (subst expr name q)
@@ -289,6 +294,7 @@ getValue = \case
     (SAny _) -> Nothing
     (SConst x) -> Just x
     (SPointer _) -> Nothing
+    (SIte _ _ _) -> Nothing
     (SAdd p q) -> (+) <$> getValue p <*> getValue q
     (SSub p q) -> (-) <$> getValue p <*> getValue q
     (SMul p q) -> (*) <$> getValue p <*> getValue q

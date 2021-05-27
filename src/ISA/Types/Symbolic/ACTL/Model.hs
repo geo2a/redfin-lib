@@ -18,8 +18,8 @@ import qualified GHC.Generics as GHC
 import Prelude hiding (not)
 
 import ISA.Backend.Symbolic.Zipper
+import ISA.Types.Boolean
 import ISA.Types.Context
-import ISA.Types.Prop
 import ISA.Types.SBV
 import ISA.Types.Symbolic
 import ISA.Types.Symbolic.ACTL

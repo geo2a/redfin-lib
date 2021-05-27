@@ -21,11 +21,13 @@ import qualified Data.Text as Text
 import Prelude hiding (not)
 
 import ISA.Assembly
+import ISA.Backend.Graph
+import ISA.Backend.Graph.BasicBlock
 import ISA.Backend.Symbolic.Zipper.Run
 import ISA.Types
+import ISA.Types.Boolean
 import ISA.Types.Context
 import ISA.Types.Key
-import ISA.Types.Prop
 import ISA.Types.Symbolic
 import ISA.Types.Symbolic.ACTL
 import ISA.Types.Symbolic.ACTL.Model

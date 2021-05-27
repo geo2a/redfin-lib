@@ -56,7 +56,7 @@ import Generic.Random
 import Test.QuickCheck (Arbitrary, arbitrary)
 import Prelude hiding (not)
 
-import ISA.Types.Prop
+import ISA.Types.Boolean
 
 -- | Data registers
 data Register = R0 | R1 | R2 | R3
@@ -159,23 +159,23 @@ instance Boolean Int32 where
     x ||| y = if toBool x ||| toBool y then 1 else 0
     x &&& y = if toBool x &&& toBool y then 1 else 0
 
--- instance TryEq a => TryEq (Data a) where
+-- instance BEq a => BEq (Data a) where
 --   (MkData x) === (MkData y) = MkData (x === y)
 
--- instance TryOrd a => TryOrd (Data a) where
+-- instance BOrd a => BOrd (Data a) where
 --   (MkData x) `lt` (MkData y) = MkData (x `lt` y)
 --   (MkData x) `gt` (MkData y) = MkData (x `gt` y)
 
-instance TryEq Int8 where
+instance BEq Int8 where
     x === y = fromBool $ x == y
 
-instance TryEq Int32 where
+instance BEq Int32 where
     x === y = fromBool $ x == y
-instance TryOrd Int8 where
+instance BOrd Int8 where
     lt x y = fromBool $ x < y
     gt x y = fromBool $ x > y
 
-instance TryOrd Int32 where
+instance BOrd Int32 where
     lt x y = fromBool $ x < y
     gt x y = fromBool $ x > y
 
@@ -195,11 +195,11 @@ instance Monoid Int32 where
    into booleans
 -}
 class
-    (Show a, TryEq a, TryOrd a, Monoid a, Num a, Integral a, Bounded a, Boolean a) =>
+    (Show a, BEq a, BOrd a, Monoid a, Num a, Integral a, Bounded a, Boolean a) =>
     Value a
 
 instance
-    (Show a, TryEq a, TryOrd a, Monoid a, Num a, Integral a, Bounded a, Boolean a) =>
+    (Show a, BEq a, BOrd a, Monoid a, Num a, Integral a, Bounded a, Boolean a) =>
     Value a
 
 class Value a => ToValue a where

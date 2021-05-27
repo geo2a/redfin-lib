@@ -35,8 +35,8 @@ import Data.Maybe
 import Data.Text (Text)
 import GHC.Generics
 
+import ISA.Types.Boolean
 import ISA.Types.Key
-import ISA.Types.Prop
 import ISA.Types.SBV
 import ISA.Types.Symbolic
 import ISA.Types.Symbolic.Address
@@ -101,7 +101,7 @@ unstar ctx = \case
                  in z
     n@(SAny _) -> Just n
     n@(SConst _) -> Just n
-    -- n@(SKey _) -> Just n
+    (SIte i t e) -> SIte <$> (unstar ctx i) <*> (unstar ctx t) <*> (unstar ctx e)
     (SAdd p q) -> SAdd <$> (unstar ctx p) <*> (unstar ctx q)
     (SSub p q) -> SSub <$> (unstar ctx p) <*> (unstar ctx q)
     (SMul p q) -> SMul <$> (unstar ctx p) <*> (unstar ctx q)

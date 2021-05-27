@@ -28,7 +28,7 @@ library
       ISA.Types,
       ISA.Types.Parser,
       ISA.Types.Key,
-      ISA.Types.Prop,
+      ISA.Types.Boolean,
       ISA.Types.SBV,
       ISA.Types.SBV.SFunArray,
       ISA.Types.Tree,
@@ -57,6 +57,7 @@ library
       ISA.Example.MotorControl
   other-modules:
       ISA.Example.Common,
+      ISA.Semantics.Overflow,
       FS
   hs-source-dirs:
       src

@@ -8,7 +8,7 @@
  Maintainer : mail@gmail.com
  Stability  : experimental
 -}
-module ISA.Example.MotorControl (mc_loop, initCtx) where
+module ISA.Example.MotorControl (mc_loop, mc, initCtx) where
 
 import Prelude hiding (div, mod)
 
@@ -16,12 +16,14 @@ import qualified Data.Map.Strict as Map
 
 import ISA.Assembly
 import ISA.Types
+import ISA.Types.Boolean
 import ISA.Types.Context
 import ISA.Types.Key
-import ISA.Types.Prop
 import ISA.Types.Symbolic
 
--- | The loop body of a stepper motor control program.
+import ISA.Backend.Graph
+
+-- | The loop body of a stepper motor control program
 mc_loop :: Script
 mc_loop = do
     let a_max = 0
@@ -115,6 +117,11 @@ mc_loop = do
     st r0 s
 
     halt
+
+mc :: Script
+mc = do
+    "start" @@ mc_loop
+    goto "start"
 
 initCtx :: Context Sym
 initCtx =
