@@ -15,14 +15,18 @@ module ISA.Types.Symbolic.Address (
 ) where
 
 import Control.Applicative
+import Control.DeepSeq
 import Data.Aeson
 import Data.Int
+import GHC.Generics
 
 import ISA.Types
 import ISA.Types.Symbolic
 
 newtype Address = MkAddress (Either CAddress Sym)
     deriving (Eq, Ord) via (Either CAddress Sym)
+
+deriving instance Generic Address
 
 instance ToJSON Address where
     toJSON (MkAddress addr) = case addr of
@@ -32,6 +36,8 @@ instance FromJSON Address where
     parseJSON v =
         MkAddress . Left <$> (parseJSON @CAddress v)
             <|> MkAddress . Right <$> (parseJSON @Sym v)
+
+instance NFData Address
 
 -- -- We do not expect a non-Object value here.
 -- -- We could use empty to fail, but typeMismatch

@@ -108,8 +108,8 @@ sat (MkProblem symVars task) = do
     sbvOutput <- SBV.satConcurrentWithAll solver qs (prepare symVars env)
     solutions <- atomically (consume env)
     finishTime <- getCurrentTime
-    let stats = mkStats (map (\(_, x, _) -> x) sbvOutput)
-    print (stats {_totalTime = diffUTCTime finishTime startTime})
+    let totalTime = diffUTCTime finishTime startTime
+    let stats = mkStats totalTime (map (\(_, x, _) -> x) sbvOutput)
     pure (MkSolution solutions stats)
 
 solver :: SBV.SMTConfig

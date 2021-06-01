@@ -12,6 +12,7 @@ module ISA.Types.Symbolic.ACTL (
     ACTL (..),
     negateACTL,
     Atom (..),
+    aImplies,
     parseTheorem,
 ) where
 
@@ -73,6 +74,9 @@ data Atom where
     -- | Less-than
     ALt :: Atom -> Atom -> Atom
 
+aImplies :: Atom -> Atom -> Atom
+aImplies x y = (ANot x) `AOr` y
+
 deriving instance Show Atom
 deriving instance GHC.Generic Atom
 instance Aeson.ToJSON Atom where
@@ -102,6 +106,7 @@ operatorTable =
     ,
         [ binary "&&&" AAnd
         , binary "|||" AOr
+        , binary "==>" aImplies
         ]
     ]
 

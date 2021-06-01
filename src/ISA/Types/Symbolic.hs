@@ -38,6 +38,7 @@ module ISA.Types.Symbolic (
     toInstructionCode,
 ) where
 
+import Control.DeepSeq
 import Data.Aeson (
     FromJSON,
     ToJSON,
@@ -73,6 +74,7 @@ deriving instance Read Concrete
 instance ToJSON Concrete where
     toEncoding = genericToEncoding defaultOptions
 instance FromJSON Concrete
+instance NFData Concrete
 
 instance Show Concrete where
     show (CInt32 i) = show i
@@ -177,6 +179,7 @@ deriving instance Generic Sym
 instance ToJSON Sym where
     toEncoding = genericToEncoding defaultOptions
 instance FromJSON Sym
+instance NFData Sym
 
 instance Show Sym where
     show (SAdd x y) = "(" <> show x <> " + " <> show y <> ")"

@@ -44,6 +44,7 @@ gatherFree :: Sym -> Set Sym
 gatherFree = \case
     c@(SAny _) -> Set.singleton c
     (SPointer p) -> gatherFree p
+    (SIte i t e) -> gatherFree i <> gatherFree t <> gatherFree e
     (SAdd l r) -> gatherFree l <> gatherFree r
     (SSub l r) -> gatherFree l <> gatherFree r
     (SMul l r) -> gatherFree l <> gatherFree r
@@ -58,11 +59,22 @@ gatherFree = \case
     (SLt l r) -> gatherFree l <> gatherFree r
     (SConst _) -> mempty
 
+-- symIte ::
+--     SFunArray Int32 Int32 ->
+--     Map.Map Text SBV.SInt32 ->
+--     Sym ->
+--     Maybe SBV.SInt32
+-- symIte mem vars = \case
+
+--     _ -> Nothing
+
 -- | Convert a symbolic expression into an SBV 'Int32'
 symInt32 :: SFunArray Int32 Int32 -> Map.Map Text SBV.SInt32 -> Sym -> Maybe SBV.SInt32
 symInt32 mem vars = \case
     (SConst (CInt32 i)) -> Just (SBV.literal i)
     SAny x -> Map.lookup x vars
+    SIte i t e ->
+        SBV.ite <$> (symBool mem vars i) <*> symInt32 mem vars t <*> symInt32 mem vars e
     SPointer p -> do
         v <-
             symAddress vars (MkAddress (Right p))
@@ -82,6 +94,8 @@ symBool mem vars = \case
     (SConst (CBool b)) -> Just $ SBV.literal b
     (SConst _) -> Nothing
     SAny _ -> Nothing
+    SIte i t e ->
+        SBV.ite <$> (symBool mem vars i) <*> symBool mem vars t <*> symBool mem vars e
     (SEq l r) -> (SBV..==) <$> symInt32 mem vars l <*> symInt32 mem vars r
     (SGt l r) -> (SBV..>) <$> symInt32 mem vars l <*> symInt32 mem vars r
     (SLt l r) -> (SBV..<) <$> symInt32 mem vars l <*> symInt32 mem vars r

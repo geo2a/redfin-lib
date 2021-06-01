@@ -23,7 +23,7 @@ import ISA.Types.Context
 import ISA.Types.SBV
 import ISA.Types.Symbolic
 import ISA.Types.Symbolic.ACTL
-nimport ISA.Types.Symbolic.Address
+import ISA.Types.Symbolic.Address
 import ISA.Types.Symbolic.SMT.Problem
 import ISA.Types.Symbolic.SMT.Solving
 import ISA.Types.Symbolic.SMT.Translation
@@ -95,6 +95,7 @@ data Proof
     = Proved ACTL Solution
     | Falsifiable ACTL [(Int, (Sym, SMTResult))] Solution
 
+-- | Extract the solution --- expressions and their SMT results 
 solution :: Proof -> Solution
 solution = \case 
   Proved _ x -> x

@@ -37,6 +37,7 @@ module ISA.Types.Tree (
     findLoc,
 ) where
 
+import Control.DeepSeq
 import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics
 
@@ -47,7 +48,7 @@ data Tree key a
     = Leaf key a
     | Trunk key (Tree key a)
     | Branch key (Tree key a) (Tree key a)
-    deriving (Show, Functor, Generic, ToJSON, FromJSON)
+    deriving (Show, Functor, Generic, ToJSON, FromJSON, NFData)
 
 rootKey :: Tree key a -> key
 rootKey = \case
@@ -119,13 +120,13 @@ data Cxt key a
     | D key (Cxt key a)
     | L key (Cxt key a) (Tree key a)
     | R key (Tree key a) (Cxt key a)
-    deriving (Show, Generic, ToJSON, FromJSON)
+    deriving (Show, Generic, ToJSON, FromJSON, NFData)
 
 data Loc key a = Loc
     { struct :: Tree key a
     , cxt :: Cxt key a
     }
-    deriving (Show, Generic, ToJSON, FromJSON)
+    deriving (Show, Generic, ToJSON, FromJSON, NFData)
 
 locKey :: Loc key a -> key
 locKey (Loc k _) = rootKey k

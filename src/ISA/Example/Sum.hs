@@ -18,7 +18,6 @@ module ISA.Example.Sum (
     proving,
 ) where
 
-import Criterion.Main
 import Data.Int (Int32)
 import qualified Data.Map as Map
 import qualified Data.Text as Text
@@ -29,6 +28,7 @@ import ISA.Backend.Graph
 import ISA.Backend.Graph.BasicBlock
 import ISA.Backend.Symbolic.Zipper
 import ISA.Backend.Symbolic.Zipper.Run
+import ISA.Backend.Symbolic.Zipper.Save
 import ISA.Types
 import ISA.Types.Boolean
 import ISA.Types.Context
@@ -141,8 +141,10 @@ proving trace = do
 ----- Demos
 demo :: IO ()
 demo = do
-    let n = 2
-    trace <- runModel 10000 (mkInitCtx n 0 1000)
+    let n = 8
+    -- trace <- runModel 10000 (mkInitCtx n 0 1000)
+    -- saveTrace "traces/sum_8.json" trace
+    trace <- either undefined id <$> loadTrace "traces/sum_8.json"
     -- print $ evalACTL trace (negateACTL (sum_is_correct n))
     r1 <- prove trace all_finally_halted
     r2 <- prove trace all_globally_no_overflow

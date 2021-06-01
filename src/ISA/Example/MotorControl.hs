@@ -8,18 +8,29 @@
  Maintainer : mail@gmail.com
  Stability  : experimental
 -}
-module ISA.Example.MotorControl (mc_loop, mc, initCtx) where
+module ISA.Example.MotorControl where
 
 import Prelude hiding (div, mod)
 
-import qualified Data.Map.Strict as Map
+import Data.Int (Int32)
+import qualified Data.Map as Map
+import qualified Data.Text as Text
+import Prelude hiding (div, not)
 
 import ISA.Assembly
+import ISA.Backend.Graph
+import ISA.Backend.Graph.BasicBlock
+import ISA.Backend.Symbolic.Zipper
+import ISA.Backend.Symbolic.Zipper.Run
+import ISA.Backend.Symbolic.Zipper.Save
 import ISA.Types
 import ISA.Types.Boolean
 import ISA.Types.Context
 import ISA.Types.Key
 import ISA.Types.Symbolic
+import ISA.Types.Symbolic.ACTL
+import ISA.Types.Symbolic.ACTL.Model
+import ISA.Types.Symbolic.Address
 
 import ISA.Backend.Graph
 
@@ -130,8 +141,8 @@ initCtx =
         , _constraints =
             [ ("0 < a_max < 10", (SGt a_max 0) &&& (SLt a_max 100))
             , ("0 < v_max < 100", (SGt v_max 0) &&& (SLt v_max 100))
-            , ("0 < dist < 1000", (SGt dist 0) &&& (SLt dist 100))
-            , ("0 < s < 100", (SGt s 0) &&& (SLt s 100))
+            , ("0 < dist < 1000", (SGt dist 0) &&& (SLt dist 1000))
+            , ("0 < s < 1000", (SGt s 0) &&& (SLt s 1000))
             , ("0 < v < v_max", (SGt v 0) &&& (SLt v v_max))
             ]
         , _bindings =
@@ -157,3 +168,25 @@ initCtx =
     dist = SAny "dist"
     s = SAny "s"
     v = SAny "v"
+
+----- Properties
+all_finally_halted = either undefined id (parseTheorem "" "F ([Halted])")
+
+all_globally_no_overflow = either undefined id (parseTheorem "" "G (![Overflow])")
+
+proveOnTraceFromFile :: FilePath -> ACTL -> IO ()
+proveOnTraceFromFile tracePath prop = do
+    trace <- either (error . Text.unpack) id <$> loadTrace tracePath
+    prove trace prop
+    pure ()
+
+----- Demos
+demo :: IO ()
+demo = do
+    trace <- runModel 1000 initCtx
+    saveTrace "traces/mc_loop_halted.json" trace
+    -- trace <- either undefined id <$> loadTrace "traces/mc_loop_halted.json"
+    r1 <- prove trace all_finally_halted
+    r2 <- prove trace all_globally_no_overflow
+    print (r1, r2)
+    pure ()

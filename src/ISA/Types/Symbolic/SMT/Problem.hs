@@ -49,10 +49,11 @@ instance Aeson.ToJSON Stats where
     toEncoding = Aeson.genericToEncoding Aeson.defaultOptions
 instance Aeson.FromJSON Stats
 
-mkStats :: [NominalDiffTime] -> Stats
-mkStats timings = 
+-- | externalTime is the total user time, the timings list of timings for individual threads
+mkStats :: NominalDiffTime -> [NominalDiffTime] -> Stats
+mkStats externalTime timings = 
   let nQueries = length timings
-      total = sum timings
+      total = externalTime
       median = case drop (nQueries `div` 2) . sort $ timings of
         [] -> 0
         (x:_) -> x

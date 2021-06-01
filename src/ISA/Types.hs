@@ -1,5 +1,4 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -44,6 +43,7 @@ module ISA.Types (
     pad,
 ) where
 
+import Control.DeepSeq
 import Control.Monad
 import Data.Aeson hiding (Value)
 import Data.Bits
@@ -66,6 +66,8 @@ instance ToJSON Register where
     toEncoding = genericToEncoding defaultOptions
 instance FromJSON Register
 
+instance NFData Register
+
 instance Arbitrary Register where
     arbitrary = genericArbitrary uniform
 
@@ -87,6 +89,8 @@ newtype CAddress = CAddress Word8
         )
     deriving (Show, Read) via Word8
 
+instance NFData CAddress
+
 instance Arbitrary CAddress where
     arbitrary = genericArbitrary uniform
 
@@ -101,6 +105,8 @@ data Flag
 instance ToJSON Flag where
     toEncoding = genericToEncoding defaultOptions
 instance FromJSON Flag
+
+instance NFData Flag
 
 instance Arbitrary Flag where
     arbitrary = genericArbitrary uniform

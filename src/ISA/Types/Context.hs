@@ -29,6 +29,7 @@ module ISA.Types.Context (
     isReachable,
 ) where
 
+import Control.DeepSeq
 import qualified Data.Aeson as Aeson
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -59,7 +60,7 @@ data Context a = MkContext
       --   satisfiability of @_pathCondition s && conjoin (_constraints s)@
       _solution :: Maybe SMTResult
     }
-    deriving (Functor, Generic)
+    deriving (Functor, Generic, NFData)
 
 instance Aeson.FromJSON a => Aeson.FromJSON (Context a)
 instance Aeson.ToJSON a => Aeson.ToJSON (Context a)

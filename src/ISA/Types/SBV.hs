@@ -9,6 +9,7 @@
 -}
 module ISA.Types.SBV where
 
+import Control.DeepSeq
 import Data.Aeson (
     FromJSON,
     ToJSON,
@@ -33,6 +34,8 @@ instance ToJSON SMTModel where
     toEncoding = genericToEncoding defaultOptions
 instance FromJSON SMTModel
 
+instance NFData SMTModel
+
 -- | A simplified version of SBV's @SMTResult datatype
 data SMTResult
     = Unsatisfiable
@@ -42,6 +45,7 @@ data SMTResult
 instance ToJSON SMTResult where
     toEncoding = genericToEncoding defaultOptions
 instance FromJSON SMTResult
+instance NFData SMTResult
 
 isUnsat :: SMTResult -> Bool
 isUnsat = \case

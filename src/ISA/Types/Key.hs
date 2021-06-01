@@ -8,6 +8,7 @@ module ISA.Types.Key (
     keyTag,
 ) where
 
+import Control.DeepSeq
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import Data.Text (Text)
@@ -39,6 +40,7 @@ data Key where
 deriving instance Eq Key
 deriving instance Ord Key
 deriving instance Generic Key
+deriving instance NFData Key
 
 deriving instance Aeson.ToJSON Key
 deriving instance Aeson.FromJSON Key

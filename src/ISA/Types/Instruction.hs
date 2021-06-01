@@ -15,12 +15,14 @@ module ISA.Types.Instruction (
 ) where
 
 import Control.Selective
-import Data.Int ()
+import Data.Int (Int32)
 import Data.Kind (Constraint, Type)
 import Data.Word ()
 import Prelude hiding (Read, abs, div, mod, readIO)
 
 import ISA.Types
+import ISA.Types.Symbolic
+import ISA.Types.Symbolic.Address
 
 --------------------------------------------------------------------------------
 ---------------- Instructions --------------------------------------------------
@@ -109,3 +111,27 @@ mkI = Instruction
 
 instance Show a => Show (Instruction a) where
     show (Instruction i) = show i
+
+-- symboliseInstruction :: InstructionImpl c v Int32 -> InstructionImpl c v Sym
+-- symboliseInstruction icvi =
+--     case icvi of
+--         Halt -> Halt
+--         (Load r c) -> Load r c
+--         (Set r (Imm ii)) -> Set r (Imm (SConst (CInt32 ii)))
+--         (Store r c) -> Store r c
+
+-- (Add r c) -> Add _ _
+-- (AddI r ii) -> AddI _ _
+-- (Sub r c) -> Sub _ _
+-- (SubI r ii) -> SubI _ _
+-- (Mul r c) -> Mul _ _
+-- (Div r c) -> Div _ _
+-- (Mod r c) -> Mod _ _
+-- (Abs r) -> Abs _
+-- (Jump ii) -> Jump _
+-- (LoadMI r c) -> LoadMI _ _
+-- (CmpEq r c) -> CmpEq _ _
+-- (CmpGt r c) -> CmpGt _ _
+-- (CmpLt r c) -> CmpLt _ _
+-- (JumpCt ii) -> JumpCt _
+-- (JumpCf ii) -> JumpCf _

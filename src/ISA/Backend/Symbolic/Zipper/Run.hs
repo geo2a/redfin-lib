@@ -29,11 +29,11 @@ import ISA.Backend.Dependencies
 import ISA.Backend.Symbolic.Zipper
 import ISA.Semantics
 import ISA.Types
+import ISA.Types.Boolean
 import ISA.Types.Context
 import ISA.Types.Instruction
 import ISA.Types.Instruction.Decode
 import ISA.Types.Key
-import ISA.Types.Prop
 import ISA.Types.SBV
 import ISA.Types.Symbolic
 import ISA.Types.Symbolic.Address
@@ -173,6 +173,7 @@ branchOn f s = case f of
                             s{_pathCondition = not cond &&& (_pathCondition s)}
                  in Two yes no
     Overflow -> One s
+    DivisionByZero -> One s
 
 -- | Run symbolic simulation for a number of steps
 runModel :: Int -> Context Sym -> IO Trace

@@ -1,12 +1,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
+{-# LANGUAGE NamedFieldPuns #-}
 
 {- |
- Module     : ISA.Backend.Symbolic.QueryList
+ Module     : ISA.Backend.Symbolic.Zipper
  Copyright  : (c) Georgy Lucknow 2021
  License    : MIT (see the file LICENSE)
  Maintainer : mail@gmail.com
@@ -18,12 +15,14 @@ module ISA.Backend.Symbolic.Zipper where
 
 import Control.Applicative
 import Control.Concurrent.STM
+import Control.DeepSeq
 import Control.Monad.Reader
 import Control.Monad.State.Class
 import Control.Selective
 import qualified Data.Aeson as Aeson
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntSet as IntSet
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import qualified Data.SBV.Trans as SBV
@@ -63,6 +62,7 @@ intialState = IntMap.lookup 0 . _states
 
 instance Aeson.ToJSON Trace
 instance Aeson.FromJSON Trace
+instance NFData Trace
 
 -- | Empty symbolic simulation trace
 emptyTrace :: Trace
@@ -297,6 +297,25 @@ growTrace choice = do
         Zero -> s
         One _ -> s + 1
         Two _ _ -> s + 2
+
+{- | Summarise the effects of the trace on the given variable as a disjunctive formula
+ summary :: Text -> Trace -> Sym
+ summary varName (MkTrace{_layout, _states}) =
+     let ls = leafs _layout
+         lsStates = IntMap.elems $ IntMap.restrictKeys _states (IntSet.fromList ls)
+         vs =
+             map
+                 (maybe (const (SConst (CBool False))) . getBinding key)
+                 ss
+         ss =
+             map
+                 (maybe (const (SConst (CBool False))) . Map.lookup varName . _store)
+                 lsStates
+      in foldr
+             (\(addr, expr) acc -> SOr (SPointer addr `SEq` expr) acc)
+             (SConst (CBool False))
+             (zip ss vs)
+-}
 
 -- | The read callback to plug into FS semantics of instructions
 readKey :: HasCallStack => Key -> Engine Sym

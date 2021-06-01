@@ -46,6 +46,7 @@ library
       ISA.Backend.Simulation,
       ISA.Backend.Symbolic.Zipper,
       ISA.Backend.Symbolic.Zipper.Run,
+      ISA.Backend.Symbolic.Zipper.Save,
       ISA.Types.Symbolic.SMT.Problem,
       ISA.Types.Symbolic.SMT.Translation,
       ISA.Types.Symbolic.SMT.Solving,
@@ -139,4 +140,16 @@ test-suite tests
                 tasty-hunit,
                 tasty-quickcheck,
                 time >= 1.8.0.2,
-                unreasonably-polymorphic-isa
+                redfin-lib
+
+benchmark bench
+  type: exitcode-stdio-1.0
+  main-is:              Bench.hs
+  hs-source-dirs:       benchmark
+  other-modules:        Bench.Sum,
+                        Bench.MotorControlLoop
+  build-depends:        base,
+                        redfin-lib,
+                        sbv,
+                        time,
+                        criterion
